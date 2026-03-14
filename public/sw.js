@@ -1,5 +1,5 @@
-const CACHE_NAME = "notaflow-v2-20260313";
-const CACHE_PREFIX = "notaflow-";
+const CACHE_NAME = "Notario-v2-20260313";
+const CACHE_PREFIX = "Notario-";
 const STATIC_ASSETS = ["/", "/index.html", "/favicon.ico", "/manifest.json"];
 
 // Install

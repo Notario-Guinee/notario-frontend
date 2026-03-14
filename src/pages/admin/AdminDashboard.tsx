@@ -40,7 +40,7 @@ export default function AdminDashboard() {
           {fr ? "🛡️ Tableau de bord Admin Global" : "🛡️ Global Admin Dashboard"}
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {fr ? "Vue d'ensemble de la plateforme NotaFlow" : "Overview of the NotaFlow platform"}
+          {fr ? "Vue d'ensemble de la plateforme Notario" : "Overview of the Notario platform"}
         </p>
       </div>
 

@@ -26,9 +26,9 @@ const plans = [
 ];
 
 const faqs = [
-  { q: "Comment démarrer avec NotaFlow ?", a: "Demandez une démo gratuite, nous configurons votre cabinet en 24h. Vos données sont importées et votre équipe formée." },
+  { q: "Comment démarrer avec Notario ?", a: "Demandez une démo gratuite, nous configurons votre cabinet en 24h. Vos données sont importées et votre équipe formée." },
   { q: "Mes données sont-elles sécurisées ?", a: "Vos données sont chiffrées, hébergées en conformité avec les réglementations locales, avec sauvegardes quotidiennes automatiques." },
-  { q: "Puis-je utiliser NotaFlow hors ligne ?", a: "NotaFlow fonctionne en mode hors ligne avec synchronisation automatique dès le retour de la connexion." },
+  { q: "Puis-je utiliser Notario hors ligne ?", a: "Notario fonctionne en mode hors ligne avec synchronisation automatique dès le retour de la connexion." },
   { q: "Comment sont calculés les tarifs notariaux ?", a: "Notre moteur de tarifs intègre les barèmes officiels guinéens et calcule automatiquement les droits, taxes et honoraires." },
 ];
 
@@ -45,7 +45,7 @@ export default function Landing() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <Scale className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-heading text-lg font-bold text-foreground">NotaFlow</span>
+            <span className="font-heading text-lg font-bold text-foreground">Notario</span>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Fonctionnalités</a>
@@ -188,7 +188,7 @@ export default function Landing() {
       <section className="py-20 px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-heading text-3xl font-bold text-foreground">Prêt à moderniser votre étude ?</h2>
-          <p className="mt-3 text-muted-foreground">Rejoignez les cabinets qui font confiance à NotaFlow</p>
+          <p className="mt-3 text-muted-foreground">Rejoignez les cabinets qui font confiance à Notario</p>
           <Button size="lg" className="mt-8 bg-primary text-primary-foreground font-semibold text-base px-8 hover:bg-primary/90">
             Demander une démo gratuite <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
@@ -202,9 +202,9 @@ export default function Landing() {
             <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
               <Scale className="h-3 w-3 text-primary-foreground" />
             </div>
-            <span className="font-heading text-sm font-bold text-foreground">NotaFlow</span>
+            <span className="font-heading text-sm font-bold text-foreground">Notario</span>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 NotaFlow. Tous droits réservés. Conakry, Guinée.</p>
+          <p className="text-xs text-muted-foreground">© 2026 Notario. Tous droits réservés. Conakry, Guinée.</p>
         </div>
       </footer>
     </div>
