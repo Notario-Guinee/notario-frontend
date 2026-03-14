@@ -1,4 +1,4 @@
-# 📜 Notario Plus — Plateforme SaaS Notariale
+# 📜 Notario — Plateforme SaaS Notariale
 
 > Plateforme numérique dédiée à la modernisation et à la gestion des études notariales en Guinée.
 
@@ -17,7 +17,7 @@
 
 ## 📋 À propos du projet
 
-**Notario Plus** est une plateforme SaaS conçue spécifiquement pour les notaires guinéens. Elle offre des outils numériques permettant de gérer efficacement les dossiers notariaux, d'automatiser la génération de documents officiels, et de centraliser le suivi des affaires juridiques au sein d'une interface moderne et sécurisée.
+**Notario** est une plateforme SaaS conçue spécifiquement pour les notaires guinéens. Elle offre des outils numériques permettant de gérer efficacement les dossiers notariaux, d'automatiser la génération de documents officiels, et de centraliser le suivi des affaires juridiques au sein d'une interface moderne et sécurisée.
 
 ---
 
@@ -64,7 +64,7 @@ npm install
 npm run dev
 ```
 
-L'application sera accessible à l'adresse : `http://localhost:3000`
+L'application sera accessible à l'adresse : `http://localhost:8080`
 
 ---
 
