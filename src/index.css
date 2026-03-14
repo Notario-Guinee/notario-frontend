@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ── LIGHT THEME — macOS-inspired ── */
+  :root {
+    --background: 220 16% 93%;
+    --foreground: 220 20% 20%;
+
+    --card: 220 14% 97%;
+    --card-foreground: 220 20% 20%;
+
+    --popover: 220 14% 97%;
+    --popover-foreground: 220 20% 20%;
+
+    --primary: 211 55% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 46%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 14% 88%;
+    --muted-foreground: 220 10% 42%;
+
+    --accent: 211 55% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 65% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 48% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --teal: 174 50% 34%;
+    --teal-foreground: 0 0% 100%;
+
+    --warning: 38 90% 46%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 220 12% 84%;
+    --input: 220 14% 88%;
+    --ring: 211 55% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 220 10% 42%;
+    --sidebar-primary: 211 55% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border: 220 12% 84%;
+    --sidebar-ring: 211 55% 48%;
+
+    --tertiary: 220 14% 90%;
+
+    --font-heading: 'Sora', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+    --shadow-glow-gold: 0 0 16px rgba(56, 132, 195, 0.15);
+    --shadow-glow-blue: 0 0 16px rgba(42, 163, 214, 0.1);
+  }
+
+  /* ── DARK THEME — Professional slate, Notion-inspired ── */
+  .dark {
+    --background: 220 13% 15%;
+    --foreground: 210 20% 96%;
+
+    --card: 220 13% 18%;
+    --card-foreground: 210 20% 96%;
+
+    --popover: 220 13% 18%;
+    --popover-foreground: 210 20% 96%;
+
+    --primary: 211 55% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 211 45% 42%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 12% 22%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 220 13% 22%;
+    --accent-foreground: 210 15% 85%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 48% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --teal: 174 50% 38%;
+    --teal-foreground: 210 20% 96%;
+
+    --warning: 38 90% 50%;
+    --warning-foreground: 220 13% 15%;
+
+    --border: 220 12% 25%;
+    --input: 220 12% 22%;
+    --ring: 211 55% 48%;
+
+    --sidebar-background: 220 13% 14%;
+    --sidebar-foreground: 220 10% 58%;
+    --sidebar-primary: 211 55% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 20%;
+    --sidebar-accent-foreground: 210 15% 85%;
+    --sidebar-border: 220 12% 23%;
+    --sidebar-ring: 211 55% 48%;
+
+    --tertiary: 220 12% 25%;
+
+    --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.25);
+    --shadow-glow-gold: 0 0 16px rgba(56, 132, 195, 0.12);
+    --shadow-glow-blue: 0 0 16px rgba(42, 163, 214, 0.1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  .glass {
+    backdrop-filter: blur(16px);
+  }
+
+  :root .glass {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .dark .glass {
+    background: rgba(21, 30, 45, 0.8);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .glass-strong {
+    background: rgba(21, 30, 45, 0.95);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(211 55% 48%), hsl(211 65% 58%));
+  }
+
+  .gradient-blue {
+    background: linear-gradient(135deg, hsl(200 67% 50%), hsl(210 80% 60%));
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(211 55% 48%), hsl(211 65% 58%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-blue {
+    background: linear-gradient(135deg, hsl(200 67% 50%), hsl(210 80% 60%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "NotaFlow",
+  "short_name": "NotaFlow",
+  "description": "Plateforme SaaS pour cabinets de notaires en Guinée",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#1e2433",
+  "theme_color": "#3884c3",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" },
+    { "src": "/favicon.ico", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
