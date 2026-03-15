@@ -9,22 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { HardDrive, FileText, AlertTriangle, Send } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
-
-/** Données de répartition par catégorie */
-const categories = [
-  { label: "Actes notariés",      go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
-  { label: "Archives numériques", go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
-  { label: "Documents clients",   go: 1.3, pct:  8, color: "hsl(258 60% 56%)" },
-  { label: "Factures",            go: 0.9, pct:  6, color: "hsl(38 92% 50%)"  },
-];
-
-/** Données du graphique camembert (répartition par type de fichier) */
-const pieData = [
-  { name: "Documents", value: 8.2, color: "hsl(211 55% 48%)" },
-  { name: "Archives",  value: 4.1, color: "hsl(200 67% 50%)" },
-  { name: "Photos",    value: 2.3, color: "hsl(87 52% 49%)"  },
-  { name: "Autres",    value: 0.9, color: "hsl(220 24% 64%)" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 /** Fichiers les plus volumineux du cabinet */
 const fichiers = [
@@ -37,6 +22,23 @@ const fichiers = [
 
 export default function Stockage() {
   const navigate = useNavigate();
+  const { t, lang } = useLanguage();
+  const isEN = lang === "EN";
+
+  const categories = [
+    { labelFR: "Actes notariés",      labelEN: t("storage.cat.acts"),     go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
+    { labelFR: "Archives numériques", labelEN: t("storage.cat.archives"), go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
+    { labelFR: "Documents clients",   labelEN: t("storage.cat.clients"),  go: 1.3, pct:  8, color: "hsl(258 60% 56%)" },
+    { labelFR: "Factures",            labelEN: t("storage.cat.invoices"), go: 0.9, pct:  6, color: "hsl(38 92% 50%)"  },
+  ];
+
+  const pieData = [
+    { name: isEN ? t("storage.pie.docs")     : "Documents", value: 8.2, color: "hsl(211 55% 48%)" },
+    { name: isEN ? t("storage.pie.archives") : "Archives",  value: 4.1, color: "hsl(200 67% 50%)" },
+    { name: isEN ? t("storage.pie.photos")   : "Photos",    value: 2.3, color: "hsl(87 52% 49%)"  },
+    { name: isEN ? t("storage.pie.other")    : "Autres",    value: 0.9, color: "hsl(220 24% 64%)" },
+  ];
+
   const used = 15.5, total = 20;
   const pct = Math.round(used / total * 100);
   const remaining = total - used;
@@ -53,7 +55,7 @@ export default function Stockage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-xl font-bold text-foreground">Stockage</h1>
+      <h1 className="font-heading text-xl font-bold text-foreground">{t("storage.title")}</h1>
 
       {/* ── Bannière d'alerte critique ── */}
       {lowStorage && (
@@ -66,10 +68,12 @@ export default function Stockage() {
           <AlertTriangle className={cn("h-5 w-5 shrink-0", criticalStorage ? "text-destructive" : "text-warning")} />
           <div>
             <p className={cn("text-sm font-semibold", criticalStorage ? "text-destructive" : "text-warning")}>
-              {criticalStorage ? "Espace de stockage critique" : "Espace de stockage faible"}
+              {criticalStorage ? t("storage.critical") : t("storage.low")}
             </p>
             <p className={cn("text-xs", criticalStorage ? "text-destructive/80" : "text-warning/80")}>
-              Il ne reste que {remaining.toFixed(1)} Go. Contactez l'administrateur pour étendre votre espace.
+              {isEN
+                ? `Only ${remaining.toFixed(1)} GB remaining. Contact the administrator to extend your storage.`
+                : `Il ne reste que ${remaining.toFixed(1)} Go. Contactez l'administrateur pour étendre votre espace.`}
             </p>
           </div>
         </div>
@@ -82,14 +86,14 @@ export default function Stockage() {
         <div className="rounded-xl border border-border bg-card p-6 shadow-card">
           <div className="flex items-center gap-2 mb-4">
             <HardDrive className="h-4 w-4 text-muted-foreground" />
-            <h2 className="font-heading text-sm font-semibold text-foreground">Utilisation globale</h2>
+            <h2 className="font-heading text-sm font-semibold text-foreground">{t("storage.globalUsage")}</h2>
           </div>
 
           {/* Valeur principale */}
           <p className="font-heading text-3xl font-bold text-foreground mb-1">
             {used} Go <span className="text-base font-normal text-muted-foreground">/ {total} Go</span>
           </p>
-          <p className="text-xs text-muted-foreground mb-4">Espace utilisé</p>
+          <p className="text-xs text-muted-foreground mb-4">{t("storage.used")}</p>
 
           {/* Barre de progression horizontale */}
           <div className="h-4 w-full rounded-full bg-muted overflow-hidden mb-3">
@@ -101,10 +105,10 @@ export default function Stockage() {
 
           {/* Détail chiffré */}
           <p className="text-xs text-muted-foreground">
-            {used} Go utilisés sur {total} Go alloués
+            {used} Go {isEN ? t("storage.usedOf") : "utilisés sur"} {total} Go {isEN ? t("storage.allocated") : "alloués"}
           </p>
           <p className={cn("text-xs mt-0.5 font-medium", pct > 90 ? "text-destructive" : "text-warning")}>
-            {remaining.toFixed(1)} Go disponibles — {pct}% utilisé
+            {remaining.toFixed(1)} Go {isEN ? t("storage.available") : "disponibles"} — {pct}% {isEN ? "used" : "utilisé"}
           </p>
 
           {/* Bouton de demande d'extension */}
@@ -118,24 +122,24 @@ export default function Stockage() {
             )}
           >
             <Send className="h-3.5 w-3.5" />
-            {pct > 90 ? "Extension urgente requise" : "Demander une extension"}
+            {pct > 90 ? t("storage.urgentExtension") : t("storage.requestExtension")}
           </button>
         </div>
 
         {/* Détail par catégorie avec barres individuelles */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-          <h2 className="font-heading text-sm font-semibold text-foreground mb-5">Détail par catégorie</h2>
+          <h2 className="font-heading text-sm font-semibold text-foreground mb-5">{t("storage.categoryBreakdown")}</h2>
           <div className="space-y-5">
             {categories.map((cat) => (
-              <div key={cat.label}>
+              <div key={cat.labelFR}>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground">{cat.label}</span>
+                  <span className="text-muted-foreground">{isEN ? cat.labelEN : cat.labelFR}</span>
                   <span className="text-muted-foreground font-medium">{cat.go} Go — {cat.pct}%</span>
                 </div>
                 <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${cat.pct}%`, background: cat.color }}
+                    style={{ width: `${cat.pct}%`, background: cat.color  }}
                   />
                 </div>
               </div>
@@ -143,11 +147,11 @@ export default function Stockage() {
           </div>
           {/* Ligne de total */}
           <div className="mt-5 border-t border-border pt-4 flex justify-between">
-            <span className="text-sm font-semibold text-foreground">Total</span>
+            <span className="text-sm font-semibold text-foreground">{t("storage.total")}</span>
             <span className="text-sm font-bold text-foreground">{used} Go / {total} Go</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Dernière mise à jour : {new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            {t("storage.lastUpdate")} : {new Date().toLocaleDateString(isEN ? "en-GB" : "fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
       </div>
@@ -155,7 +159,7 @@ export default function Stockage() {
       {/* ── Répartition par type de fichier (camembert) + fichiers volumineux ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-          <h2 className="font-heading text-sm font-semibold text-foreground mb-4">Répartition par type</h2>
+          <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("storage.fileTypeBreakdown")}</h2>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
@@ -175,7 +179,7 @@ export default function Stockage() {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-          <h2 className="font-heading text-sm font-semibold text-foreground mb-4">Fichiers les plus volumineux</h2>
+          <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("storage.largestFiles")}</h2>
           <div className="space-y-3">
             {fichiers.map(f => (
               <div key={f.nom} className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">

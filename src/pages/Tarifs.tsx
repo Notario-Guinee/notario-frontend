@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Composant {
   id: string;
@@ -89,6 +90,7 @@ const defaultComposants: Record<string, Composant[]> = {
 const modes: Composant["mode"][] = ["Fixe", "Pourcentage", "Pourcentage dégressif"];
 
 export default function Tarifs() {
+  const { t } = useLanguage();
   const [typeSelectionne, setTypeSelectionne] = useState("Vente de terrain");
   const [valeur, setValeur] = useState("");
   const [resultats, setResultats] = useState<{ nom: string; montant: number }[] | null>(null);
@@ -125,7 +127,7 @@ export default function Tarifs() {
     updateComposants([...composants, newComp]);
     setShowAdd(false);
     setForm({ nom: "", mode: "Fixe", taux: "" });
-    toast.success("Composant ajouté");
+    toast.success(t("tarifs.toastAdded"));
   };
 
   const handleUpdate = () => {
@@ -133,12 +135,12 @@ export default function Tarifs() {
     updateComposants(composants.map(c => c.id === editingComp.id ? editingComp : c));
     setShowEdit(false);
     setEditingComp(null);
-    toast.success("Composant modifié");
+    toast.success(t("tarifs.toastUpdated"));
   };
 
   const handleDelete = (id: string) => {
     updateComposants(composants.filter(c => c.id !== id));
-    toast.success("Composant supprimé");
+    toast.success(t("tarifs.toastDeleted"));
   };
 
   const openEdit = (c: Composant) => {
@@ -148,7 +150,7 @@ export default function Tarifs() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-xl font-bold text-foreground">Moteur de Tarifs Notariaux</h1>
+      <h1 className="font-heading text-xl font-bold text-foreground">{t("tarifs.title")}</h1>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Simulateur */}
@@ -157,12 +159,12 @@ export default function Tarifs() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
               <Calculator className="h-5 w-5 text-primary" />
             </div>
-            <h2 className="font-heading text-base font-semibold text-foreground">Simulateur de tarifs</h2>
+            <h2 className="font-heading text-base font-semibold text-foreground">{t("tarifs.simulatorTitle")}</h2>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Type d'acte</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("tarifs.deedType")}</label>
               <select
                 value={typeSelectionne}
                 onChange={e => { setTypeSelectionne(e.target.value); setResultats(null); }}
@@ -172,7 +174,7 @@ export default function Tarifs() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Valeur du dossier (GNF)</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("tarifs.caseValue")}</label>
               <input
                 type="text"
                 value={valeur}
@@ -182,13 +184,13 @@ export default function Tarifs() {
               />
             </div>
             <Button onClick={calculer} className="w-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
-              <Calculator className="mr-2 h-4 w-4" /> Calculer les frais
+              <Calculator className="mr-2 h-4 w-4" /> {t("tarifs.calculate")}
             </Button>
           </div>
 
           {resultats && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-5 rounded-xl bg-muted/50 p-4 space-y-3">
-              <h3 className="font-heading text-sm font-semibold text-foreground">Résultat pour : {typeSelectionne}</h3>
+              <h3 className="font-heading text-sm font-semibold text-foreground">{t("tarifs.resultFor")} {typeSelectionne}</h3>
               {resultats.map(r => (
                 <div key={r.nom} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{r.nom}</span>
@@ -196,7 +198,7 @@ export default function Tarifs() {
                 </div>
               ))}
               <div className="border-t border-border pt-3 flex justify-between font-heading font-bold">
-                <span className="text-foreground">Total estimé</span>
+                <span className="text-foreground">{t("tarifs.estimatedTotal")}</span>
                 <span className="text-primary">{formatGNF(total)}</span>
               </div>
             </motion.div>
@@ -211,19 +213,19 @@ export default function Tarifs() {
                 <Settings2 className="h-5 w-5 text-accent-foreground" />
               </div>
               <div>
-                <h2 className="font-heading text-base font-semibold text-foreground">Composants tarifaires</h2>
-                <p className="text-xs text-muted-foreground">{typeSelectionne} — {composants.length} composant{composants.length > 1 ? "s" : ""}</p>
+                <h2 className="font-heading text-base font-semibold text-foreground">{t("tarifs.componentsTitle")}</h2>
+                <p className="text-xs text-muted-foreground">{typeSelectionne} — {composants.length} {composants.length > 1 ? t("tarifs.componentCountPlural") : t("tarifs.componentCount")}</p>
               </div>
             </div>
             <Button size="sm" onClick={() => { setForm({ nom: "", mode: "Fixe", taux: "" }); setShowAdd(true); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Ajouter
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> {t("tarifs.add")}
             </Button>
           </div>
           <div className="space-y-2">
             <AnimatePresence mode="wait">
               <motion.div key={typeSelectionne} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }} className="space-y-2">
                 {composants.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-8">Aucun composant configuré pour ce type d'acte.</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">{t("tarifs.noComponents")}</p>
                 )}
                 {composants.map((c) => (
                   <div key={c.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5 group">
@@ -252,12 +254,12 @@ export default function Tarifs() {
 
       {/* Types d'actes configurés */}
       <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-        <h2 className="font-heading text-sm font-semibold text-foreground mb-4">Types d'actes configurés</h2>
+        <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("tarifs.configuredTypes")}</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-          {typesActes.map(t => (
-            <button key={t} onClick={() => { setTypeSelectionne(t); setResultats(null); }}
-              className={`flex items-center justify-between rounded-lg border p-3 text-sm text-left transition-colors ${typeSelectionne === t ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/30 text-foreground hover:bg-muted"}`}>
-              <span className="truncate">{t}</span>
+          {typesActes.map(tp => (
+            <button key={tp} onClick={() => { setTypeSelectionne(tp); setResultats(null); }}
+              className={`flex items-center justify-between rounded-lg border p-3 text-sm text-left transition-colors ${typeSelectionne === tp ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/30 text-foreground hover:bg-muted"}`}>
+              <span className="truncate">{tp}</span>
               <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
             </button>
           ))}
@@ -268,15 +270,15 @@ export default function Tarifs() {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Ajouter un composant — {typeSelectionne}</DialogTitle>
+            <DialogTitle>{t("tarifs.addComponentTitle")} — {typeSelectionne}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Nom du composant</label>
-              <input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder="Ex: Droits d'enregistrement" className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
+              <label className="text-xs font-medium text-muted-foreground">{t("tarifs.componentName")}</label>
+              <input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder={t("tarifs.placeholderName")} className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Mode de calcul</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("tarifs.calcMode")}</label>
               <Select value={form.mode} onValueChange={(v: Composant["mode"]) => setForm(f => ({ ...f, mode: v }))}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -285,13 +287,13 @@ export default function Tarifs() {
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">{form.mode === "Fixe" ? "Montant (GNF)" : "Taux (%)"}</label>
-              <input type="number" value={form.taux} onChange={e => setForm(f => ({ ...f, taux: e.target.value }))} placeholder={form.mode === "Fixe" ? "Ex: 50000" : "Ex: 2.5"} className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
+              <label className="text-xs font-medium text-muted-foreground">{form.mode === "Fixe" ? t("tarifs.amountGNF") : t("tarifs.rate")}</label>
+              <input type="number" value={form.taux} onChange={e => setForm(f => ({ ...f, taux: e.target.value }))} placeholder={form.mode === "Fixe" ? t("tarifs.placeholderFixed") : t("tarifs.placeholderRate")} className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>Annuler</Button>
-            <Button onClick={handleAdd} className="bg-primary text-primary-foreground hover:bg-primary/90">Ajouter</Button>
+            <Button variant="outline" onClick={() => setShowAdd(false)}>{t("tarifs.cancel")}</Button>
+            <Button onClick={handleAdd} className="bg-primary text-primary-foreground hover:bg-primary/90">{t("tarifs.add")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -300,16 +302,16 @@ export default function Tarifs() {
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Modifier le composant</DialogTitle>
+            <DialogTitle>{t("tarifs.editComponentTitle")}</DialogTitle>
           </DialogHeader>
           {editingComp && (
             <div className="space-y-4 py-2">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Nom du composant</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("tarifs.componentName")}</label>
                 <input value={editingComp.nom} onChange={e => setEditingComp(c => c ? { ...c, nom: e.target.value } : c)} className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Mode de calcul</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("tarifs.calcMode")}</label>
                 <Select value={editingComp.mode} onValueChange={(v: Composant["mode"]) => setEditingComp(c => c ? { ...c, mode: v } : c)}>
                   <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -318,14 +320,14 @@ export default function Tarifs() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">{editingComp.mode === "Fixe" ? "Montant (GNF)" : "Taux (%)"}</label>
+                <label className="text-xs font-medium text-muted-foreground">{editingComp.mode === "Fixe" ? t("tarifs.amountGNF") : t("tarifs.rate")}</label>
                 <input type="number" value={editingComp.taux} onChange={e => setEditingComp(c => c ? { ...c, taux: parseFloat(e.target.value) || 0 } : c)} className="mt-1.5 w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50" />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEdit(false)}>Annuler</Button>
-            <Button onClick={handleUpdate} className="bg-primary text-primary-foreground hover:bg-primary/90">Enregistrer</Button>
+            <Button variant="outline" onClick={() => setShowEdit(false)}>{t("tarifs.cancel")}</Button>
+            <Button onClick={handleUpdate} className="bg-primary text-primary-foreground hover:bg-primary/90">{t("tarifs.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatGNF } from "@/data/mockData";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface ActionType {
   id: string;
@@ -52,17 +53,18 @@ const etatColors: Record<string, string> = {
 };
 
 export default function TypesActions() {
+  const { t } = useLanguage();
   const [actions, setActions] = useState<ActionType[]>(initialActions);
   const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("Toutes les catégories");
-  const [filterEtat, setFilterEtat] = useState("Tous les états");
+  const [filterCat, setFilterCat] = useState("all-categories");
+  const [filterEtat, setFilterEtat] = useState("all-statuses");
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<ActionType | null>(null);
   const [form, setForm] = useState({ libelle: "", description: "", categorie: "Vente", prix: "", duree: "", etat: "actif" as ActionType["etat"] });
 
   const filtered = actions.filter((a) => {
-    if (filterCat !== "Toutes les catégories" && a.categorie !== filterCat) return false;
-    if (filterEtat !== "Tous les états" && a.etat !== filterEtat) return false;
+    if (filterCat !== "all-categories" && a.categorie !== filterCat) return false;
+    if (filterEtat !== "all-statuses" && a.etat !== filterEtat) return false;
     if (search) {
       return [a.libelle, a.description].some(f => searchMatch(f, search));
     }
@@ -91,41 +93,41 @@ export default function TypesActions() {
     setActions(prev => [...prev, newAction]);
     setShowCreate(false);
     setForm({ libelle: "", description: "", categorie: "Vente", prix: "", duree: "", etat: "actif" });
-    toast.success("Type d'action créé");
+    toast.success(t("typesActions.toastCreated"));
   };
 
   const handleUpdate = () => {
     if (!editing) return;
     setActions(prev => prev.map(a => a.id === editing.id ? editing : a));
     setEditing(null);
-    toast.success("Type d'action modifié");
+    toast.success(t("typesActions.toastUpdated"));
   };
 
   const handleArchive = (id: string) => {
     setActions(prev => prev.map(a => a.id === id ? { ...a, etat: a.etat === "inactif" ? "actif" : "inactif" as ActionType["etat"] } : a));
-    toast.success("État mis à jour");
+    toast.success(t("typesActions.toastArchived"));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">Types d'actions</h1>
-          <p className="text-sm text-muted-foreground mt-1">Catalogue des prestations</p>
+          <h1 className="font-heading text-2xl font-bold text-foreground">{t("typesActions.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("typesActions.subtitle")}</p>
         </div>
         <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-2" onClick={() => { setForm({ libelle: "", description: "", categorie: "Vente", prix: "", duree: "", etat: "actif" }); setShowCreate(true); }}>
-          <Plus className="h-4 w-4" /> Nouveau type
+          <Plus className="h-4 w-4" /> {t("typesActions.newType")}
         </Button>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
-          { label: "Total types", value: stats.total, icon: FileText, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
-          { label: "Actifs", value: stats.actifs, icon: CheckCircle2, bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
-          { label: "Inactifs", value: stats.inactifs, icon: XCircle, bg: "bg-rose-50 dark:bg-rose-900/20", iconBg: "bg-rose-500" },
-          { label: "Brouillons", value: stats.brouillons, icon: Clock, bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
-          { label: "Utilisations", value: stats.utilisations, icon: TrendingUp, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
+          { label: t("typesActions.totalTypes"), value: stats.total, icon: FileText, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
+          { label: t("typesActions.active"), value: stats.actifs, icon: CheckCircle2, bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
+          { label: t("typesActions.inactive"), value: stats.inactifs, icon: XCircle, bg: "bg-rose-50 dark:bg-rose-900/20", iconBg: "bg-rose-500" },
+          { label: t("typesActions.drafts"), value: stats.brouillons, icon: Clock, bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
+          { label: t("typesActions.usages"), value: stats.utilisations, icon: TrendingUp, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
         ].map((kpi) => (
           <div key={kpi.label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4", kpi.bg)}>
             <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white", kpi.iconBg)}>
@@ -143,17 +145,17 @@ export default function TypesActions() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Rechercher par libellé ou description..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
+          <Input placeholder={t("typesActions.searchPlaceholder")} value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
         </div>
         <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-          <option>Toutes les catégories</option>
-          {categories.map(c => <option key={c}>{c}</option>)}
+          <option value="all-categories">{t("typesActions.allCategories")}</option>
+          {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filterEtat} onChange={e => setFilterEtat(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-          <option>Tous les états</option>
-          <option value="actif">Actif</option>
-          <option value="inactif">Inactif</option>
-          <option value="brouillon">Brouillon</option>
+          <option value="all-statuses">{t("typesActions.allStatuses")}</option>
+          <option value="actif">{t("typesActions.statusActive")}</option>
+          <option value="inactif">{t("typesActions.statusInactive")}</option>
+          <option value="brouillon">{t("typesActions.statusDraft")}</option>
         </select>
       </div>
 
@@ -163,7 +165,7 @@ export default function TypesActions() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                {["Libellé", "Catégorie", "Prix", "Durée", "État", "Utilisations", "Actions"].map(h => (
+                {[t("typesActions.colLabel"), t("typesActions.colCategory"), t("typesActions.colPrice"), t("typesActions.colDuration"), t("typesActions.colStatus"), t("typesActions.colUsages"), t("typesActions.colActions")].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -189,14 +191,14 @@ export default function TypesActions() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditing({ ...a })}>Modifier</Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => handleArchive(a.id)}>Archiver</Button>
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditing({ ...a })}>{t("typesActions.edit")}</Button>
+                      <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => handleArchive(a.id)}>{t("typesActions.archive")}</Button>
                     </div>
                   </td>
                 </motion.tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">Aucun type d'action trouvé</td></tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{t("typesActions.noResults")}</td></tr>
               )}
             </tbody>
           </table>
@@ -207,48 +209,48 @@ export default function TypesActions() {
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nouveau type d'action</DialogTitle>
-            <DialogDescription>Ajouter une prestation au catalogue</DialogDescription>
+            <DialogTitle>{t("typesActions.createTitle")}</DialogTitle>
+            <DialogDescription>{t("typesActions.createDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Libellé</label>
-              <Input value={form.libelle} onChange={e => setForm(p => ({ ...p, libelle: e.target.value }))} placeholder="Ex: Acte de vente" className="mt-1" />
+              <label className="text-xs font-medium text-muted-foreground">{t("typesActions.labelField")}</label>
+              <Input value={form.libelle} onChange={e => setForm(p => ({ ...p, libelle: e.target.value }))} placeholder={t("typesActions.placeholderLabel")} className="mt-1" />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Description</label>
-              <Input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Description courte" className="mt-1" />
+              <label className="text-xs font-medium text-muted-foreground">{t("typesActions.descriptionField")}</label>
+              <Input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder={t("typesActions.placeholderDesc")} className="mt-1" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Catégorie</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.categoryField")}</label>
                 <select value={form.categorie} onChange={e => setForm(p => ({ ...p, categorie: e.target.value }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
                   {categories.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Prix (GNF)</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.priceField")}</label>
                 <Input value={form.prix} onChange={e => setForm(p => ({ ...p, prix: e.target.value }))} placeholder="150000" className="mt-1" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Durée estimée</label>
-                <Input value={form.duree} onChange={e => setForm(p => ({ ...p, duree: e.target.value }))} placeholder="2-3 jours" className="mt-1" />
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.durationField")}</label>
+                <Input value={form.duree} onChange={e => setForm(p => ({ ...p, duree: e.target.value }))} placeholder={t("typesActions.placeholderDuration")} className="mt-1" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">État</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.statusField")}</label>
                 <select value={form.etat} onChange={e => setForm(p => ({ ...p, etat: e.target.value as ActionType["etat"] }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                  <option value="actif">Actif</option>
-                  <option value="brouillon">Brouillon</option>
-                  <option value="inactif">Inactif</option>
+                  <option value="actif">{t("typesActions.statusActive")}</option>
+                  <option value="brouillon">{t("typesActions.statusDraft")}</option>
+                  <option value="inactif">{t("typesActions.statusInactive")}</option>
                 </select>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Annuler</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate}>Créer</Button>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>{t("typesActions.cancel")}</Button>
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate}>{t("typesActions.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -257,50 +259,50 @@ export default function TypesActions() {
       <Dialog open={!!editing} onOpenChange={open => !open && setEditing(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Modifier le type d'action</DialogTitle>
-            <DialogDescription>Mettre à jour les informations</DialogDescription>
+            <DialogTitle>{t("typesActions.editTitle")}</DialogTitle>
+            <DialogDescription>{t("typesActions.editDesc")}</DialogDescription>
           </DialogHeader>
           {editing && (
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Libellé</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.labelField")}</label>
                 <Input value={editing.libelle} onChange={e => setEditing({ ...editing, libelle: e.target.value })} className="mt-1" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("typesActions.descriptionField")}</label>
                 <Input value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} className="mt-1" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Catégorie</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("typesActions.categoryField")}</label>
                   <select value={editing.categorie} onChange={e => setEditing({ ...editing, categorie: e.target.value })} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
                     {categories.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Prix (GNF)</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("typesActions.priceField")}</label>
                   <Input value={String(editing.prix)} onChange={e => setEditing({ ...editing, prix: Number(e.target.value) || 0 })} className="mt-1" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Durée</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("typesActions.durationField")}</label>
                   <Input value={editing.duree} onChange={e => setEditing({ ...editing, duree: e.target.value })} className="mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">État</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("typesActions.statusField")}</label>
                   <select value={editing.etat} onChange={e => setEditing({ ...editing, etat: e.target.value as ActionType["etat"] })} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                    <option value="actif">Actif</option>
-                    <option value="brouillon">Brouillon</option>
-                    <option value="inactif">Inactif</option>
+                    <option value="actif">{t("typesActions.statusActive")}</option>
+                    <option value="brouillon">{t("typesActions.statusDraft")}</option>
+                    <option value="inactif">{t("typesActions.statusInactive")}</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Annuler</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleUpdate}>Enregistrer</Button>
+            <Button variant="outline" onClick={() => setEditing(null)}>{t("typesActions.cancel")}</Button>
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleUpdate}>{t("typesActions.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

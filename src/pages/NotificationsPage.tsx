@@ -140,13 +140,13 @@ export default function NotificationsPage() {
   const filteredNotifs = filterType === "all" ? notifications : notifications.filter(n => n.type === filterType);
 
   const typeFilters = [
-    { key: "all", label: lang === "FR" ? "Tous" : "All" },
-    { key: "rdv", label: lang === "FR" ? "RDV" : "Appointments" },
-    { key: "dossier", label: lang === "FR" ? "Dossiers" : "Cases" },
-    { key: "paiement", label: lang === "FR" ? "Paiements" : "Payments" },
-    { key: "document", label: "Documents" },
-    { key: "action", label: "Actions" },
-    { key: "securite", label: lang === "FR" ? "Sécurité" : "Security" },
+    { key: "all", label: t("notif.filterAll") },
+    { key: "rdv", label: t("notif.filterRdv") },
+    { key: "dossier", label: t("notif.filterDossier") },
+    { key: "paiement", label: t("notif.filterPaiement") },
+    { key: "document", label: t("notif.filterDocument") },
+    { key: "action", label: t("notif.filterAction") },
+    { key: "securite", label: t("notif.filterSecurite") },
   ];
 
   return (

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Boite = { id: string; numero: string; designation: string; localisation: string; dateArchivage: string; dossiers: string[] };
 
@@ -26,6 +27,7 @@ const initialBoites: Boite[] = [
 ];
 
 export default function ArchivesPhysiques() {
+  const { t, lang } = useLanguage();
   const [boites, setBoites] = useState(initialBoites);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -48,7 +50,7 @@ export default function ArchivesPhysiques() {
     const dossiersArr = form.dossiers.split(",").map(d => d.trim()).filter(Boolean);
     if (editingBoite) {
       setBoites(prev => prev.map(b => b.id === editingBoite.id ? { ...b, designation: form.designation, localisation: form.localisation, dossiers: dossiersArr } : b));
-      toast.success("Boîte modifiée");
+      toast.success(t("archives.toastEdited"));
     } else {
       const num = `BOI-2026-${String(boites.length + 1).padStart(3, "0")}`;
       const newBoite: Boite = {
@@ -56,7 +58,7 @@ export default function ArchivesPhysiques() {
         localisation: form.localisation, dateArchivage: new Date().toISOString().slice(0, 10), dossiers: dossiersArr,
       };
       setBoites(prev => [...prev, newBoite]);
-      toast.success(`Boîte ${num} créée`);
+      toast.success(`${t("archives.newBoxBtn")} ${num}`);
     }
     setShowModal(false);
     resetForm();
@@ -64,39 +66,39 @@ export default function ArchivesPhysiques() {
 
   const handleDelete = (id: string) => {
     setBoites(prev => prev.filter(b => b.id !== id));
-    toast.success("Boîte supprimée");
+    toast.success(t("archives.toastDeleted"));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">Archives Physiques</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("archives.title")}</h1>
         <div className="ml-auto">
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Nouvelle boîte
+            <Plus className="mr-2 h-4 w-4" /> {t("archives.newBoxBtn")}
           </Button>
         </div>
       </div>
 
       <div className="flex items-center gap-3 rounded-lg bg-muted px-3 py-2 max-w-md">
         <Search className="h-4 w-4 text-muted-foreground" />
-        <input type="text" placeholder="Rechercher boîte, désignation..." value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder={t("archives.searchFull")} value={search} onChange={e => setSearch(e.target.value)}
           className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none" />
       </div>
 
       <div className="grid grid-cols-3 gap-3 sm:max-w-lg">
         <div className="rounded-xl border border-border bg-card p-4 text-center">
           <p className="font-heading text-2xl font-bold text-foreground">{boites.length}</p>
-          <p className="text-xs text-muted-foreground">Boîtes</p>
+          <p className="text-xs text-muted-foreground">{t("archives.statBoxes")}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 text-center">
           <p className="font-heading text-2xl font-bold text-foreground">{boites.reduce((s, b) => s + b.dossiers.length, 0)}</p>
-          <p className="text-xs text-muted-foreground">Dossiers</p>
+          <p className="text-xs text-muted-foreground">{t("archives.statDossiers")}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 text-center">
           <p className="font-heading text-2xl font-bold text-foreground">3</p>
-          <p className="text-xs text-muted-foreground">Salles</p>
+          <p className="text-xs text-muted-foreground">{t("archives.statRooms")}</p>
         </div>
       </div>
 
@@ -108,8 +110,8 @@ export default function ArchivesPhysiques() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openEdit(b)}><Edit className="mr-2 h-4 w-4" /> Modifier</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(b.id)}><Trash2 className="mr-2 h-4 w-4" /> Supprimer</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openEdit(b)}><Edit className="mr-2 h-4 w-4" /> {t("archives.actionEdit")}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(b.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("archives.actionDelete")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -124,10 +126,10 @@ export default function ArchivesPhysiques() {
             </div>
             <div className="space-y-1.5 text-xs text-muted-foreground">
               <p>📍 {b.localisation}</p>
-              <p>📅 Archivé le {new Date(b.dateArchivage).toLocaleDateString('fr-FR')}</p>
+              <p>📅 {t("archives.archivedOn")} {new Date(b.dateArchivage).toLocaleDateString(lang === "FR" ? "fr-FR" : "en-GB")}</p>
             </div>
             <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2">Dossiers ({b.dossiers.length})</p>
+              <p className="text-xs text-muted-foreground mb-2">{t("archives.dossiersLabel")} ({b.dossiers.length})</p>
               <div className="flex flex-wrap gap-1">
                 {b.dossiers.map(d => (
                   <span key={d} className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-mono text-muted-foreground">{d}</span>
@@ -142,27 +144,27 @@ export default function ArchivesPhysiques() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editingBoite ? "Modifier la boîte" : "Nouvelle boîte d'archives"}</DialogTitle>
-            <DialogDescription>{editingBoite ? "Modifiez les informations de la boîte" : "Créez une nouvelle boîte d'archives physiques"}</DialogDescription>
+            <DialogTitle className="font-heading">{editingBoite ? t("archives.modalTitleEdit") : t("archives.modalTitleNew")}</DialogTitle>
+            <DialogDescription>{editingBoite ? t("archives.modalDescEdit") : t("archives.modalDescNew")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Désignation *</Label>
-              <Input value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} placeholder="Ex: Actes de vente 2026 — T1" />
+              <Label>{t("archives.labelDesignation")}</Label>
+              <Input value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} placeholder={t("archives.placeholderDesignation")} />
             </div>
             <div className="space-y-2">
-              <Label>Localisation *</Label>
-              <Input value={form.localisation} onChange={e => setForm(f => ({ ...f, localisation: e.target.value }))} placeholder="Ex: Salle B, Étagère 3, Rang A" />
+              <Label>{t("archives.labelLocation")}</Label>
+              <Input value={form.localisation} onChange={e => setForm(f => ({ ...f, localisation: e.target.value }))} placeholder={t("archives.placeholderLocation")} />
             </div>
             <div className="space-y-2">
-              <Label>Dossiers (séparés par des virgules)</Label>
-              <Input value={form.dossiers} onChange={e => setForm(f => ({ ...f, dossiers: e.target.value }))} placeholder="DOS-2026-001, DOS-2026-002" />
+              <Label>{t("archives.labelDossiers")}</Label>
+              <Input value={form.dossiers} onChange={e => setForm(f => ({ ...f, dossiers: e.target.value }))} placeholder={t("archives.placeholderDossiers")} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{t("archives.btnCancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleSave} disabled={!form.designation || !form.localisation}>
-              {editingBoite ? "Enregistrer" : "Créer la boîte"}
+              {editingBoite ? t("archives.btnSave") : t("archives.btnCreate")}
             </Button>
           </DialogFooter>
         </DialogContent>

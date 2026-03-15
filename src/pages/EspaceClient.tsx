@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, FileText, MessageSquare, Bell, Settings, LogOut, Upload, CheckCircle, Clock, XCircle, AlertTriangle, Send, User, ChevronRight, Eye, EyeOff, Save, KeyRound } from "lucide-react";
+import { FolderOpen, FileText, MessageSquare, Bell, Settings, LogOut, Upload, CheckCircle, Clock, XCircle, AlertTriangle, Send, User, ChevronRight, Eye, EyeOff, Save, KeyRound, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const currentClient = {
@@ -72,6 +73,7 @@ type Tab = "dossiers" | "documents" | "messages" | "notifications" | "preference
 export default function EspaceClient() {
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const [tab, setTab] = useState<Tab>("dossiers");
   const [selectedDossier, setSelectedDossier] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
@@ -161,9 +163,9 @@ export default function EspaceClient() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa]">
+    <div className="min-h-screen bg-background">
       {/* Top Bar */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#1B6B93] flex items-center justify-center text-white font-bold text-sm">N</div>
@@ -180,6 +182,13 @@ export default function EspaceClient() {
               </div>
             )}
             <LanguageSwitcher />
+            <button
+              onClick={toggleTheme}
+              className="rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              aria-label="Changer de thème"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-[#1B6B93]/10 flex items-center justify-center">
                 <User className="h-3.5 w-3.5 text-[#1B6B93]" />
@@ -208,7 +217,7 @@ export default function EspaceClient() {
                 <p className="text-xs text-amber-700 mt-1">{t("espace.docsRequiredDesc")} {pendingRequests.length} {t("espace.docsRequiredSuffix")}</p>
                 <div className="mt-3 space-y-2">
                   {pendingRequests.map(req => (
-                    <div key={req.id} className="flex items-center justify-between bg-white rounded-lg border border-amber-200 px-3 py-2">
+                    <div key={req.id} className="flex items-center justify-between bg-card rounded-lg border border-amber-200 px-3 py-2">
                       <div>
                         <p className="text-sm font-medium text-foreground">{isEN ? req.documentEN : req.document}</p>
                         <p className="text-xs text-muted-foreground">{t("espace.case")} {req.dossierCode} — {isEN ? req.descriptionEN : req.description}</p>
@@ -225,13 +234,13 @@ export default function EspaceClient() {
         )}
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-1 rounded-xl bg-white border border-border p-1 mb-6 shadow-sm">
+        <div className="flex flex-wrap gap-1 rounded-xl bg-card border border-border p-1 mb-6 shadow-sm">
           {tabs.map(tb => (
             <button key={tb.key} onClick={() => setTab(tb.key)}
               className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium transition-all ${tab === tb.key ? "bg-[#1B6B93] text-white shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"}`}>
               <tb.icon className="h-3.5 w-3.5" />
               {tb.label}
-              {tb.badge ? <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 ${tab === tb.key ? "bg-white/20" : "bg-red-100 text-red-600"}`}>{tb.badge}</span> : null}
+              {tb.badge ? <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 ${tab === tb.key ? "bg-card/20" : "bg-red-100 text-red-600"}`}>{tb.badge}</span> : null}
             </button>
           ))}
         </div>
@@ -241,7 +250,7 @@ export default function EspaceClient() {
           <div className="space-y-4">
             {clientDossiers.map((d, i) => (
               <motion.div key={d.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                className="rounded-xl border border-border bg-white p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                className="rounded-xl border border-border bg-card p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setSelectedDossier(selectedDossier === d.id ? null : d.id)}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -308,7 +317,7 @@ export default function EspaceClient() {
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-2">
                 <p className="text-xs font-semibold text-amber-800 mb-2">📎 {t("espace.docsToSubmit")}</p>
                 {pendingRequests.map(req => (
-                  <div key={req.id} className="flex items-center justify-between bg-white rounded-lg border border-amber-200 px-3 py-2 mb-2 last:mb-0">
+                  <div key={req.id} className="flex items-center justify-between bg-card rounded-lg border border-amber-200 px-3 py-2 mb-2 last:mb-0">
                     <div>
                       <p className="text-sm font-medium text-foreground">{isEN ? req.documentEN : req.document}</p>
                       <p className="text-xs text-muted-foreground">{req.dossierCode} — {isEN ? req.descriptionEN : req.description}</p>
@@ -324,7 +333,7 @@ export default function EspaceClient() {
             <h3 className="text-sm font-semibold text-foreground">{t("espace.sharedDocs")}</h3>
             {clientDocuments.map((doc, i) => (
               <motion.div key={doc.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                className="flex items-center gap-3 rounded-xl border border-border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -365,7 +374,7 @@ export default function EspaceClient() {
         {/* MESSAGES */}
         {tab === "messages" && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
               <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
                 {messages.map((msg, i) => (
                   <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
@@ -396,7 +405,7 @@ export default function EspaceClient() {
           <div className="space-y-3">
             {clientNotifications.map((notif, i) => (
               <motion.div key={notif.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                className={`rounded-xl border bg-white p-4 shadow-sm flex items-start gap-3 ${!notif.read ? "border-[#1B6B93]/30 bg-[#1B6B93]/[0.02]" : "border-border"}`}>
+                className={`rounded-xl border bg-card p-4 shadow-sm flex items-start gap-3 ${!notif.read ? "border-[#1B6B93]/30 bg-[#1B6B93]/[0.02]" : "border-border"}`}>
                 <div className="mt-0.5">{statusIcon(notif.status)}</div>
                 <div className="flex-1">
                   <p className={`text-sm ${!notif.read ? "font-semibold text-foreground" : "text-foreground"}`}>{isEN ? notif.eventEN : notif.event}</p>
@@ -417,7 +426,7 @@ export default function EspaceClient() {
         {/* PREFERENCES */}
         {tab === "preferences" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-foreground mb-4">{t("espace.notifChannels")}</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
@@ -431,7 +440,7 @@ export default function EspaceClient() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-foreground mb-4">{t("espace.notifEvents")}</h3>
               <div className="space-y-3">
                 {[
@@ -451,7 +460,7 @@ export default function EspaceClient() {
             </div>
 
             {/* Mes informations — éditable */}
-            <div className="rounded-xl border border-border bg-white p-5 shadow-sm lg:col-span-2">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground">{t("espace.myInfo")}</h3>
                 {!editingProfile ? (
@@ -503,7 +512,7 @@ export default function EspaceClient() {
             </div>
 
             {/* Changement de mot de passe */}
-            <div className="rounded-xl border border-border bg-white p-5 shadow-sm lg:col-span-2">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <KeyRound className="h-4 w-4" /> {isEN ? "Change password" : "Changer le mot de passe"}

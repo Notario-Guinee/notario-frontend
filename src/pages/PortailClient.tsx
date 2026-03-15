@@ -164,24 +164,24 @@ export default function PortailClient() {
     }]);
     setShowDocRequestModal(false);
     setDocRequestForm({ clientId: "", dossierCode: "", document: "", description: "" });
-    toast.success("Demande de document envoyée au client. Il recevra une notification.");
+    toast.success(t("portail.toastDocRequestSent"));
   };
 
   const handleAcceptDoc = (id: string) => {
     setDocRequests(prev => prev.map(r => r.id === id ? { ...r, statut: "accepted" } : r));
-    toast.success("Document accepté ✓");
+    toast.success(t("portail.toastDocAccepted"));
   };
 
   const handleRejectDoc = (id: string) => {
     setDocRequests(prev => prev.map(r => r.id === id ? { ...r, statut: "rejected" } : r));
-    toast.info("Document refusé. Le client sera notifié.");
+    toast.info(t("portail.toastDocRejected"));
   };
 
   const tabs: { key: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: "overview", label: t("portail.tabOverview"), icon: Globe },
     { key: "cases", label: t("portail.tabCases"), icon: FolderOpen },
     { key: "documents", label: t("portail.tabDocuments"), icon: FileText },
-    { key: "doc-requests", label: "Demandes de documents", icon: FileUp, badge: docRequests.filter(r => r.statut === "submitted").length },
+    { key: "doc-requests", label: t("portail.docRequestsTab"), icon: FileUp, badge: docRequests.filter(r => r.statut === "submitted").length },
     { key: "communication", label: t("portail.tabCommunication"), icon: MessageSquare },
     { key: "notifications", label: t("portail.tabNotifications"), icon: Bell },
     { key: "preferences", label: t("portail.tabPreferences"), icon: Settings },
@@ -227,8 +227,8 @@ export default function PortailClient() {
             {[
               { value: activeClients.length, label: t("portail.activeAccess"), color: "bg-emerald-50 dark:bg-emerald-900/20" },
               { value: portail.reduce((s, p) => s + p.documentsPartages, 0), label: t("portail.sharedDocs"), color: "bg-blue-50 dark:bg-blue-900/20" },
-              { value: docRequests.filter(r => r.statut === "submitted").length, label: "Documents soumis", color: "bg-purple-50 dark:bg-purple-900/20" },
-              { value: docRequests.filter(r => r.statut === "pending").length, label: "En attente client", color: "bg-amber-50 dark:bg-amber-900/20" },
+              { value: docRequests.filter(r => r.statut === "submitted").length, label: t("portail.submittedDocs"), color: "bg-purple-50 dark:bg-purple-900/20" },
+              { value: docRequests.filter(r => r.statut === "pending").length, label: t("portail.awaitingClient"), color: "bg-amber-50 dark:bg-amber-900/20" },
             ].map((s, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
                 className={`rounded-xl border border-border p-4 text-center shadow-card ${s.color}`}>
@@ -348,9 +348,9 @@ export default function PortailClient() {
       {tab === "doc-requests" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-sm font-semibold text-foreground">Demandes de documents aux clients</h2>
+            <h2 className="font-heading text-sm font-semibold text-foreground">{t("portail.docRequestsTitle")}</h2>
             <Button size="sm" onClick={() => { setDocRequestForm({ clientId: "", dossierCode: "", document: "", description: "" }); setShowDocRequestModal(true); }}>
-              <Plus className="mr-1 h-4 w-4" /> Demander un document
+              <Plus className="mr-1 h-4 w-4" /> {t("portail.requestDoc")}
             </Button>
           </div>
 
@@ -359,7 +359,7 @@ export default function PortailClient() {
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Upload className="h-4 w-4 text-emerald-600" />
-                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Documents soumis par les clients — À vérifier</p>
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">{t("portail.submittedByClients")}</p>
               </div>
               <div className="space-y-2">
                 {docRequests.filter(r => r.statut === "submitted").map(req => (
@@ -367,16 +367,16 @@ export default function PortailClient() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">{req.document}</p>
                       <p className="text-xs text-muted-foreground">
-                        {req.clientName} — Dossier {req.dossierCode} — Soumis le {req.dateSubmitted ? new Date(req.dateSubmitted).toLocaleDateString('fr-FR') : ""}
+                        {req.clientName} — {t("portail.caseLabel")} {req.dossierCode} — {t("portail.submittedOn")} {req.dateSubmitted ? new Date(req.dateSubmitted).toLocaleDateString('fr-FR') : ""}
                       </p>
                       {req.fileName && <p className="text-xs text-primary mt-0.5">📎 {req.fileName}</p>}
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-300 hover:bg-emerald-100" onClick={() => handleAcceptDoc(req.id)}>
-                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> Accepter
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> {t("portail.accept")}
                       </Button>
                       <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => handleRejectDoc(req.id)}>
-                        <XCircle className="h-3.5 w-3.5 mr-1" /> Refuser
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> {t("portail.reject")}
                       </Button>
                     </div>
                   </div>
@@ -388,17 +388,17 @@ export default function PortailClient() {
           {/* Pending requests */}
           {docRequests.filter(r => r.statut === "pending").length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">En attente du client</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t("portail.awaitingClientSection")}</h3>
               <div className="space-y-2">
                 {docRequests.filter(r => r.statut === "pending").map(req => (
                   <div key={req.id} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800 p-4">
                     <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">{req.document}</p>
-                      <p className="text-xs text-muted-foreground">{req.clientName} — Dossier {req.dossierCode} — Demandé le {new Date(req.dateRequest).toLocaleDateString('fr-FR')}</p>
+                      <p className="text-xs text-muted-foreground">{req.clientName} — {t("portail.caseLabel")} {req.dossierCode} — {new Date(req.dateRequest).toLocaleDateString('fr-FR')}</p>
                       <p className="text-xs text-muted-foreground italic mt-0.5">{req.description}</p>
                     </div>
-                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">En attente</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{t("portail.pending")}</span>
                   </div>
                 ))}
               </div>
@@ -408,17 +408,17 @@ export default function PortailClient() {
           {/* Accepted/Rejected */}
           {docRequests.filter(r => r.statut === "accepted" || r.statut === "rejected").length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Historique</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t("portail.history")}</h3>
               <div className="space-y-2">
                 {docRequests.filter(r => r.statut === "accepted" || r.statut === "rejected").map(req => (
                   <div key={req.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
                     {req.statut === "accepted" ? <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" /> : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">{req.document}</p>
-                      <p className="text-xs text-muted-foreground">{req.clientName} — Dossier {req.dossierCode}</p>
+                      <p className="text-xs text-muted-foreground">{req.clientName} — {t("portail.caseLabel")} {req.dossierCode}</p>
                     </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${req.statut === "accepted" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
-                      {req.statut === "accepted" ? "Accepté" : "Refusé"}
+                      {req.statut === "accepted" ? t("portail.accepted") : t("portail.rejected")}
                     </span>
                   </div>
                 ))}
@@ -448,7 +448,7 @@ export default function PortailClient() {
                     <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="text-xs font-semibold text-foreground">{msg.clientName}</span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${msg.direction === "sent" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {msg.direction === "sent" ? "→ Envoyé" : "← Reçu"}
+                      {msg.direction === "sent" ? t("portail.directionSent") : t("portail.directionReceived")}
                     </span>
                     <span className="ml-auto text-[10px] text-muted-foreground">{new Date(msg.date).toLocaleDateString('fr-FR')}</span>
                   </div>
@@ -468,7 +468,7 @@ export default function PortailClient() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {[t("label.date"), t("portail.notifSentTo"), "Événement", t("portail.notifChannel"), t("label.statut")].map(h => (
+                  {[t("label.date"), t("portail.notifSentTo"), t("portail.notifEvent"), t("portail.notifChannel"), t("label.statut")].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -606,17 +606,17 @@ export default function PortailClient() {
       <Dialog open={showDocRequestModal} onOpenChange={setShowDocRequestModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-heading">Demander un document au client</DialogTitle>
-            <DialogDescription>Le client recevra une notification et pourra soumettre le document depuis son espace.</DialogDescription>
+            <DialogTitle className="font-heading">{t("portail.requestDocTitle")}</DialogTitle>
+            <DialogDescription>{t("portail.requestDocDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Client *</Label>
+              <Label>{t("label.client")} *</Label>
               <div className="relative">
                 <Input
                   value={docClientSearch}
                   onChange={e => { setDocClientSearch(e.target.value); if (!e.target.value) setDocRequestForm(f => ({ ...f, clientId: "" })); }}
-                  placeholder="Rechercher par nom, code client ou téléphone..."
+                  placeholder={t("portail.searchClientPlaceholder")}
                   className="pl-9"
                 />
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -645,27 +645,27 @@ export default function PortailClient() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Dossier *</Label>
+              <Label>{t("label.dossier")} *</Label>
               <Select value={docRequestForm.dossierCode} onValueChange={v => setDocRequestForm(f => ({ ...f, dossierCode: v }))}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un dossier" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("portail.selectDossierPlaceholder")} /></SelectTrigger>
                 <SelectContent>
                   {mockDossiers.map(d => <SelectItem key={d.id} value={d.code}>{d.code} — {d.objet}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Document demandé *</Label>
-              <Input value={docRequestForm.document} onChange={e => setDocRequestForm(f => ({ ...f, document: e.target.value }))} placeholder="Ex: Certificat de décès, Titre foncier..." />
+              <Label>{t("portail.requestedDoc")} *</Label>
+              <Input value={docRequestForm.document} onChange={e => setDocRequestForm(f => ({ ...f, document: e.target.value }))} placeholder={t("portail.requestedDocPlaceholder")} />
             </div>
             <div className="space-y-2">
-              <Label>Description / Instructions</Label>
-              <Textarea value={docRequestForm.description} onChange={e => setDocRequestForm(f => ({ ...f, description: e.target.value }))} placeholder="Précisions pour le client..." rows={3} />
+              <Label>{t("portail.descInstructions")}</Label>
+              <Textarea value={docRequestForm.description} onChange={e => setDocRequestForm(f => ({ ...f, description: e.target.value }))} placeholder={t("portail.instructionsPlaceholder")} rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDocRequestModal(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowDocRequestModal(false)}>{t("action.cancel")}</Button>
             <Button onClick={handleDocRequest} disabled={!docRequestForm.clientId || !docRequestForm.dossierCode || !docRequestForm.document}>
-              <Send className="mr-1 h-4 w-4" /> Envoyer la demande
+              <Send className="mr-1 h-4 w-4" /> {t("portail.sendRequest")}
             </Button>
           </DialogFooter>
         </DialogContent>

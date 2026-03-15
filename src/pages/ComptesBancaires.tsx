@@ -16,6 +16,7 @@ import { formatGNF } from "@/data/mockData";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Compte = { id: string; nom: string; banque: string; numero: string; solde: number; statut: string; type: string };
 
@@ -38,6 +39,7 @@ const banques = ["BCRG", "BICIGUI", "Ecobank Guinée", "UBA", "Société Génér
 const typesCompte = ["Courant", "Épargne", "Spécial", "Séquestre"];
 
 export default function ComptesBancaires() {
+  const { t } = useLanguage();
   const [comptes, setComptes] = useState(initialComptes);
   const [showModal, setShowModal] = useState(false);
   const [editingCompte, setEditingCompte] = useState<Compte | null>(null);
@@ -56,14 +58,14 @@ export default function ComptesBancaires() {
   const handleSave = () => {
     if (editingCompte) {
       setComptes(prev => prev.map(c => c.id === editingCompte.id ? { ...c, nom: form.nom, banque: form.banque, numero: form.numero, solde: Number(form.solde) || c.solde, type: form.type } : c));
-      toast.success("Compte modifié");
+      toast.success(t("comptes.toastEdited"));
     } else {
       const newCompte: Compte = {
         id: String(Date.now()), nom: form.nom, banque: form.banque, numero: form.numero,
         solde: Number(form.solde) || 0, statut: "Actif", type: form.type,
       };
       setComptes(prev => [...prev, newCompte]);
-      toast.success("Compte ajouté");
+      toast.success(t("comptes.toastAdded"));
     }
     setShowModal(false);
     resetForm();
@@ -71,25 +73,25 @@ export default function ComptesBancaires() {
 
   const handleDelete = (id: string) => {
     setComptes(prev => prev.filter(c => c.id !== id));
-    toast.success("Compte supprimé");
+    toast.success(t("comptes.toastDeleted"));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">Comptes Bancaires</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("comptes.title")}</h1>
         <div className="ml-auto">
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Ajouter un compte
+            <Plus className="mr-2 h-4 w-4" /> {t("comptes.addAccount")}
           </Button>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">Solde total consolidé</p>
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">{t("comptes.totalBalance")}</p>
         <p className="mt-2 font-heading text-3xl font-extrabold text-foreground">{formatGNF(totalSolde)}</p>
-        <p className="mt-1 text-xs text-success flex items-center gap-1"><TrendingUp className="h-3 w-3" /> +8.3% ce mois</p>
+        <p className="mt-1 text-xs text-success flex items-center gap-1"><TrendingUp className="h-3 w-3" /> {t("comptes.monthlyGrowth")}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -100,8 +102,8 @@ export default function ComptesBancaires() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openEdit(c)}><Edit className="mr-2 h-4 w-4" /> Modifier</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="mr-2 h-4 w-4" /> Supprimer</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => openEdit(c)}><Edit className="mr-2 h-4 w-4" /> {t("comptes.edit")}</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("comptes.delete")}</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -120,13 +122,13 @@ export default function ComptesBancaires() {
 
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="font-heading text-sm font-semibold text-foreground">Opérations récentes</h2>
+          <h2 className="font-heading text-sm font-semibold text-foreground">{t("comptes.recentOps")}</h2>
         </div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {["Date", "Compte", "Libellé", "Type", "Montant"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+              {[t("comptes.colDate"), t("comptes.colAccount"), t("comptes.colLabel"), t("comptes.colType"), t("comptes.colAmount")].map((h, i) => (
+                <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
@@ -154,47 +156,47 @@ export default function ComptesBancaires() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editingCompte ? "Modifier le compte" : "Ajouter un compte bancaire"}</DialogTitle>
-            <DialogDescription>{editingCompte ? "Modifiez les informations du compte" : "Ajoutez un nouveau compte bancaire"}</DialogDescription>
+            <DialogTitle className="font-heading">{editingCompte ? t("comptes.modalEditTitle") : t("comptes.modalNewTitle")}</DialogTitle>
+            <DialogDescription>{editingCompte ? t("comptes.modalEditDesc") : t("comptes.modalNewDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Nom du compte *</Label>
-              <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder="Ex: BCRG — Compte Principal" />
+              <Label>{t("comptes.labelName")}</Label>
+              <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder={t("comptes.placeholderName")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Banque *</Label>
+                <Label>{t("comptes.labelBank")}</Label>
                 <Select value={form.banque} onValueChange={v => setForm(f => ({ ...f, banque: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("comptes.selectBank")} /></SelectTrigger>
                   <SelectContent>
                     {banques.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Type de compte</Label>
+                <Label>{t("comptes.labelAccountType")}</Label>
                 <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {typesCompte.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {typesCompte.map(tp => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Numéro de compte (IBAN)</Label>
-              <Input value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} placeholder="GN01 XXXX XXXX XXXX XXXX XXX" />
+              <Label>{t("comptes.labelIban")}</Label>
+              <Input value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} placeholder={t("comptes.placeholderIban")} />
             </div>
             <div className="space-y-2">
-              <Label>Solde initial (GNF)</Label>
+              <Label>{t("comptes.labelInitialBalance")}</Label>
               <Input type="number" value={form.solde} onChange={e => setForm(f => ({ ...f, solde: e.target.value }))} placeholder="0" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{t("comptes.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleSave} disabled={!form.nom || !form.banque}>
-              {editingCompte ? "Enregistrer" : "Ajouter le compte"}
+              {editingCompte ? t("comptes.save") : t("comptes.addBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>

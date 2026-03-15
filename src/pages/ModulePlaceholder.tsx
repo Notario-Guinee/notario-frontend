@@ -7,33 +7,36 @@
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Construction } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
-const pathNames: Record<string, string> = {
-  "/agenda": "Agenda & Rendez-vous",
-  "/paiements": "Paiements & Reçus",
-  "/comptes": "Comptes Bancaires",
-  "/caisse": "Caisse & Débours",
-  "/tarifs": "Moteur de Tarifs",
-  "/archives-numeriques": "Archives Numériques (OCR)",
-  "/archives-physiques": "Archives Physiques",
-  "/modeles": "Modèles de Documents",
-  "/messagerie": "Messagerie Interne",
-  "/notifications": "Centre de Notifications",
-  "/formation": "Espace Formation",
-  "/portail": "Portail Client",
-  "/cabinet": "Mon Cabinet",
-  "/utilisateurs": "Gestion Utilisateurs",
-  "/securite": "Sécurité & Audit",
-  "/stockage": "Stockage",
-  "/admin/tenants": "Gestion des Tenants",
-  "/admin/modules": "Modules & Facturation",
-  "/admin/leads": "Leads & Démos",
-  "/admin/monitoring": "Monitoring Plateforme",
+const pathKeys: Record<string, string> = {
+  "/agenda": "placeholder.path.agenda",
+  "/paiements": "placeholder.path.paiements",
+  "/comptes": "placeholder.path.comptes",
+  "/caisse": "placeholder.path.caisse",
+  "/tarifs": "placeholder.path.tarifs",
+  "/archives-numeriques": "placeholder.path.archivesNumeriques",
+  "/archives-physiques": "placeholder.path.archivesPhysiques",
+  "/modeles": "placeholder.path.modeles",
+  "/messagerie": "placeholder.path.messagerie",
+  "/notifications": "placeholder.path.notifications",
+  "/formation": "placeholder.path.formation",
+  "/portail": "placeholder.path.portail",
+  "/cabinet": "placeholder.path.cabinet",
+  "/utilisateurs": "placeholder.path.utilisateurs",
+  "/securite": "placeholder.path.securite",
+  "/stockage": "placeholder.path.stockage",
+  "/admin/tenants": "placeholder.path.adminTenants",
+  "/admin/modules": "placeholder.path.adminModules",
+  "/admin/leads": "placeholder.path.adminLeads",
+  "/admin/monitoring": "placeholder.path.adminMonitoring",
 };
 
 export default function ModulePlaceholder() {
+  const { t } = useLanguage();
   const location = useLocation();
-  const name = pathNames[location.pathname] || "Module";
+  const key = pathKeys[location.pathname];
+  const name = key ? t(key) : "Module";
 
   return (
     <motion.div
@@ -46,7 +49,7 @@ export default function ModulePlaceholder() {
       </div>
       <h1 className="font-heading text-2xl font-bold text-foreground mb-2">{name}</h1>
       <p className="text-sm text-muted-foreground max-w-md text-center">
-        Ce module est en cours de développement. Il sera disponible prochainement avec toutes les fonctionnalités prévues.
+        {t("placeholder.underDev")}
       </p>
     </motion.div>
   );
