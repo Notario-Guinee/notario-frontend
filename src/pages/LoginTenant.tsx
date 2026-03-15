@@ -6,16 +6,38 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginTenant() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const cabinetName = "Cabinet Maître Sylla";
   const subdomain = "sylla.notariale.com";
+
+  // Appel réel au backend — remplace l'ancien navigate("/dashboard") direct
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Veuillez remplir tous les champs");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Erreur de connexion");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative">
@@ -71,17 +93,31 @@ export default function LoginTenant() {
               <label className="text-xs font-medium text-muted-foreground">{t("login.password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10" />
+                <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
                 <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
+
+            {/* Message d'erreur affiché si le login échoue */}
+            {error && (
+              <div className="text-red-500 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
             <div className="text-right">
               <button onClick={() => navigate("/forgot-password?portal=tenant")} className="text-xs text-primary hover:underline">{t("login.forgotPassword")}</button>
             </div>
-            <Button className="w-full bg-[#1a2e42] hover:bg-[#243d56] text-white font-medium h-11" onClick={() => navigate("/dashboard")}>
-              {t("login.tenantSubmit")}
+            <Button
+              className="w-full bg-[#1a2e42] hover:bg-[#243d56] text-white font-medium h-11"
+              onClick={handleLogin}
+              disabled={loading}
+            >
+              {loading ? "Connexion en cours..." : t("login.tenantSubmit")}
             </Button>
           </div>
           <div className="flex items-center gap-3 my-5">

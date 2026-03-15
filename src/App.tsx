@@ -8,11 +8,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { RoleProvider } from "@/context/RoleContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 // ─── Pages principales de l'application ───
@@ -69,12 +70,23 @@ import InscriptionClient from "./pages/InscriptionClient";
 const queryClient = new QueryClient();
 
 /**
+ * Garde de route — redirige vers /login si l'utilisateur n'est pas connecté
+ * Utilisé pour protéger toutes les routes du dashboard
+ */
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/**
  * Composant racine — enveloppe l'arbre avec tous les providers
  * et définit la structure de routage de l'application
  */
 const App = () => (
   <ThemeProvider>
     <LanguageProvider>
+    {/* AuthProvider ajouté pour gérer l'authentification JWT avec le backend */}
+    <AuthProvider>
     <RoleProvider>
     <SidebarProvider>
     <QueryClientProvider client={queryClient}>
@@ -96,7 +108,11 @@ const App = () => (
             <Route path="/inscription-client" element={<InscriptionClient />} />
 
             {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-            <Route element={<DashboardLayout />}>
+            <Route element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
               {/* Routes du gérant */}
               <Route index element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
@@ -145,6 +161,7 @@ const App = () => (
     </QueryClientProvider>
     </SidebarProvider>
     </RoleProvider>
+    </AuthProvider>
     </LanguageProvider>
   </ThemeProvider>
 );
