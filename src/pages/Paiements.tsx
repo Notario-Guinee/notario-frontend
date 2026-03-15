@@ -39,8 +39,7 @@ const modes = ["Tous", "Espèces", "Virement", "Chèque", "Orange Money", "PayCa
 const modeIcons: Record<string, string> = { "Orange Money": "🟠", "Virement": "🏦", "Chèque": "📄", "Espèces": "💵", "PayCard": "💳" };
 
 export default function Paiements() {
-  const { lang } = useLanguage();
-  const fr = lang === "FR";
+  const { t } = useLanguage();
   const [paiements, setPaiements] = useState(initialPaiements);
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState("Tous");
@@ -76,23 +75,23 @@ export default function Paiements() {
     setPaiements(prev => [newPaiement, ...prev]);
     setShowCreateModal(false);
     resetForm();
-    toast.success(fr ? `Paiement ${ref} enregistré avec succès` : `Payment ${ref} recorded successfully`);
+    toast.success(`${ref} — ${t("caisse.toastSaved")}`);
   };
 
   return (
     <div className="space-y-6">
       {/* En-tête */}
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">{fr ? "Paiements & Reçus" : "Payments & Receipts"}</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("paiements.title")}</h1>
         <div className="ml-auto flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={fr ? "Rechercher..." : "Search..."} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
+            <Input placeholder={t("paiements.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
           </div>
           <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Export</Button>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowCreateModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> {fr ? "Enregistrer paiement" : "Record payment"}
+            <Plus className="mr-2 h-4 w-4" /> {t("paiements.recordBtn")}
           </Button>
         </div>
       </div>
@@ -102,7 +101,7 @@ export default function Paiements() {
         {modes.map(m => (
           <button key={m} onClick={() => setFilterMode(m)}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${filterMode === m ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}>
-            {modeIcons[m]} {m}
+            {modeIcons[m]} {m === "Tous" ? t("paiements.filterAll") : m}
           </button>
         ))}
       </div>
@@ -127,8 +126,8 @@ export default function Paiements() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {[fr ? "Référence" : "Reference", fr ? "Client" : "Client", fr ? "Facture" : "Invoice", fr ? "Montant" : "Amount", fr ? "Mode" : "Method", fr ? "Statut" : "Status", "Date", "Transaction"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+              {[t("paiements.colRef"), t("paiements.colClient"), t("paiements.colInvoice"), t("paiements.colAmount"), t("paiements.colMethod"), t("paiements.colStatus"), "Date", "Transaction"].map((h, i) => (
+                <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
@@ -154,19 +153,19 @@ export default function Paiements() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{fr ? "Enregistrer un paiement" : "Record a payment"}</DialogTitle>
-            <DialogDescription>{fr ? "Enregistrez un paiement reçu" : "Record a received payment"}</DialogDescription>
+            <DialogTitle className="font-heading">{t("paiements.modalTitle")}</DialogTitle>
+            <DialogDescription>{t("paiements.modalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Recherche avancée client */}
             <div className="space-y-2">
-              <Label>{fr ? "Client" : "Client"} *</Label>
+              <Label>{t("paiements.labelClient")} *</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={clientSearch}
                   onChange={e => { setClientSearch(e.target.value); if (!e.target.value) setForm(f => ({ ...f, client: "" })); }}
-                  placeholder={fr ? "Rechercher par nom, code client ou téléphone..." : "Search by name, client code or phone..."}
+                  placeholder={t("paiements.searchClientPlaceholder")}
                   className="pl-9"
                 />
                 {clientSearch && (
@@ -190,7 +189,7 @@ export default function Paiements() {
                       </div>
                     </button>
                   )) : (
-                    <p className="text-xs text-muted-foreground p-3 text-center">{fr ? "Aucun client trouvé" : "No client found"}</p>
+                    <p className="text-xs text-muted-foreground p-3 text-center">{t("paiements.noClientFound")}</p>
                   )}
                 </div>
               )}
@@ -207,9 +206,9 @@ export default function Paiements() {
 
             {/* Facture associée */}
             <div className="space-y-2">
-              <Label>{fr ? "Facture associée" : "Associated invoice"}</Label>
+              <Label>{t("paiements.labelInvoice")}</Label>
               <Select value={form.facture} onValueChange={v => setForm(f => ({ ...f, facture: v }))}>
-                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner une facture..." : "Select an invoice..."} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("paiements.selectInvoice")} /></SelectTrigger>
                 <SelectContent>
                   {mockFactures.map(f => (
                     <SelectItem key={f.id} value={f.numero}>{f.numero} — {f.client} ({formatGNF(f.montant)})</SelectItem>
@@ -221,11 +220,11 @@ export default function Paiements() {
             {/* Montant et mode */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{fr ? "Montant (GNF)" : "Amount (GNF)"} *</Label>
+                <Label>{t("paiements.labelAmount")} *</Label>
                 <Input type="number" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} placeholder="0" />
               </div>
               <div className="space-y-2">
-                <Label>{fr ? "Mode de paiement" : "Payment method"} *</Label>
+                <Label>{t("paiements.labelMethod")} *</Label>
                 <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -238,13 +237,13 @@ export default function Paiements() {
             {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder={fr ? "Notes sur le paiement..." : "Payment notes..."} rows={2} />
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder={t("paiements.placeholderNotes")} rows={2} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("paiements.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.montant}>
-              {fr ? "Enregistrer le paiement" : "Record payment"}
+              {t("paiements.record")}
             </Button>
           </DialogFooter>
         </DialogContent>

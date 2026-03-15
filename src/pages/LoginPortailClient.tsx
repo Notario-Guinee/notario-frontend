@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Connexion Portail Client — Authentification du client
+// Accès à l'espace client personnel pour consulter dossiers,
+// documents et messages avec le cabinet notarial
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, User, FileText, FolderOpen, MessageSquare, Bell } from "lucide-react";

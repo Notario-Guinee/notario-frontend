@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Modèles de Documents — Bibliothèque de modèles notariaux
+// Inclut : création, modification, duplication et suppression de
+// modèles d'actes, filtrables par type et catégorie
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, FileText, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Modele = { id: string; nom: string; categorie: string; type: string; description: string; placeholders: string[] };
 
@@ -25,10 +32,11 @@ const placeholderExamples = ["<<Client.Nom>>", "<<Client.CNI>>", "<<Client.DateN
 const categories = ["Vente", "Bail", "Société", "Donation", "Communication", "Succession", "Procuration"];
 
 export default function ModelesDocuments() {
+  const { t } = useLanguage();
   const [modeles, setModeles] = useState(initialModeles);
   const [selected, setSelected] = useState<Modele | null>(null);
   const [filterCat, setFilterCat] = useState("Tous");
-  const [editorContent, setEditorContent] = useState("Sélectionnez un modèle pour commencer l'édition...");
+  const [editorContent, setEditorContent] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingModele, setEditingModele] = useState<Modele | null>(null);
   const [form, setForm] = useState({ nom: "", categorie: "Vente", type: "Cabinet", description: "", placeholders: "" });
@@ -48,14 +56,14 @@ export default function ModelesDocuments() {
     const phArr = form.placeholders.split(",").map(p => p.trim()).filter(Boolean);
     if (editingModele) {
       setModeles(prev => prev.map(m => m.id === editingModele.id ? { ...m, nom: form.nom, categorie: form.categorie, type: form.type, description: form.description, placeholders: phArr } : m));
-      toast.success("Modèle modifié");
+      toast.success(t("modeles.toastUpdated"));
     } else {
       const newModele: Modele = {
         id: String(Date.now()), nom: form.nom, categorie: form.categorie,
         type: form.type, description: form.description, placeholders: phArr,
       };
       setModeles(prev => [...prev, newModele]);
-      toast.success("Modèle créé");
+      toast.success(t("modeles.toastCreated"));
     }
     setShowModal(false);
     resetForm();
@@ -63,18 +71,18 @@ export default function ModelesDocuments() {
 
   const handleDelete = (id: string) => {
     setModeles(prev => prev.filter(m => m.id !== id));
-    if (selected?.id === id) { setSelected(null); setEditorContent("Sélectionnez un modèle pour commencer l'édition..."); }
-    toast.success("Modèle supprimé");
+    if (selected?.id === id) { setSelected(null); setEditorContent(""); }
+    toast.success(t("modeles.toastDeleted"));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">Modèles de Documents</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("modeles.title")}</h1>
         <div className="ml-auto">
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Nouveau modèle
+            <Plus className="mr-2 h-4 w-4" /> {t("modeles.newTemplate")}
           </Button>
         </div>
       </div>
@@ -83,7 +91,7 @@ export default function ModelesDocuments() {
         {cats.map(c => (
           <button key={c} onClick={() => setFilterCat(c)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterCat === c ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-            {c}
+            {c === "Tous" ? t("modeles.all") : c}
           </button>
         ))}
       </div>
@@ -98,8 +106,8 @@ export default function ModelesDocuments() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEdit(m)}><Edit className="mr-2 h-4 w-4" /> Modifier</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(m.id)}><Trash2 className="mr-2 h-4 w-4" /> Supprimer</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openEdit(m)}><Edit className="mr-2 h-4 w-4" /> {t("modeles.editLabel")}</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(m.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("modeles.deleteLabel")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -125,12 +133,12 @@ export default function ModelesDocuments() {
             <div className="rounded-xl border border-border bg-card p-5 shadow-card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-heading text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Edit className="h-4 w-4 text-primary" /> Éditeur — {selected.nom}
+                  <Edit className="h-4 w-4 text-primary" /> {t("modeles.editorTitle")} — {selected.nom}
                 </h2>
-                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Générer PDF</Button>
+                <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">{t("modeles.generatePdf")}</Button>
               </div>
               <div className="mb-3">
-                <p className="text-xs text-muted-foreground mb-2">Placeholders disponibles :</p>
+                <p className="text-xs text-muted-foreground mb-2">{t("modeles.availablePlaceholders")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {placeholderExamples.map(p => (
                     <button key={p} onClick={() => setEditorContent(prev => prev + " " + p)}
@@ -148,7 +156,7 @@ export default function ModelesDocuments() {
             <div className="rounded-xl border border-dashed border-border bg-card/50 flex items-center justify-center h-64">
               <div className="text-center">
                 <FileText className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-                <p className="text-sm text-muted-foreground">Sélectionnez un modèle à gauche pour l'éditer</p>
+                <p className="text-sm text-muted-foreground">{t("modeles.selectPrompt")}</p>
               </div>
             </div>
           )}
@@ -159,24 +167,24 @@ export default function ModelesDocuments() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editingModele ? "Modifier le modèle" : "Nouveau modèle de document"}</DialogTitle>
-            <DialogDescription>{editingModele ? "Modifiez les informations du modèle" : "Créez un nouveau modèle de document"}</DialogDescription>
+            <DialogTitle className="font-heading">{editingModele ? t("modeles.editModalTitle") : t("modeles.createModalTitle")}</DialogTitle>
+            <DialogDescription>{editingModele ? t("modeles.editModalDesc") : t("modeles.createModalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Nom du modèle *</Label>
-              <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder="Ex: Acte de vente de terrain" />
+              <Label>{t("modeles.nameLabel")}</Label>
+              <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder={t("modeles.namePlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Catégorie</Label>
+                <Label>{t("modeles.categoryLabel")}</Label>
                 <Select value={form.categorie} onValueChange={v => setForm(f => ({ ...f, categorie: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Portée</Label>
+                <Label>{t("modeles.scopeLabel")}</Label>
                 <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -187,18 +195,18 @@ export default function ModelesDocuments() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Description du modèle..." rows={2} />
+              <Label>{t("modeles.descLabel")}</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t("modeles.descPlaceholder")} rows={2} />
             </div>
             <div className="space-y-2">
-              <Label>Placeholders (séparés par des virgules)</Label>
-              <Input value={form.placeholders} onChange={e => setForm(f => ({ ...f, placeholders: e.target.value }))} placeholder="Client.Nom, Acte.DateSignature, ..." />
+              <Label>{t("modeles.placeholdersLabel")}</Label>
+              <Input value={form.placeholders} onChange={e => setForm(f => ({ ...f, placeholders: e.target.value }))} placeholder={t("modeles.placeholdersPlaceholder")} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{t("modeles.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleSave} disabled={!form.nom}>
-              {editingModele ? "Enregistrer" : "Créer le modèle"}
+              {editingModele ? t("modeles.saveBtn") : t("modeles.createBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>

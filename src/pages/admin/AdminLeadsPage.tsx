@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Leads & Démos — Gestion des prospects commerciaux
+// Suivi des leads entrants, demandes de démonstration et pipeline
+// de conversion vers les abonnements de la plateforme Notario
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn, searchMatch } from "@/lib/utils";
 import { Search, Plus, Edit, Eye, Megaphone } from "lucide-react";

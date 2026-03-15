@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Licences — Gestion des clés de licence SaaS
+// Génération, attribution et révocation des licences d'accès
+// aux tenants (cabinets notariaux) de la plateforme
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Key, Plus, Copy, Check } from "lucide-react";

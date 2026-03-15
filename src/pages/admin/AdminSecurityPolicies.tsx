@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Politiques de Sécurité — Règles de sécurité globales
+// Configuration des politiques d'authentification (2FA, sessions,
+// mots de passe, IP autorisées) appliquées à toute la plateforme
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Shield, Lock, Key, Clock, Globe, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";

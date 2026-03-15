@@ -1,3 +1,10 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant WorkflowProcedural — Visualisation des étapes d'un
+// dossier notarial sous forme de pipeline interactif animé
+// Supporte les dispositions horizontale (≥900px) et verticale
+// Actions disponibles : Démarrer, Terminer, Revenir en arrière
+// ═══════════════════════════════════════════════════════════════
+
 import { useCallback, useEffect, useState } from "react";
 import {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,
@@ -220,7 +227,7 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
               </p>
 
               {/* Description */}
-              <p className={cn("mt-1 text-[10px] text-center leading-tight max-w-[120px]", isPending && "opacity-40")} style={{ color: "#6B7280" }}>
+              <p className={cn("mt-1 text-[10px] text-center leading-tight max-w-[120px] text-muted-foreground", isPending && "opacity-40")}>
                 {step.description}
               </p>
 
@@ -329,7 +336,7 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">TERMINÉ</span>
                   )}
                 </div>
-                <p className="text-xs mt-1" style={{ color: "#6B7280" }}>{step.description}</p>
+                <p className="text-xs mt-1 text-muted-foreground">{step.description}</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {canStart && (
                     <button

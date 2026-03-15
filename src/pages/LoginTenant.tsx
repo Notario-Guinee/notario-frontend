@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Connexion Gérant — Authentification du gérant de cabinet
+// Formulaire email/mot de passe avec affichage/masquage du mdp
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";

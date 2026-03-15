@@ -1,6 +1,6 @@
 {
-  "name": "NotaFlow",
-  "short_name": "NotaFlow",
+  "name": "Notario",
+  "short_name": "Notario",
   "description": "Plateforme SaaS pour cabinets de notaires en Guinée",
   "start_url": "/dashboard",
   "display": "standalone",

@@ -102,8 +102,7 @@ const cabinetEmployees = [
 ];
 
 export default function Messagerie() {
-  const { lang } = useLanguage();
-  const fr = lang === "FR";
+  const { t } = useLanguage();
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConv, setSelectedConv] = useState(conversations[0]);
   const [message, setMessage] = useState("");
@@ -123,7 +122,7 @@ export default function Messagerie() {
       id: Date.now().toString(),
       from: currentUser.firstName,
       text: message,
-      time: "À l'instant",
+      time: t("msg.justNow"),
       mine: true,
     };
     setMessages((prev) => ({
@@ -141,8 +140,8 @@ export default function Messagerie() {
       nom: groupName,
       avatar: "👥",
       presence: "online",
-      lastMsg: fr ? `Groupe créé avec ${selectedMembers.length} membres` : `Group created with ${selectedMembers.length} members`,
-      time: "À l'instant",
+      lastMsg: `${t("msg.groupCreatedSuccess")} — ${selectedMembers.length} ${t("msg.members")}`,
+      time: t("msg.justNow"),
       unread: 0,
       dossier: null,
       isGroup: true,
@@ -154,10 +153,8 @@ export default function Messagerie() {
       [newGroup.id]: [{
         id: "1",
         from: "Système",
-        text: fr
-          ? `Groupe « ${groupName} » créé par ${currentUser.name}. Membres : ${selectedMembers.join(", ")}`
-          : `Group "${groupName}" created by ${currentUser.name}. Members: ${selectedMembers.join(", ")}`,
-        time: "À l'instant",
+        text: `« ${groupName} » ${t("msg.groupCreatedSuccess")} — ${currentUser.name}. ${t("msg.membersLabel")}: ${selectedMembers.join(", ")}`,
+        time: t("msg.justNow"),
         mine: false,
       }],
     }));
@@ -165,7 +162,7 @@ export default function Messagerie() {
     setShowGroupModal(false);
     setGroupName("");
     setSelectedMembers([]);
-    toast.success(fr ? `Groupe « ${groupName} » créé avec succès` : `Group "${groupName}" created successfully`);
+    toast.success(`« ${groupName} » ${t("msg.groupCreatedSuccess")}`);
   };
 
   // Basculer la sélection d'un membre
@@ -188,30 +185,30 @@ export default function Messagerie() {
         <div className="flex items-center gap-3">
           <MessageCircle className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-heading font-bold text-foreground">{fr ? "Messagerie" : "Messaging"}</h1>
-            <p className="text-sm text-muted-foreground">{fr ? "Communication interne du cabinet" : "Internal office communication"}</p>
+            <h1 className="text-xl font-heading font-bold text-foreground">{t("msg.title")}</h1>
+            <p className="text-sm text-muted-foreground">{t("msg.subtitle")}</p>
           </div>
         </div>
         <div className="flex gap-2">
           {/* Bouton de création de groupe */}
           <Button variant="outline" className="gap-2" onClick={() => { setGroupName(""); setSelectedMembers([]); setShowGroupModal(true); }}>
             <Users className="h-4 w-4" />
-            {fr ? "Créer un groupe" : "Create group"}
+            {t("msg.createGroup")}
           </Button>
           {/* Bouton de nouvelle conversation */}
           <Dialog open={newConvOpen} onOpenChange={setNewConvOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                {fr ? "Nouvelle conversation" : "New conversation"}
+                {t("msg.newConversation")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{fr ? "Nouvelle conversation" : "New conversation"}</DialogTitle>
+                <DialogTitle>{t("msg.newConversation")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder={fr ? "Rechercher un collaborateur..." : "Search a colleague..."} />
+                <Input placeholder={t("msg.searchCollaborator")} />
                 <div className="space-y-2">
                   {cabinetEmployees.map((emp) => (
                     <button
@@ -225,7 +222,7 @@ export default function Messagerie() {
                           avatar: emp.avatar,
                           presence: "online",
                           lastMsg: "",
-                          time: "À l'instant",
+                          time: t("msg.justNow"),
                           unread: 0,
                           dossier: null,
                         };
@@ -252,11 +249,11 @@ export default function Messagerie() {
         {/* Panneau gauche — Liste des conversations */}
         <div className="w-80 border-r border-border bg-card flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
-            <h3 className="font-heading text-sm font-semibold text-foreground mb-3">{fr ? "Conversations" : "Conversations"}</h3>
+            <h3 className="font-heading text-sm font-semibold text-foreground mb-3">{t("msg.conversations")}</h3>
             <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={fr ? "Rechercher dans les conversations..." : "Search conversations..."}
+                placeholder={t("msg.searchConversations")}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none" />
             </div>
           </div>
@@ -299,7 +296,7 @@ export default function Messagerie() {
                     </Badge>
                   )}
                   {conv.isGroup && conv.members && (
-                    <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {fr ? "membres" : "members"}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {t("msg.members")}</p>
                   )}
                 </div>
               </button>
@@ -322,7 +319,7 @@ export default function Messagerie() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-foreground">{selectedConv.nom}</p>
-                {selectedConv.isGroup && <Badge variant="outline" className="text-[10px]">{selectedConv.members?.length} {fr ? "membres" : "members"}</Badge>}
+                {selectedConv.isGroup && <Badge variant="outline" className="text-[10px]">{selectedConv.members?.length} {t("msg.members")}</Badge>}
               </div>
               {selectedConv.dossier && (
                 <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/5">
@@ -332,10 +329,10 @@ export default function Messagerie() {
             </div>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <Phone className="h-3.5 w-3.5" /> {fr ? "Appel" : "Call"}
+                <Phone className="h-3.5 w-3.5" /> {t("msg.call")}
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <Video className="h-3.5 w-3.5" /> {fr ? "Visio" : "Video"}
+                <Video className="h-3.5 w-3.5" /> {t("msg.video")}
               </Button>
             </div>
           </div>
@@ -382,7 +379,7 @@ export default function Messagerie() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && envoyer()}
-                placeholder={fr ? "Écrire un message..." : "Type a message..."}
+                placeholder={t("msg.writeMessage")}
                 className="flex-1 rounded-lg bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none"
               />
               <Button onClick={envoyer} size="icon" className="shrink-0">
@@ -399,20 +396,20 @@ export default function Messagerie() {
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              {fr ? "Créer un groupe" : "Create a group"}
+              {t("msg.groupModalTitle")}
             </DialogTitle>
-            <DialogDescription>{fr ? "Créez un groupe de discussion et ajoutez des employés du cabinet" : "Create a chat group and add office employees"}</DialogDescription>
+            <DialogDescription>{t("msg.groupModalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Nom du groupe */}
             <div className="space-y-2">
-              <Label>{fr ? "Nom du groupe" : "Group name"} *</Label>
-              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder={fr ? "Ex: Équipe Dossiers Urgents" : "e.g. Urgent Cases Team"} />
+              <Label>{t("msg.groupName")} *</Label>
+              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder={t("msg.groupNamePlaceholder")} />
             </div>
 
             {/* Sélection des membres */}
             <div className="space-y-2">
-              <Label>{fr ? "Membres" : "Members"} ({selectedMembers.length} {fr ? "sélectionnés" : "selected"})</Label>
+              <Label>{t("msg.membersLabel")} ({selectedMembers.length} {t("msg.selected")})</Label>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {cabinetEmployees.map(emp => (
                   <label key={emp.id} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
@@ -443,9 +440,9 @@ export default function Messagerie() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGroupModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => setShowGroupModal(false)}>{t("msg.cancelGroup")}</Button>
             <Button className="bg-primary text-primary-foreground gap-2" onClick={handleCreateGroup} disabled={!groupName.trim() || selectedMembers.length === 0}>
-              <Users className="h-4 w-4" /> {fr ? "Créer le groupe" : "Create group"}
+              <Users className="h-4 w-4" /> {t("msg.createGroupBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>

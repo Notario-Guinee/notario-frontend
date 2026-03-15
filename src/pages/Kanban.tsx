@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Kanban — Tableau de gestion des tâches en colonnes
+// Inclut : drag & drop, CRUD tâches, tiroir de détail,
+// déplacement entre colonnes (À faire / En cours / Terminée)
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, Download, ListTodo, Clock, CheckCircle2, AlertTriangle, CalendarClock, X, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,25 +18,28 @@ import { mockKanbanTasks, type KanbanTask } from "@/data/mockData";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type ColumnId = "todo" | "in_progress" | "done";
 
 interface Column {
   id: ColumnId;
-  title: string;
+  titleKey: string;
   color: string;
   bgColor: string;
 }
 
 const columns: Column[] = [
-  { id: "todo", title: "À faire", color: "border-secondary", bgColor: "bg-secondary/5" },
-  { id: "in_progress", title: "En cours", color: "border-primary", bgColor: "bg-primary/5" },
-  { id: "done", title: "Terminée", color: "border-success", bgColor: "bg-success/5" },
+  { id: "todo", titleKey: "kanban.todo", color: "border-secondary", bgColor: "bg-secondary/5" },
+  { id: "in_progress", titleKey: "kanban.inProgress", color: "border-primary", bgColor: "bg-primary/5" },
+  { id: "done", titleKey: "kanban.done", color: "border-success", bgColor: "bg-success/5" },
 ];
 
 const priorites: KanbanTask["priorite"][] = ["Basse", "Normale", "Haute", "Urgente"];
 
 export default function Kanban() {
+  const { t } = useLanguage();
+
   const [tasks, setTasks] = useState<Record<ColumnId, KanbanTask[]>>({
     todo: mockKanbanTasks.slice(0, 3),
     in_progress: mockKanbanTasks.slice(3, 6),
@@ -67,6 +76,11 @@ export default function Kanban() {
     }).length,
   };
 
+  const getColTitle = (id: ColumnId) => {
+    const col = columns.find(c => c.id === id);
+    return col ? t(col.titleKey) : id;
+  };
+
   const handleDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
@@ -86,8 +100,7 @@ export default function Kanban() {
     }));
 
     if (srcCol !== destCol) {
-      const colNames: Record<ColumnId, string> = { todo: "À faire", in_progress: "En cours", done: "Terminée" };
-      toast.success(`"${moved.titre}" déplacée vers ${colNames[destCol]}`);
+      toast.success(`"${moved.titre}" ${t("kanban.movedTo")} ${getColTitle(destCol)}`);
     }
   };
 
@@ -97,8 +110,7 @@ export default function Kanban() {
       [from]: prev[from].filter(t => t.id !== task.id),
       [to]: [...prev[to], task],
     }));
-    const colNames: Record<ColumnId, string> = { todo: "À faire", in_progress: "En cours", done: "Terminée" };
-    toast.success(`"${task.titre}" → ${colNames[to]}`);
+    toast.success(`"${task.titre}" → ${getColTitle(to)}`);
   };
 
   const handleCreate = () => {
@@ -106,7 +118,7 @@ export default function Kanban() {
       id: String(Date.now()),
       titre: form.titre,
       description: form.description,
-      assignee: form.assignee || "Non assigné",
+      assignee: form.assignee || t("kanban.unassigned"),
       deadline: form.deadline,
       priorite: form.priorite,
       dossier: form.dossier || undefined,
@@ -115,7 +127,7 @@ export default function Kanban() {
     setTasks(prev => ({ ...prev, [createForColumn]: [...prev[createForColumn], newTask] }));
     setShowCreateModal(false);
     resetForm();
-    toast.success("Tâche créée");
+    toast.success(t("kanban.taskCreated"));
   };
 
   const handleEdit = () => {
@@ -139,7 +151,7 @@ export default function Kanban() {
     });
     setShowEditModal(false);
     setShowDetailDrawer(false);
-    toast.success("Tâche modifiée");
+    toast.success(t("kanban.taskEdited"));
   };
 
   const handleDelete = () => {
@@ -154,7 +166,7 @@ export default function Kanban() {
     setShowDeleteDialog(false);
     setShowDetailDrawer(false);
     setSelectedTask(null);
-    toast.success("Tâche supprimée");
+    toast.success(t("kanban.taskDeleted"));
   };
 
   const openTaskDetail = (task: KanbanTask, colId: ColumnId) => {
@@ -177,14 +189,14 @@ export default function Kanban() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">Tableau Kanban</h1>
-          <p className="text-sm text-muted-foreground mt-1">Tâches et échéances</p>
+          <h1 className="font-heading text-2xl font-bold text-foreground">{t("kanban.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("kanban.subtitle")}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" /> Exporter</Button>
+          <Button variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" /> {t("kanban.export")}</Button>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-2"
             onClick={() => { resetForm(); setCreateForColumn("todo"); setShowCreateModal(true); }}>
-            <Plus className="h-4 w-4" /> Nouvelle tâche
+            <Plus className="h-4 w-4" /> {t("kanban.newTask")}
           </Button>
         </div>
       </div>
@@ -192,12 +204,12 @@ export default function Kanban() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { icon: ListTodo, value: stats.total, label: "Total tâches", color: "text-foreground" },
-          { icon: Clock, value: stats.todo, label: "À faire", color: "text-secondary" },
-          { icon: Clock, value: stats.inProgress, label: "En cours", color: "text-primary" },
-          { icon: CheckCircle2, value: stats.done, label: "Terminées", color: "text-success" },
-          { icon: AlertTriangle, value: stats.urgentes, label: "Urgentes", color: "text-destructive" },
-          { icon: CalendarClock, value: stats.enRetard, label: "En retard", color: "text-destructive" },
+          { icon: ListTodo, value: stats.total, label: t("kanban.totalTasks"), color: "text-foreground" },
+          { icon: Clock, value: stats.todo, label: t("kanban.todo"), color: "text-secondary" },
+          { icon: Clock, value: stats.inProgress, label: t("kanban.inProgress"), color: "text-primary" },
+          { icon: CheckCircle2, value: stats.done, label: t("kanban.done"), color: "text-success" },
+          { icon: AlertTriangle, value: stats.urgentes, label: t("kanban.urgent"), color: "text-destructive" },
+          { icon: CalendarClock, value: stats.enRetard, label: t("kanban.overdue"), color: "text-destructive" },
         ].map((kpi, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -213,7 +225,7 @@ export default function Kanban() {
           {columns.map(col => (
             <div key={col.id} className={`rounded-xl border-t-2 ${col.color} border border-border ${col.bgColor} overflow-hidden`}>
               <div className="p-4 pb-2">
-                <h2 className="font-heading text-sm font-semibold text-foreground">{col.title} ({tasks[col.id].length})</h2>
+                <h2 className="font-heading text-sm font-semibold text-foreground">{t(col.titleKey)} ({tasks[col.id].length})</h2>
               </div>
               <Droppable droppableId={col.id}>
                 {(provided, snapshot) => (
@@ -268,19 +280,19 @@ export default function Kanban() {
                               {col.id !== "todo" && (
                                 <Button variant="outline" size="sm" className="text-[11px] h-7 flex-1"
                                   onClick={() => moveTask(task, col.id, col.id === "done" ? "in_progress" : "todo")}>
-                                  → {col.id === "done" ? "En cours" : "À faire"}
+                                  → {col.id === "done" ? t("kanban.inProgress") : t("kanban.todo")}
                                 </Button>
                               )}
                               {col.id !== "done" && (
                                 <Button variant="outline" size="sm" className="text-[11px] h-7 flex-1"
                                   onClick={() => moveTask(task, col.id, col.id === "todo" ? "in_progress" : "done")}>
-                                  → {col.id === "todo" ? "En cours" : "Terminée"}
+                                  → {col.id === "todo" ? t("kanban.inProgress") : t("kanban.done")}
                                 </Button>
                               )}
                               {col.id !== "done" && (
                                 <Button variant="outline" size="sm" className="text-[11px] h-7 flex-1"
                                   onClick={() => moveTask(task, col.id, "done")}>
-                                  → Terminée
+                                  → {t("kanban.done")}
                                 </Button>
                               )}
                             </div>
@@ -294,7 +306,7 @@ export default function Kanban() {
                     <button
                       onClick={() => { resetForm(); setCreateForColumn(col.id); setShowCreateModal(true); }}
                       className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border py-3 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
-                      <Plus className="h-3.5 w-3.5" /> Ajouter une tâche
+                      <Plus className="h-3.5 w-3.5" /> {t("kanban.addTask")}
                     </button>
                   </div>
                 )}
@@ -323,7 +335,7 @@ export default function Kanban() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" onClick={() => openEditTask(selectedTask)}><Edit className="mr-1 h-3.5 w-3.5" /> Modifier</Button>
+                    <Button variant="outline" size="sm" onClick={() => openEditTask(selectedTask)}><Edit className="mr-1 h-3.5 w-3.5" /> {t("kanban.edit")}</Button>
                     <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setShowDeleteDialog(true)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     <button onClick={() => setShowDetailDrawer(false)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
                   </div>
@@ -334,9 +346,9 @@ export default function Kanban() {
                     <p className="text-sm text-foreground">{selectedTask.description}</p>
                   </div>
                   {[
-                    { label: "Assigné à", value: selectedTask.assignee },
-                    { label: "Échéance", value: selectedTask.deadline },
-                    { label: "Priorité", value: selectedTask.priorite },
+                    { label: t("kanban.assignedTo"), value: selectedTask.assignee },
+                    { label: t("kanban.deadline"), value: selectedTask.deadline },
+                    { label: t("kanban.priority"), value: selectedTask.priorite },
                   ].map(item => (
                     <div key={item.label} className="flex justify-between border-b border-border pb-3">
                       <span className="text-sm text-muted-foreground">{item.label}</span>
@@ -345,7 +357,7 @@ export default function Kanban() {
                   ))}
                   {selectedTask.tags.length > 0 && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-2">Tags</p>
+                      <p className="text-sm text-muted-foreground mb-2">{t("kanban.tags")}</p>
                       <div className="flex flex-wrap gap-1">
                         {selectedTask.tags.map(tag => (
                           <span key={tag} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">{tag}</span>
@@ -356,12 +368,12 @@ export default function Kanban() {
 
                   {/* Quick move */}
                   <div className="pt-4 border-t border-border">
-                    <p className="text-sm font-medium text-foreground mb-2">Déplacer vers</p>
+                    <p className="text-sm font-medium text-foreground mb-2">{t("kanban.moveTo")}</p>
                     <div className="flex gap-2">
                       {columns.filter(c => c.id !== selectedColumn).map(c => (
                         <Button key={c.id} variant="outline" size="sm" className="flex-1"
                           onClick={() => { moveTask(selectedTask, selectedColumn, c.id); setShowDetailDrawer(false); }}>
-                          → {c.title}
+                          → {t(c.titleKey)}
                         </Button>
                       ))}
                     </div>
@@ -377,49 +389,49 @@ export default function Kanban() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">Nouvelle tâche</DialogTitle>
-            <DialogDescription>Créer une tâche dans la colonne "{columns.find(c => c.id === createForColumn)?.title}"</DialogDescription>
+            <DialogTitle className="font-heading">{t("kanban.createModalTitle")}</DialogTitle>
+            <DialogDescription>{t("kanban.createModalDesc")} "{columns.find(c => c.id === createForColumn) ? t(columns.find(c => c.id === createForColumn)!.titleKey) : ""}"</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Titre *</Label>
-              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder="Titre de la tâche" />
+              <Label>{t("kanban.titleLabel")} *</Label>
+              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder={t("kanban.titlePlaceholder")} />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Description détaillée..." />
+              <Label>{t("kanban.description")}</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder={t("kanban.descPlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Assigné à</Label>
-                <Input value={form.assignee} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder="Nom" />
+                <Label>{t("kanban.assigneeLabel")}</Label>
+                <Input value={form.assignee} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} placeholder={t("kanban.assigneePlaceholder")} />
               </div>
               <div className="space-y-2">
-                <Label>Échéance</Label>
-                <Input value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} placeholder="JJ/MM/AAAA" />
+                <Label>{t("kanban.deadlineLabel")}</Label>
+                <Input value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} placeholder={t("kanban.deadlinePlaceholder")} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Priorité</Label>
+                <Label>{t("kanban.priorityLabel")}</Label>
                 <Select value={form.priorite} onValueChange={v => setForm(f => ({ ...f, priorite: v as KanbanTask["priorite"] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{priorites.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Dossier lié</Label>
+                <Label>{t("kanban.linkedCase")}</Label>
                 <Input value={form.dossier} onChange={e => setForm(f => ({ ...f, dossier: e.target.value }))} placeholder="N-2025-XXX" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Tags</Label>
-              <Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} placeholder="Séparés par des virgules" />
+              <Label>{t("kanban.tags")}</Label>
+              <Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} placeholder={t("kanban.tagsPlaceholder")} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Annuler</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.titre}>Créer</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("kanban.cancel")}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.titre}>{t("kanban.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -428,25 +440,25 @@ export default function Kanban() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">Modifier la tâche</DialogTitle>
-            <DialogDescription>Modifiez les informations de cette tâche</DialogDescription>
+            <DialogTitle className="font-heading">{t("kanban.editModalTitle")}</DialogTitle>
+            <DialogDescription>{t("kanban.editModalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Titre</Label>
+              <Label>{t("kanban.titleLabel")}</Label>
               <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("kanban.description")}</Label>
               <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Assigné à</Label>
+                <Label>{t("kanban.assigneeLabel")}</Label>
                 <Input value={form.assignee} onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Priorité</Label>
+                <Label>{t("kanban.priorityLabel")}</Label>
                 <Select value={form.priorite} onValueChange={v => setForm(f => ({ ...f, priorite: v as KanbanTask["priorite"] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{priorites.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
@@ -455,18 +467,18 @@ export default function Kanban() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Échéance</Label>
+                <Label>{t("kanban.deadlineLabel")}</Label>
                 <Input value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Tags</Label>
+                <Label>{t("kanban.tags")}</Label>
                 <Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>Annuler</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleEdit}>Enregistrer</Button>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>{t("kanban.cancel")}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleEdit}>{t("kanban.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -475,12 +487,12 @@ export default function Kanban() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette tâche ?</AlertDialogTitle>
-            <AlertDialogDescription>La tâche "<strong>{selectedTask?.titre}</strong>" sera supprimée définitivement.</AlertDialogDescription>
+            <AlertDialogTitle>{t("kanban.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>"<strong>{selectedTask?.titre}</strong>" {t("kanban.deleteDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+            <AlertDialogCancel>{t("kanban.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t("kanban.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

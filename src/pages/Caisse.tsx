@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Caisse & Débours — Gestion de la trésorerie du cabinet
+// Inclut : soldes par mode de paiement, totaux entrées/sorties,
+// journal des opérations filtrable, CRUD des mouvements de caisse
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, TrendingUp, TrendingDown, AlertTriangle, Edit, MoreHorizontal, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +17,7 @@ import { formatGNF } from "@/data/mockData";
 import { searchMatch } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Operation = { id: string; type: string; libelle: string; dossier: string; montant: number; mode: string; date: string };
 
@@ -36,6 +43,7 @@ const modesOp = ["Espèces", "Virement", "Chèque", "Orange Money", "PayCard"];
 const typesOp = ["Entrée", "Sortie", "Débours"];
 
 export default function Caisse() {
+  const { t } = useLanguage();
   const [operations, setOperations] = useState(initialOperations);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("Tous");
@@ -57,7 +65,7 @@ export default function Caisse() {
   const handleSave = () => {
     if (editingOp) {
       setOperations(prev => prev.map(o => o.id === editingOp.id ? { ...o, type: form.type, libelle: form.libelle, dossier: form.dossier || "—", montant: Number(form.montant) || o.montant, mode: form.mode } : o));
-      toast.success("Opération modifiée");
+      toast.success(t("caisse.toastEdited"));
     } else {
       const newOp: Operation = {
         id: String(Date.now()), type: form.type, libelle: form.libelle,
@@ -65,7 +73,7 @@ export default function Caisse() {
         mode: form.mode, date: new Date().toISOString().slice(0, 10),
       };
       setOperations(prev => [newOp, ...prev]);
-      toast.success("Opération enregistrée");
+      toast.success(t("caisse.toastSaved"));
     }
     setShowModal(false);
     resetForm();
@@ -73,21 +81,28 @@ export default function Caisse() {
 
   const handleDelete = (id: string) => {
     setOperations(prev => prev.filter(o => o.id !== id));
-    toast.success("Opération supprimée");
+    toast.success(t("caisse.toastDeleted"));
+  };
+
+  const filterLabels: Record<string, string> = {
+    "Tous": t("caisse.filterAll"),
+    "Entrée": t("caisse.filterEntry"),
+    "Sortie": t("caisse.filterExpense"),
+    "Débours": t("caisse.filterDisbursement"),
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">Caisse & Débours</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("caisse.title")}</h1>
         <div className="ml-auto flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
+            <Input placeholder={t("caisse.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> Nouvelle opération
+            <Plus className="mr-2 h-4 w-4" /> {t("caisse.newOp")}
           </Button>
         </div>
       </div>
@@ -105,24 +120,24 @@ export default function Caisse() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-success"><TrendingUp className="h-4 w-4" /><span className="text-xs font-medium">Total Entrées</span></div>
+          <div className="flex items-center gap-2 text-success"><TrendingUp className="h-4 w-4" /><span className="text-xs font-medium">{t("caisse.totalEntries")}</span></div>
           <p className="mt-2 font-heading text-xl font-bold text-foreground">{formatGNF(totalEntrees)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-destructive"><TrendingDown className="h-4 w-4" /><span className="text-xs font-medium">Total Sorties</span></div>
+          <div className="flex items-center gap-2 text-destructive"><TrendingDown className="h-4 w-4" /><span className="text-xs font-medium">{t("caisse.totalExpenses")}</span></div>
           <p className="mt-2 font-heading text-xl font-bold text-foreground">{formatGNF(totalSorties)}</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-2 text-primary"><AlertTriangle className="h-4 w-4" /><span className="text-xs font-medium">Solde net</span></div>
+          <div className="flex items-center gap-2 text-primary"><AlertTriangle className="h-4 w-4" /><span className="text-xs font-medium">{t("caisse.netBalance")}</span></div>
           <p className="mt-2 font-heading text-xl font-bold text-foreground">{formatGNF(totalEntrees - totalSorties)}</p>
         </div>
       </div>
 
       <div className="flex gap-2">
-        {["Tous", "Entrée", "Sortie", "Débours"].map(t => (
-          <button key={t} onClick={() => setFilterType(t)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterType === t ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-            {t}
+        {(["Tous", "Entrée", "Sortie", "Débours"] as const).map(key => (
+          <button key={key} onClick={() => setFilterType(key)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${filterType === key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+            {filterLabels[key]}
           </button>
         ))}
       </div>
@@ -131,8 +146,8 @@ export default function Caisse() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {["Date", "Libellé", "Dossier", "Mode", "Type", "Montant", ""].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
+              {[t("caisse.colDate"), t("caisse.colLabel"), t("caisse.colDossier"), t("caisse.colMode"), t("caisse.colType"), t("caisse.colAmount"), ""].map((h, i) => (
+                <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
@@ -155,8 +170,8 @@ export default function Caisse() {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(op)}><Edit className="mr-2 h-4 w-4" /> Modifier</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(op.id)}><Trash2 className="mr-2 h-4 w-4" /> Supprimer</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEdit(op)}><Edit className="mr-2 h-4 w-4" /> {t("caisse.edit")}</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(op.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("caisse.delete")}</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>
@@ -170,20 +185,20 @@ export default function Caisse() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editingOp ? "Modifier l'opération" : "Nouvelle opération"}</DialogTitle>
-            <DialogDescription>{editingOp ? "Modifiez les détails de l'opération" : "Enregistrez une nouvelle opération de caisse"}</DialogDescription>
+            <DialogTitle className="font-heading">{editingOp ? t("caisse.modalEditTitle") : t("caisse.modalNewTitle")}</DialogTitle>
+            <DialogDescription>{editingOp ? t("caisse.modalEditDesc") : t("caisse.modalNewDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Type d'opération *</Label>
+                <Label>{t("caisse.labelType")}</Label>
                 <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{typesOp.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  <SelectContent>{typesOp.map(tp => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Mode de paiement</Label>
+                <Label>{t("caisse.labelMode")}</Label>
                 <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{modesOp.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
@@ -191,24 +206,24 @@ export default function Caisse() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Libellé *</Label>
-              <Input value={form.libelle} onChange={e => setForm(f => ({ ...f, libelle: e.target.value }))} placeholder="Ex: Droits d'enregistrement DGI" />
+              <Label>{t("caisse.labelLabel")}</Label>
+              <Input value={form.libelle} onChange={e => setForm(f => ({ ...f, libelle: e.target.value }))} placeholder={t("caisse.placeholderLabel")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Dossier associé</Label>
+                <Label>{t("caisse.labelDossier")}</Label>
                 <Input value={form.dossier} onChange={e => setForm(f => ({ ...f, dossier: e.target.value }))} placeholder="DOS-XXXX-XXX" />
               </div>
               <div className="space-y-2">
-                <Label>Montant (GNF) *</Label>
+                <Label>{t("caisse.labelAmount")}</Label>
                 <Input type="number" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} placeholder="0" />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{t("caisse.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleSave} disabled={!form.libelle || !form.montant}>
-              {editingOp ? "Enregistrer" : "Ajouter l'opération"}
+              {editingOp ? t("caisse.save") : t("caisse.addOp")}
             </Button>
           </DialogFooter>
         </DialogContent>

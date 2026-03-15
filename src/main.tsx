@@ -62,7 +62,7 @@ const purgeLegacyCaches = async () => {
   const keys = await caches.keys();
   await Promise.all(
     keys
-      .filter((key) => key.includes("lovable") || key.startsWith("notaflow-"))
+      .filter((key) => key.includes("lovable") || key.startsWith("Notario-"))
       .map((key) => caches.delete(key))
   );
 };

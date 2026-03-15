@@ -41,8 +41,7 @@ const initialUsers: User[] = [
 const allModules = ["Clients", "Dossiers", "Actes", "Factures", "Paiements", "Archives", "Messagerie", "Agenda", "Kanban"];
 
 export default function Utilisateurs() {
-  const { lang } = useLanguage();
-  const fr = lang === "FR";
+  const { t } = useLanguage();
   const [users, setUsers] = useState(initialUsers);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("Tous");
@@ -79,7 +78,7 @@ export default function Utilisateurs() {
     }]);
     setShowNew(false);
     setForm({ nom: "", prenom: "", email: "", telephone: "", role: "Standard", dateNaissance: "", lieuNaissance: "", adresse: "" });
-    toast.success(fr ? "Utilisateur ajouté" : "User added");
+    toast.success(t("users.toastAdded"));
   };
 
   // Mise à jour d'un utilisateur
@@ -87,7 +86,7 @@ export default function Utilisateurs() {
     if (!editing) return;
     setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
     setEditing(null);
-    toast.success(fr ? "Utilisateur mis à jour" : "User updated");
+    toast.success(t("users.toastUpdated"));
   };
 
   // Archivage d'un utilisateur
@@ -95,17 +94,17 @@ export default function Utilisateurs() {
     if (!archiving) return;
     setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
     setArchiving(null);
-    toast.success(fr ? "Utilisateur archivé" : "User archived");
+    toast.success(t("users.toastArchived"));
   };
 
   return (
     <div className="space-y-6">
       {/* En-tête */}
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">{fr ? "Utilisateurs du cabinet" : "Office Users"}</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("users.pageTitle")}</h1>
         <div className="ml-auto">
           <Button size="sm" onClick={() => setShowNew(true)} className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90">
-            <Plus className="mr-2 h-4 w-4" />{fr ? "Nouvel utilisateur" : "New user"}
+            <Plus className="mr-2 h-4 w-4" />{t("users.newUser")}
           </Button>
         </div>
       </div>
@@ -114,14 +113,14 @@ export default function Utilisateurs() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={fr ? "Rechercher par nom, email, code..." : "Search by name, email, code..."} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder={t("users.searchPlaceholder")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-          <option value="Tous">{fr ? "Tous les rôles" : "All roles"}</option>
+          <option value="Tous">{t("users.allRoles")}</option>
           {["Gérant", "Notaire", "Comptable", "Standard"].map(r => <option key={r}>{r}</option>)}
         </select>
         <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-          <option value="Tous">{fr ? "Tous les statuts" : "All statuses"}</option>
+          <option value="Tous">{t("users.allStatuses")}</option>
           {["Actif", "Archivé"].map(s => <option key={s}>{s}</option>)}
         </select>
       </div>
@@ -131,7 +130,7 @@ export default function Utilisateurs() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {[fr ? "Utilisateur" : "User", "Code", fr ? "Téléphone" : "Phone", fr ? "Rôle" : "Role", fr ? "Statut" : "Status", "Actions"].map(h => (
+              {[t("users.colUser"), "Code", t("users.colPhone"), t("users.colRole"), t("users.colStatus"), t("users.colActions")].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
               ))}
             </tr>
@@ -177,19 +176,19 @@ export default function Utilisateurs() {
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{fr ? "Nouvel utilisateur" : "New user"}</DialogTitle>
-            <DialogDescription>{fr ? "Ajouter un membre à votre cabinet" : "Add a member to your office"}</DialogDescription>
+            <DialogTitle>{t("users.modalNewTitle")}</DialogTitle>
+            <DialogDescription>{t("users.modalNewDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Champs obligatoires */}
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Prénom" : "First name"} *</label><Input value={form.prenom} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} className="mt-1" /></div>
-              <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Nom" : "Last name"} *</label><Input value={form.nom} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">{t("users.firstName")} *</label><Input value={form.prenom} onChange={e => setForm(p => ({ ...p, prenom: e.target.value }))} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">{t("users.lastName")} *</label><Input value={form.nom} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} className="mt-1" /></div>
             </div>
             <div><label className="text-xs font-medium text-muted-foreground">Email *</label><Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="mt-1" /></div>
-            <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Téléphone" : "Phone"} *</label><Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} className="mt-1" /></div>
+            <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")} *</label><Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} className="mt-1" /></div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground">{fr ? "Rôle" : "Role"}</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("users.role")}</label>
               <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
                 {["Standard", "Notaire", "Comptable"].map(r => <option key={r}>{r}</option>)}
               </select>
@@ -197,26 +196,26 @@ export default function Utilisateurs() {
 
             {/* Champs facultatifs */}
             <div className="border-t border-border pt-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{fr ? "Informations facultatives" : "Optional information"}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{t("users.optionalSection")}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">{fr ? "Date de naissance" : "Date of birth"}</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("users.dateOfBirth")}</label>
                   <Input type="date" value={form.dateNaissance} onChange={e => setForm(p => ({ ...p, dateNaissance: e.target.value }))} className="mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">{fr ? "Lieu de naissance" : "Place of birth"}</label>
-                  <Input value={form.lieuNaissance} onChange={e => setForm(p => ({ ...p, lieuNaissance: e.target.value }))} placeholder={fr ? "Ex: Conakry" : "e.g. Conakry"} className="mt-1" />
+                  <label className="text-xs font-medium text-muted-foreground">{t("users.placeOfBirth")}</label>
+                  <Input value={form.lieuNaissance} onChange={e => setForm(p => ({ ...p, lieuNaissance: e.target.value }))} placeholder={t("users.placeOfBirthPlaceholder")} className="mt-1" />
                 </div>
               </div>
               <div className="mt-4">
-                <label className="text-xs font-medium text-muted-foreground">{fr ? "Adresse" : "Address"}</label>
-                <Input value={form.adresse} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder={fr ? "Ex: Quartier Almamya, Kaloum, Conakry" : "e.g. Almamya, Kaloum, Conakry"} className="mt-1" />
+                <label className="text-xs font-medium text-muted-foreground">{t("users.address")}</label>
+                <Input value={form.adresse} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder={t("users.addressPlaceholder")} className="mt-1" />
               </div>
             </div>
 
             {/* Droits d'accès aux modules */}
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-2 block">{fr ? "Droits d'accès aux modules" : "Module access rights"}</label>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">{t("users.moduleRights")}</label>
               <div className="grid grid-cols-2 gap-2">
                 {allModules.map(m => (
                   <label key={m} className="flex items-center gap-2 rounded-lg border border-border p-2 cursor-pointer hover:bg-muted/30">
@@ -228,9 +227,9 @@ export default function Utilisateurs() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNew(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => setShowNew(false)}>{t("users.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.nom || !form.prenom || !form.email}>
-              {fr ? "Ajouter" : "Add"}
+              {t("users.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -240,19 +239,19 @@ export default function Utilisateurs() {
       <Dialog open={!!editing} onOpenChange={o => !o && setEditing(null)}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{fr ? "Modifier l'utilisateur" : "Edit user"}</DialogTitle>
+            <DialogTitle>{t("users.modalEditTitle")}</DialogTitle>
             <DialogDescription>{editing?.prenom} {editing?.nom}</DialogDescription>
           </DialogHeader>
           {editing && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Prénom" : "First name"}</label><Input value={editing.prenom} onChange={e => setEditing({ ...editing, prenom: e.target.value })} className="mt-1" /></div>
-                <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Nom" : "Last name"}</label><Input value={editing.nom} onChange={e => setEditing({ ...editing, nom: e.target.value })} className="mt-1" /></div>
+                <div><label className="text-xs font-medium text-muted-foreground">{t("users.firstName")}</label><Input value={editing.prenom} onChange={e => setEditing({ ...editing, prenom: e.target.value })} className="mt-1" /></div>
+                <div><label className="text-xs font-medium text-muted-foreground">{t("users.lastName")}</label><Input value={editing.nom} onChange={e => setEditing({ ...editing, nom: e.target.value })} className="mt-1" /></div>
               </div>
               <div><label className="text-xs font-medium text-muted-foreground">Email</label><Input value={editing.email} onChange={e => setEditing({ ...editing, email: e.target.value })} className="mt-1" /></div>
-              <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Téléphone" : "Phone"}</label><Input value={editing.telephone} onChange={e => setEditing({ ...editing, telephone: e.target.value })} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")}</label><Input value={editing.telephone} onChange={e => setEditing({ ...editing, telephone: e.target.value })} className="mt-1" /></div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">{fr ? "Rôle" : "Role"}</label>
+                <label className="text-xs font-medium text-muted-foreground">{t("users.role")}</label>
                 <select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value })} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
                   {["Standard", "Notaire", "Comptable", "Gérant"].map(r => <option key={r}>{r}</option>)}
                 </select>
@@ -260,25 +259,25 @@ export default function Utilisateurs() {
 
               {/* Champs facultatifs en édition */}
               <div className="border-t border-border pt-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{fr ? "Informations facultatives" : "Optional information"}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{t("users.optionalSection")}</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">{fr ? "Date de naissance" : "Date of birth"}</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t("users.dateOfBirth")}</label>
                     <Input type="date" value={editing.dateNaissance || ""} onChange={e => setEditing({ ...editing, dateNaissance: e.target.value })} className="mt-1" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">{fr ? "Lieu de naissance" : "Place of birth"}</label>
+                    <label className="text-xs font-medium text-muted-foreground">{t("users.placeOfBirth")}</label>
                     <Input value={editing.lieuNaissance || ""} onChange={e => setEditing({ ...editing, lieuNaissance: e.target.value })} className="mt-1" />
                   </div>
                 </div>
                 <div className="mt-4">
-                  <label className="text-xs font-medium text-muted-foreground">{fr ? "Adresse" : "Address"}</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t("users.address")}</label>
                   <Input value={editing.adresse || ""} onChange={e => setEditing({ ...editing, adresse: e.target.value })} className="mt-1" />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">{fr ? "Droits d'accès" : "Access rights"}</label>
+                <label className="text-xs font-medium text-muted-foreground mb-2 block">{t("users.accessRights")}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {allModules.map(m => (
                     <label key={m} className="flex items-center gap-2 rounded-lg border border-border p-2 cursor-pointer hover:bg-muted/30">
@@ -291,8 +290,8 @@ export default function Utilisateurs() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleUpdate}>{fr ? "Enregistrer" : "Save"}</Button>
+            <Button variant="outline" onClick={() => setEditing(null)}>{t("users.cancel")}</Button>
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleUpdate}>{t("users.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -301,14 +300,14 @@ export default function Utilisateurs() {
       <AlertDialog open={!!archiving} onOpenChange={o => !o && setArchiving(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{fr ? "Archiver l'utilisateur" : "Archive user"}</AlertDialogTitle>
+            <AlertDialogTitle>{t("users.archiveTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {fr ? `Archiver ${archiving?.prenom} ${archiving?.nom} ? L'utilisateur n'aura plus accès au système.` : `Archive ${archiving?.prenom} ${archiving?.nom}? The user will no longer have access.`}
+              {t("users.archiveConfirm").replace("{name}", `${archiving?.prenom} ${archiving?.nom}`)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{fr ? "Annuler" : "Cancel"}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleArchive} className="bg-warning text-warning-foreground hover:bg-warning/90">{fr ? "Archiver" : "Archive"}</AlertDialogAction>
+            <AlertDialogCancel>{t("users.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleArchive} className="bg-warning text-warning-foreground hover:bg-warning/90">{t("users.archive")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

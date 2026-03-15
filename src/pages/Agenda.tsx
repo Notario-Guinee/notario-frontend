@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Agenda — Gestion des rendez-vous du cabinet
+// Inclut : vues semaine/mois/jour/liste, création de RDV,
+// rappels de notification, détail modal par rendez-vous
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, X, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +16,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { mockClients } from "@/data/mockData";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 
 type ViewMode = "mois" | "semaine" | "jour" | "liste";
 
@@ -34,18 +41,56 @@ const statusColorMap: Record<string, string> = {
   "En attente": "bg-primary/10 border-l-2 border-l-primary",
 };
 
-const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const hours = Array.from({ length: 9 }, (_, i) => `${i + 8}:00`);
-const lieux = ["Bureau 1", "Bureau 2", "Salle de conférence", "Extérieur"];
-const durees = ["15min", "30min", "45min", "1h", "1h30", "2h"];
-const rappels = ["15 minutes avant", "30 minutes avant", "1 heure avant", "2 heures avant", "1 jour avant"];
 
 export default function Agenda() {
+  const { t, lang } = useLanguage();
   const [rdvData, setRdvData] = useState<RDV[]>(initialRdvData);
   const [view, setView] = useState<ViewMode>("semaine");
   const [selectedRdv, setSelectedRdv] = useState<RDV | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const today = new Date();
+
+  // Dynamic day names based on language
+  const days = [
+    t("agenda.days.mon"),
+    t("agenda.days.tue"),
+    t("agenda.days.wed"),
+    t("agenda.days.thu"),
+    t("agenda.days.fri"),
+    t("agenda.days.sat"),
+    t("agenda.days.sun"),
+  ];
+
+  // Dynamic view mode labels
+  const viewLabels: Record<ViewMode, string> = {
+    jour: t("agenda.day"),
+    semaine: t("agenda.week"),
+    mois: t("agenda.month"),
+    liste: t("agenda.list"),
+  };
+
+  // Dynamic location options
+  const lieux = [
+    t("agenda.lieu.bureau1"),
+    t("agenda.lieu.bureau2"),
+    t("agenda.lieu.salle"),
+    t("agenda.lieu.exterieur"),
+  ];
+
+  // Internal lieu values (always French keys stored in data)
+  const lieuValues = ["Bureau 1", "Bureau 2", "Salle de conférence", "Extérieur"];
+
+  const durees = ["15min", "30min", "45min", "1h", "1h30", "2h"];
+
+  // Dynamic reminder options
+  const rappelOptions = [
+    { value: "15 minutes avant", label: t("agenda.rappel.15min") },
+    { value: "30 minutes avant", label: t("agenda.rappel.30min") },
+    { value: "1 heure avant", label: t("agenda.rappel.1h") },
+    { value: "2 heures avant", label: t("agenda.rappel.2h") },
+    { value: "1 jour avant", label: t("agenda.rappel.1j") },
+  ];
 
   const [form, setForm] = useState({
     titre: "", client: "", lieu: "Bureau 1", date: "", heure: "09:00",
@@ -63,9 +108,10 @@ export default function Agenda() {
     setRdvData(prev => [...prev, newRdv]);
     setShowCreateModal(false);
     resetForm();
-    toast.success("Rendez-vous créé avec succès");
+    toast.success(t("agenda.toast.created"));
     if (form.rappel) {
-      toast.info(`🔔 Rappel programmé : ${form.rappel}`, { duration: 4000 });
+      const rappelLabel = rappelOptions.find(r => r.value === form.rappel)?.label || form.rappel;
+      toast.info(`🔔 ${t("agenda.toast.reminder")} ${rappelLabel}`, { duration: 4000 });
     }
   };
 
@@ -73,18 +119,18 @@ export default function Agenda() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">Agenda & Rendez-vous</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("agenda.pageTitle")}</h1>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex rounded-lg bg-muted p-1">
-            {(["jour","semaine","mois","liste"] as ViewMode[]).map((v) => (
+            {(["jour", "semaine", "mois", "liste"] as ViewMode[]).map((v) => (
               <button key={v} onClick={() => setView(v)}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors ${view === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                {v}
+                {viewLabels[v]}
               </button>
             ))}
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => { resetForm(); setShowCreateModal(true); }}>
-            <Plus className="mr-1 h-4 w-4" /> Nouveau RDV
+            <Plus className="mr-1 h-4 w-4" /> {t("agenda.newRdv")}
           </Button>
         </div>
       </div>
@@ -93,10 +139,10 @@ export default function Agenda() {
       <div className="flex items-center gap-3">
         <button className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronLeft className="h-4 w-4 text-muted-foreground" /></button>
         <h2 className="font-heading text-base font-semibold text-foreground">
-          {today.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+          {today.toLocaleDateString(lang === "EN" ? "en-GB" : "fr-FR", { month: "long", year: "numeric" })}
         </h2>
         <button className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>
-        <button className="ml-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">Aujourd'hui</button>
+        <button className="ml-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">{t("agenda.today")}</button>
       </div>
 
       {/* Calendar Grid (Semaine view) */}
@@ -163,7 +209,9 @@ export default function Agenda() {
 
       {view === "jour" && (
         <div className="rounded-xl border border-border bg-card p-5 shadow-card space-y-3">
-          <h2 className="font-heading text-sm font-semibold text-foreground">{today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+          <h2 className="font-heading text-sm font-semibold text-foreground">
+            {today.toLocaleDateString(lang === "EN" ? "en-GB" : "fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+          </h2>
           {rdvData.filter(r => r.date === "2026-03-09").map((rdv) => (
             <div key={rdv.id} className={`rounded-lg p-3 ${statusColorMap[rdv.statut] || "bg-muted"}`}>
               <div className="flex items-start justify-between">
@@ -209,9 +257,9 @@ export default function Agenda() {
             <h3 className="font-heading text-lg font-bold text-foreground">{selectedRdv.titre}</h3>
             <div className="mt-4 space-y-3">
               {[
-                { label: "Client", value: selectedRdv.client, icon: User },
-                { label: "Heure", value: `${selectedRdv.heure} · ${selectedRdv.duree}`, icon: Clock },
-                { label: "Lieu", value: selectedRdv.lieu, icon: MapPin },
+                { label: t("agenda.detail.client"), value: selectedRdv.client, icon: User },
+                { label: t("agenda.detail.heure"), value: `${selectedRdv.heure} · ${selectedRdv.duree}`, icon: Clock },
+                { label: t("agenda.detail.lieu"), value: selectedRdv.lieu, icon: MapPin },
               ].map(({ label, value, icon: Icon }) => (
                 <div key={label} className="flex items-center gap-3 text-sm">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted"><Icon className="h-4 w-4 text-muted-foreground" /></div>
@@ -221,14 +269,19 @@ export default function Agenda() {
               {selectedRdv.rappel && (
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted"><Bell className="h-4 w-4 text-muted-foreground" /></div>
-                  <div><p className="text-xs text-muted-foreground">Rappel</p><p className="font-medium text-foreground">{selectedRdv.rappel}</p></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t("agenda.detail.rappel")}</p>
+                    <p className="font-medium text-foreground">
+                      {rappelOptions.find(r => r.value === selectedRdv.rappel)?.label ?? selectedRdv.rappel}
+                    </p>
+                  </div>
                 </div>
               )}
               <div className="flex items-center gap-2"><StatusBadge status={selectedRdv.statut} /></div>
             </div>
             <div className="mt-5 flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setSelectedRdv(null)}>Fermer</Button>
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Modifier</Button>
+              <Button variant="outline" size="sm" onClick={() => setSelectedRdv(null)}>{t("agenda.detail.close")}</Button>
+              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">{t("agenda.detail.edit")}</Button>
             </div>
           </motion.div>
         </div>
@@ -238,19 +291,19 @@ export default function Agenda() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">Nouveau rendez-vous</DialogTitle>
-            <DialogDescription>Planifiez un nouveau rendez-vous</DialogDescription>
+            <DialogTitle className="font-heading">{t("agenda.createRdv")}</DialogTitle>
+            <DialogDescription>{t("agenda.planNew")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Titre du rendez-vous</Label>
-              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder="Ex: Consultation succession..." />
+              <Label>{t("agenda.create.titreLabel")}</Label>
+              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder={t("agenda.create.titrePlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Client *</Label>
+                <Label>{t("agenda.create.clientLabel")}</Label>
                 <Select value={form.client} onValueChange={v => setForm(f => ({ ...f, client: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("agenda.create.clientPlaceholder")} /></SelectTrigger>
                   <SelectContent>
                     {mockClients.map(c => (
                       <SelectItem key={c.id} value={`${c.nom} ${c.prenom}`.trim()}>{c.nom} {c.prenom}</SelectItem>
@@ -259,26 +312,28 @@ export default function Agenda() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Lieu</Label>
+                <Label>{t("agenda.create.lieuLabel")}</Label>
                 <Select value={form.lieu} onValueChange={v => setForm(f => ({ ...f, lieu: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {lieux.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    {lieuValues.map((val, idx) => (
+                      <SelectItem key={val} value={val}>{lieux[idx]}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label>{t("agenda.create.dateLabel")}</Label>
                 <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Heure *</Label>
+                <Label>{t("agenda.create.heureLabel")}</Label>
                 <Input type="time" value={form.heure} onChange={e => setForm(f => ({ ...f, heure: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Durée</Label>
+                <Label>{t("agenda.duration")}</Label>
                 <Select value={form.duree} onValueChange={v => setForm(f => ({ ...f, duree: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -288,23 +343,23 @@ export default function Agenda() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-2"><Bell className="h-3.5 w-3.5 text-primary" /> Rappel de notification</Label>
+              <Label className="flex items-center gap-2"><Bell className="h-3.5 w-3.5 text-primary" /> {t("agenda.reminder")}</Label>
               <Select value={form.rappel} onValueChange={v => setForm(f => ({ ...f, rappel: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {rappels.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  {rappelOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Notes / Description</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Détails du rendez-vous..." rows={3} />
+              <Label>{t("agenda.notesDesc")}</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t("agenda.create.notesPlaceholder")} rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("agenda.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.date}>
-              Créer le rendez-vous
+              {t("agenda.createRdv")}
             </Button>
           </DialogFooter>
         </DialogContent>

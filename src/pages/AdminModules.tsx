@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Modules — Gestion des modules et offres SaaS
+// Permet d'activer/désactiver les modules disponibles et de
+// configurer les offres tarifaires pour les tenants
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";

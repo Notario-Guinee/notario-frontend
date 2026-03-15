@@ -1,4 +1,7 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+// ═══════════════════════════════════════════════════════════════
+// Page Index — Page de secours par défaut de l'application
+// Redirige vers le tableau de bord en cas d'URL non définie
+// ═══════════════════════════════════════════════════════════════
 
 const Index = () => {
   return (

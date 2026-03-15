@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Hook useIsMobile — Détecte si l'écran est en mode mobile
+// Surveille les changements de largeur via MediaQueryList
+// Point de rupture : 768px (valeur MOBILE_BREAKPOINT)
+// ═══════════════════════════════════════════════════════════════
+
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;
