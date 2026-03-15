@@ -39,6 +39,7 @@ import PortailClient from "./pages/PortailClient";
 import Administration from "./pages/Administration";
 import Utilisateurs from "./pages/Utilisateurs";
 import MonCabinet from "./pages/MonCabinet";
+import StockagePage from "./components/stockage/StockagePage";
 import NotFound from "./pages/NotFound";
 
 // ─── Pages d'administration globale ───
@@ -122,6 +123,8 @@ const App = () => (
               <Route path="/administration" element={<Administration />} />
               <Route path="/utilisateurs" element={<Utilisateurs />} />
               <Route path="/cabinet" element={<MonCabinet />} />
+              {/* Gestion du stockage et de l'abonnement */}
+              <Route path="/stockage" element={<StockagePage />} />
 
               {/* Routes d'administration globale */}
               <Route path="/admin/dashboard" element={<AdminDashboard />} />

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant KpiCard — Carte d'indicateur clé de performance (KPI)
+// Affiche une valeur principale, un titre, une tendance (+/-%)
+// et une icône colorée selon la catégorie (bleu, vert, rouge…)
+// ═══════════════════════════════════════════════════════════════
+
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown } from "lucide-react";
 

@@ -5,7 +5,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { Receipt, CheckCircle, AlertTriangle, FolderOpen, Clock, Users, FileText, Activity, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Receipt, CheckCircle, AlertTriangle, FolderOpen, Clock, Users, FileText, Activity, Loader2, HardDrive, Send } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { currentUser, mockDossiers, mockClients, mockActivities, mockTasks, mockAgendaToday, mockRevenueData, formatGNF } from "@/data/mockData";
@@ -32,6 +33,7 @@ const activityIcons: Record<string, React.ElementType> = {
 
 export default function Dashboard() {
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const [loading] = useState(false); // État de chargement (prêt pour connexion API)
   const storageUsed = 15.5;
   const storageTotal = 20;
@@ -175,29 +177,94 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* Widget de stockage */}
-      <motion.div {...fadeUp} transition={{ delay: 0.22 }} className="max-w-sm rounded-xl border border-border bg-card p-5 shadow-card">
-        <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("dashboard.storage")}</h2>
-        <div className="flex items-center gap-4">
-          <div className="relative h-20 w-20">
-            <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-              <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
-              <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke={storagePercent > 90 ? "hsl(0 72% 51%)" : storagePercent > 70 ? "hsl(211 55% 48%)" : "hsl(87 52% 49%)"}
-                strokeWidth="3"
-                strokeDasharray={`${storagePercent}, 100`}
-                strokeLinecap="round" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center font-heading text-sm font-bold text-foreground">
-              {Math.round(storagePercent)}%
-            </span>
+      {/* ═══ Widget de stockage enrichi — barre de progression + catégories ═══ */}
+      <motion.div {...fadeUp} transition={{ delay: 0.22 }} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        {/* ── Résumé d'utilisation ── */}
+        <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-center gap-2 mb-4">
+            <HardDrive className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-heading text-sm font-semibold text-foreground">{t("dashboard.storage")}</h2>
           </div>
-          <div>
-            <p className="text-lg font-bold text-foreground">{storageUsed} Go</p>
-            <p className="text-xs text-muted-foreground">{t("dashboard.usedOf")} {storageTotal} Go {t("dashboard.used")}</p>
+
+          {/* Texte "Espace utilisé" */}
+          <p className="text-xs text-muted-foreground mb-2">
+            {lang === "FR" ? "Espace utilisé" : "Storage used"}
+          </p>
+
+          {/* Barre de progression horizontale */}
+          <div className="h-4 w-full rounded-full bg-muted overflow-hidden mb-3">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${storagePercent}%`,
+                background: storagePercent > 90
+                  ? "hsl(0 72% 51%)"
+                  : storagePercent > 70
+                    ? "hsl(38 92% 50%)"
+                    : "hsl(87 52% 49%)",
+              }}
+            />
           </div>
+
+          {/* Détail chiffré */}
+          <p className="text-xs text-muted-foreground">
+            {storageUsed} Go {lang === "FR" ? "utilisés sur" : "used of"} {storageTotal} Go {lang === "FR" ? "alloués" : "allocated"}
+          </p>
+          <p className={`text-xs mt-0.5 font-medium ${storagePercent > 90 ? "text-destructive" : "text-warning"}`}>
+            {(storageTotal - storageUsed).toFixed(1)} Go {lang === "FR" ? "disponibles" : "available"} — {Math.round(storagePercent)}% {lang === "FR" ? "utilisé" : "used"}
+          </p>
+
+          {/* Bouton d'action selon le niveau */}
+          <button
+            onClick={() => navigate('/stockage')}
+            className={`mt-4 w-full rounded-lg border px-4 py-2 text-xs font-semibold transition-colors ${
+              storagePercent > 90
+                ? "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                : "border-warning/50 bg-warning/10 text-warning hover:bg-warning/20"
+            }`}
+          >
+            <Send className="inline h-3 w-3 mr-1.5" />
+            {storagePercent > 90
+              ? (lang === "FR" ? "Extension urgente requise" : "Urgent extension required")
+              : (lang === "FR" ? "Demander une extension" : "Request more storage")}
+          </button>
+        </div>
+
+        {/* ── Détail par catégorie ── */}
+        <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <h2 className="font-heading text-sm font-semibold text-foreground mb-4">
+            {lang === "FR" ? "Détail par catégorie" : "Breakdown by category"}
+          </h2>
+          <div className="space-y-4">
+            {[
+              { label: lang === "FR" ? "Actes notariés" : "Notarial deeds", go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
+              { label: lang === "FR" ? "Archives numériques" : "Digital archives", go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
+              { label: lang === "FR" ? "Documents clients" : "Client documents", go: 1.3, pct: 8, color: "hsl(258 60% 56%)" },
+              { label: lang === "FR" ? "Factures" : "Invoices", go: 0.9, pct: 6, color: "hsl(38 92% 50%)" },
+            ].map((cat) => (
+              <div key={cat.label}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">{cat.label}</span>
+                  <span className="text-muted-foreground font-medium">{cat.go} Go — {cat.pct}%</span>
+                </div>
+                <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${cat.pct}%`, background: cat.color }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Total */}
+          <div className="mt-4 border-t border-border pt-3 flex justify-between text-sm">
+            <span className="font-semibold text-foreground">Total</span>
+            <span className="font-bold text-foreground">{storageUsed} Go / {storageTotal} Go</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {lang === "FR" ? "Dernière mise à jour" : "Last updated"} : {new Date().toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" })}
+          </p>
         </div>
       </motion.div>
     </div>
