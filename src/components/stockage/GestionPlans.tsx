@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import type { PlanNotario } from '@/types/stockage';
 import * as svc from '@/services/stockageService';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface GestionPlansProps {
   /** Callback déclenché après un upgrade réussi */
@@ -40,6 +41,7 @@ const PRIX_PLANS: Record<string, number> = {
 };
 
 export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) {
+  const { t } = useLanguage();
   const [plans, setPlans] = useState<PlanNotario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   /** Plan sélectionné en attente de confirmation dans le dialog */
@@ -85,10 +87,10 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
       {/* ── Titre de section ── */}
       <div>
         <h3 className="font-heading text-base font-semibold text-foreground">
-          Votre abonnement
+          {t("subs.plan.dialogTitle")}
         </h3>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Vous pouvez uniquement évoluer vers un plan supérieur.
+          {t("subs.plan.dialogSubtitle")}
         </p>
       </div>
 
@@ -112,24 +114,24 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
               {/* Badge "Plan actuel" */}
               {estActuel && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-primary-foreground whitespace-nowrap">
-                  <CheckCircle2 className="h-3 w-3" /> Plan actuel
+                  <CheckCircle2 className="h-3 w-3" /> {t("subs.plan.current")}
                 </span>
               )}
 
               {/* Nom du plan */}
               <h4 className="font-heading text-sm font-bold text-foreground mb-3 mt-1">
-                {plan.nom}
+                {t(`subs.plan.name.${plan.id.replace('plan-', '')}`)}
               </h4>
 
               {/* Caractéristiques */}
               <ul className="space-y-2 flex-1 mb-4">
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Users className="h-4 w-4 shrink-0" />
-                  {plan.utilisateurs_max} utilisateurs maximum
+                  {plan.utilisateurs_max} {t("subs.plan.usersMax")}
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <HardDrive className="h-4 w-4 shrink-0" />
-                  {plan.stockage_gb} GB de stockage inclus
+                  {plan.stockage_gb} {t("subs.plan.storageIncluded")}
                 </li>
               </ul>
 
@@ -144,17 +146,17 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
                   <TooltipTrigger asChild>
                     <span className="block">
                       <Button disabled className="w-full text-xs" variant="outline">
-                        Rétrogradation non disponible
+                        {t("subs.plan.downgradeUnavailable")}
                       </Button>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    La rétrogradation n'est pas autorisée
+                    {t("subs.plan.downgradeTooltip")}
                   </TooltipContent>
                 </Tooltip>
               ) : estActuel ? (
                 <Button disabled className="w-full text-xs" variant="outline">
-                  Plan actuel
+                  {t("subs.plan.current")}
                 </Button>
               ) : (
                 <Button
@@ -163,8 +165,8 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
                   disabled={isActionEnCours}
                 >
                   {isActionEnCours
-                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> En cours…</>
-                    : 'Passer à ce plan →'
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("subs.plan.upgrading")}</>
+                    : t("subs.plan.switchTo")
                   }
                 </Button>
               )}
@@ -178,27 +180,27 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-heading">
-              Passer à {planAConfirmer?.nom}
+              {t("subs.plan.switchTo")} {planAConfirmer?.nom}
             </DialogTitle>
             <DialogDescription>
-              Ce changement sera effectif immédiatement.
+              {t("subs.plan.dialogSubtitle")}
             </DialogDescription>
           </DialogHeader>
           {planAConfirmer && (
             <ul className="space-y-2 py-2">
               <li className="flex items-center gap-2 text-sm text-foreground">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                {planAConfirmer.utilisateurs_max} utilisateurs maximum
+                {planAConfirmer.utilisateurs_max} {t("subs.plan.usersMax")}
               </li>
               <li className="flex items-center gap-2 text-sm text-foreground">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
-                {planAConfirmer.stockage_gb} GB de stockage inclus
+                {planAConfirmer.stockage_gb} {t("subs.plan.storageIncluded")}
               </li>
             </ul>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPlanAConfirmer(null)}>
-              Annuler
+              {t("subs.plan.cancel")}
             </Button>
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1"
@@ -206,8 +208,8 @@ export function GestionPlans({ onUpgrade, isActionEnCours }: GestionPlansProps) 
               disabled={isActionEnCours}
             >
               {isActionEnCours
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> En cours…</>
-                : 'Confirmer l\'upgrade →'
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("subs.plan.upgrading")}</>
+                : t("subs.plan.confirmUpgrade")
               }
             </Button>
           </DialogFooter>

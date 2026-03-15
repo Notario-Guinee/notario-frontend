@@ -8,6 +8,7 @@ import { HardDrive, FileStack, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QuotaStockage, NiveauAlerte } from '@/types/stockage';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface JaugeStockageProps {
   quota: QuotaStockage | null;
@@ -31,6 +32,7 @@ function afficherGb(val: number): string {
 }
 
 export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageProps) {
+  const { t } = useLanguage();
   if (isLoading || !quota) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-4">
@@ -56,7 +58,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
         <div className="flex items-center gap-2">
           <HardDrive className="h-5 w-5 text-muted-foreground" />
           <h2 className="font-heading text-base font-semibold text-foreground">
-            Espace de stockage
+            {t("subs.gauge.title")}
           </h2>
         </div>
         <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -67,7 +69,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
       {/* ── Barre de progression ── */}
       <div className="mb-2">
         <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-          <span>Espace utilisé</span>
+          <span>{t("subs.gauge.used")}</span>
           <span className={cn('font-semibold', pourcentage_utilise >= 90 ? 'text-destructive' : 'text-foreground')}>
             {pctAffiche}%
           </span>
@@ -79,7 +81,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
           />
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          {afficherGb(stockage_utilise_gb)} utilisés sur {afficherGb(stockage_total_gb)}
+          {afficherGb(stockage_utilise_gb)} {t("subs.gauge.usedOf")} {afficherGb(stockage_total_gb)}
         </p>
       </div>
 
@@ -89,7 +91,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
         <div className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <FileStack className="h-3.5 w-3.5" />
-            Inclus dans le plan
+            {t("subs.gauge.planIncluded")}
           </span>
           <span className="font-medium text-foreground">{afficherGb(stockage_plan_gb)}</span>
         </div>
@@ -98,7 +100,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
         <div className="flex items-start justify-between text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <Package className="h-3.5 w-3.5" />
-            Packs mensuels actifs
+            {t("subs.gauge.activePacks")}
           </span>
           <span className="font-medium text-foreground">{afficherGb(stockage_packs_gb)}</span>
         </div>
@@ -116,7 +118,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
 
         {/* Total disponible */}
         <div className="flex items-center justify-between text-sm border-t border-border pt-2 mt-2">
-          <span className="font-semibold text-foreground">Total disponible</span>
+          <span className="font-semibold text-foreground">{t("subs.gauge.totalAvailable")}</span>
           <span className="font-bold text-foreground">{afficherGb(stockage_total_gb)}</span>
         </div>
       </div>

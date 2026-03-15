@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { PackMensuel } from '@/types/stockage';
 import * as svc from '@/services/stockageService';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface GestionPacksProps {
   onSouscrire: (packId: string) => Promise<void>;
@@ -41,21 +42,23 @@ function afficherCapacite(gb: number): string {
   return `${gb} GB`;
 }
 
-/** Formate une date ISO en format lisible français */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
-
 export function GestionPacks({
   onSouscrire,
   onResilier,
   onAnnulerResiliation,
   isActionEnCours,
 }: GestionPacksProps) {
+  const { t, lang } = useLanguage();
+
+  /** Formate une date ISO en format lisible selon la langue */
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(lang === 'EN' ? 'en-GB' : 'fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
   const [packs, setPacks] = useState<PackMensuel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   /** Pack en attente de confirmation de souscription */
@@ -117,7 +120,7 @@ export function GestionPacks({
       {packsActifs.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-heading text-sm font-semibold text-foreground flex items-center gap-2">
-            <Package className="h-4 w-4" /> Packs en cours
+            <Package className="h-4 w-4" /> {t("subs.packs.activeTitle")}
           </h3>
           {packsActifs.map(pack => (
             <div
@@ -137,16 +140,13 @@ export function GestionPacks({
                   <>
                     <p className="text-xs text-warning flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      Résiliation le {formatDate(pack.date_resiliation)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Le pack reste actif jusqu'à cette date.
+                      {t("subs.packs.cancelScheduled")} {formatDate(pack.date_resiliation)}
                     </p>
                   </>
                 ) : pack.date_renouvellement ? (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <RefreshCw className="h-3 w-3" />
-                    Prochain renouvellement : {formatDate(pack.date_renouvellement)}
+                    {t("subs.packs.renewal")} : {formatDate(pack.date_renouvellement)}
                   </p>
                 ) : null}
               </div>
@@ -165,7 +165,7 @@ export function GestionPacks({
                 >
                   {isActionEnCours
                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : 'Annuler la résiliation'
+                    : t("subs.packs.cancelUndo")
                   }
                 </Button>
               ) : (
@@ -176,7 +176,7 @@ export function GestionPacks({
                   onClick={() => setPackAResilier(pack)}
                   disabled={isActionEnCours}
                 >
-                  Résilier en fin de mois
+                  {t("subs.packs.cancelAction")}
                 </Button>
               )}
             </div>
@@ -188,10 +188,10 @@ export function GestionPacks({
       <div className="space-y-4">
         <div>
           <h3 className="font-heading text-sm font-semibold text-foreground flex items-center gap-2">
-            <PackageOpen className="h-4 w-4" /> Ajouter du stockage mensuel
+            <PackageOpen className="h-4 w-4" /> {t("subs.packs.sectionTitle")}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Facturé chaque mois · Résiliable à tout moment · Stockage ajouté immédiatement
+            {t("subs.packs.sectionSubtitle")}
           </p>
         </div>
 
@@ -212,7 +212,7 @@ export function GestionPacks({
               {/* Badge "Populaire" sur Pack M */}
               {pack.est_populaire && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-bold text-white whitespace-nowrap">
-                  <Star className="h-3 w-3" /> Populaire
+                  <Star className="h-3 w-3" /> {t("subs.packs.popular")}
                 </span>
               )}
 
@@ -230,11 +230,11 @@ export function GestionPacks({
               {/* Bouton souscrire / souscrit / rétrogradation interdite */}
               {pack.est_actif ? (
                 <Button disabled variant="outline" className="w-full text-xs gap-1">
-                  <Check className="h-3.5 w-3.5" /> Souscrit
+                  <Check className="h-3.5 w-3.5" /> {t("subs.packs.active")}
                 </Button>
               ) : estRetrogradation(pack) ? (
                 <Button disabled variant="outline" className="w-full text-xs">
-                  Non disponible
+                  {t("subs.packs.unavailable")}
                 </Button>
               ) : (
                 <Button
@@ -242,7 +242,7 @@ export function GestionPacks({
                   onClick={() => setPackASouscrire(pack)}
                   disabled={isActionEnCours}
                 >
-                  Souscrire
+                  {t("subs.packs.subscribe")}
                 </Button>
               )}
             </div>
@@ -255,28 +255,27 @@ export function GestionPacks({
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-heading">
-              Souscrire au {packASouscrire?.nom}
+              {t("subs.packs.dialogTitle")} — {packASouscrire?.nom}
             </DialogTitle>
             <DialogDescription>
-              Vérifiez les détails avant de confirmer.
+              {t("subs.packs.dialogRenewalLabel")} {t("subs.packs.dialogRenewalValue")}
             </DialogDescription>
           </DialogHeader>
           {packASouscrire && (
             <ul className="space-y-2 py-2 text-sm">
-              <li className="flex items-center gap-2">✅ +{afficherCapacite(packASouscrire.stockage_gb)} ajoutés immédiatement</li>
-              <li className="flex items-center gap-2">💳 {new Intl.NumberFormat('fr-FR').format(packASouscrire.prix_mois_gnf)} GNF prélevés maintenant</li>
-              <li className="flex items-center gap-2">🔄 Renouvelé automatiquement chaque mois</li>
-              <li className="flex items-center gap-2">❌ Résiliable à tout moment depuis cette page</li>
+              <li className="flex items-center gap-2">✅ {t("subs.packs.dialogStorageLabel")} +{afficherCapacite(packASouscrire.stockage_gb)}</li>
+              <li className="flex items-center gap-2">💳 {t("subs.packs.dialogPriceLabel")} {new Intl.NumberFormat('fr-FR').format(packASouscrire.prix_mois_gnf)} GNF</li>
+              <li className="flex items-center gap-2">🔄 {t("subs.packs.dialogRenewalLabel")} {t("subs.packs.dialogRenewalValue")}</li>
               {packsActifs.length > 0 && packASouscrire && packASouscrire.stockage_gb > stockagePackActif && (
                 <li className="flex items-start gap-2 text-muted-foreground text-xs pt-1 border-t border-border">
-                  ℹ️ Votre pack actuel sera automatiquement remplacé. Vos données sont conservées.
+                  ℹ️ {t("subs.packs.dialogReplaceNote")}
                 </li>
               )}
             </ul>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPackASouscrire(null)}>
-              Annuler
+              {t("subs.packs.dialogCancel")}
             </Button>
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90"
@@ -284,8 +283,8 @@ export function GestionPacks({
               disabled={isActionEnCours}
             >
               {isActionEnCours
-                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> En cours…</>
-                : 'Confirmer et souscrire'
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {t("subs.packs.subscribing")}</>
+                : t("subs.packs.dialogConfirm")
               }
             </Button>
           </DialogFooter>
@@ -297,26 +296,22 @@ export function GestionPacks({
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-heading text-destructive">
-              Résilier le {packAResilier?.nom} ?
+              {packAResilier?.nom} — {t("subs.packs.cancelAction")}
             </DialogTitle>
             <DialogDescription>
-              Cette action programmera l'arrêt du pack en fin de mois.
+              {t("subs.packs.cancelScheduled")} {packAResilier?.date_renouvellement ? formatDate(packAResilier.date_renouvellement) : ''}
             </DialogDescription>
           </DialogHeader>
           {packAResilier && (
             <div className="py-2 space-y-1 text-sm text-foreground">
               <p>
-                Le pack restera actif jusqu'au{' '}
-                <strong>{packAResilier.date_renouvellement ? formatDate(packAResilier.date_renouvellement) : 'fin du mois'}</strong>.
-              </p>
-              <p className="text-muted-foreground">
-                Vous perdrez {afficherCapacite(packAResilier.stockage_gb)} de stockage supplémentaire à cette date.
+                {afficherCapacite(packAResilier.stockage_gb)}
               </p>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setPackAResilier(null)}>
-              Annuler
+              {t("subs.packs.dialogCancel")}
             </Button>
             <Button
               variant="destructive"
@@ -324,8 +319,8 @@ export function GestionPacks({
               disabled={isActionEnCours}
             >
               {isActionEnCours
-                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> En cours…</>
-                : 'Confirmer la résiliation'
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {t("subs.packs.subscribing")}</>
+                : t("subs.packs.cancelAction")
               }
             </Button>
           </DialogFooter>

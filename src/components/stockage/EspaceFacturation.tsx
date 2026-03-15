@@ -8,6 +8,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { Building2, CreditCard, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, Eye, EyeOff } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,30 +38,18 @@ function formatGnf(montant: number): string {
   return new Intl.NumberFormat('fr-FR').format(montant) + ' GNF';
 }
 
-/** Formate une date ISO en format court */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
-
-/** Configuration du badge de statut de facture */
+/** Configuration du badge de statut de facture (sans label — géré via t() dans le composant) */
 const statutConfig = {
   payé: {
     classes: 'bg-success/15 text-success border-success/30',
-    label: 'Payé',
     Icone: CheckCircle2,
   },
   en_attente: {
     classes: 'bg-warning/15 text-warning border-warning/30',
-    label: 'En attente',
     Icone: Clock,
   },
   échoué: {
     classes: 'bg-destructive/15 text-destructive border-destructive/30',
-    label: 'Échoué',
     Icone: XCircle,
   },
 } as const;
@@ -89,6 +78,17 @@ function detecterTypeCarte(numero: string): InfosCarteBancaire['type_carte'] {
 }
 
 export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationProps) {
+  const { t, lang } = useLanguage();
+
+  /** Formate une date ISO en format court selon la langue */
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(lang === 'EN' ? 'en-GB' : 'fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
   const [infos, setInfos] = useState<InfosFacturation | null>(null);
   const [carte, setCarte] = useState<InfosCarteBancaire | null>(null);
   const [factures, setFactures] = useState<LigneFacture[]>([]);
@@ -153,9 +153,9 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
     setIsSaving(true);
     try {
       await svc.sauvegarderInfosFacturation(infos);
-      toast.success('Informations enregistrées avec succès.');
+      toast.success(t("subs.billing.saveSuccess"));
     } catch {
-      toast.error("Une erreur est survenue lors de l'enregistrement.");
+      toast.error(t("subs.billing.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -200,9 +200,9 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
       await svc.sauvegarderInfosCarteBancaire(carte);
       // Le CVV ne doit pas être conservé en mémoire côté UI après sauvegarde
       setCarte(prev => prev ? { ...prev, cvv: '' } : prev);
-      toast.success('Coordonnées bancaires enregistrées avec succès.');
+      toast.success(t("subs.card.saveSuccess"));
     } catch {
-      toast.error("Une erreur est survenue lors de l'enregistrement.");
+      toast.error(t("subs.card.saveError"));
     } finally {
       setIsSavingCarte(false);
     }
@@ -219,7 +219,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
         <div className="flex items-center gap-2 mb-5">
           <Building2 className="h-5 w-5 text-muted-foreground" />
           <h3 className="font-heading text-base font-semibold text-foreground">
-            Informations de facturation
+            {t("subs.billing.legalTitle")}
           </h3>
         </div>
 
@@ -232,7 +232,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Raison sociale */}
               <div className="space-y-1.5">
-                <Label htmlFor="raison_sociale">Raison sociale *</Label>
+                <Label htmlFor="raison_sociale">{t("subs.billing.companyName")} *</Label>
                 <Input
                   id="raison_sociale"
                   value={infos.raison_sociale}
@@ -246,7 +246,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* N° RCCM */}
               <div className="space-y-1.5">
-                <Label htmlFor="numero_rccm">N° RCCM *</Label>
+                <Label htmlFor="numero_rccm">{t("subs.billing.rccm")} *</Label>
                 <Input
                   id="numero_rccm"
                   value={infos.numero_rccm}
@@ -261,7 +261,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Adresse */}
               <div className="space-y-1.5">
-                <Label htmlFor="adresse">Adresse *</Label>
+                <Label htmlFor="adresse">{t("subs.billing.address")} *</Label>
                 <Input
                   id="adresse"
                   value={infos.adresse}
@@ -275,7 +275,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Ville */}
               <div className="space-y-1.5">
-                <Label htmlFor="ville">Ville *</Label>
+                <Label htmlFor="ville">{t("subs.billing.city")} *</Label>
                 <Input
                   id="ville"
                   value={infos.ville}
@@ -289,7 +289,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Email de facturation */}
               <div className="space-y-1.5">
-                <Label htmlFor="email_facturation">Email de facturation *</Label>
+                <Label htmlFor="email_facturation">{t("subs.billing.email")} *</Label>
                 <Input
                   id="email_facturation"
                   type="email"
@@ -304,7 +304,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Téléphone */}
               <div className="space-y-1.5">
-                <Label htmlFor="telephone">Téléphone *</Label>
+                <Label htmlFor="telephone">{t("subs.billing.phone")} *</Label>
                 <Input
                   id="telephone"
                   value={infos.telephone}
@@ -324,8 +324,8 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
               disabled={isSaving}
             >
               {isSaving
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement…</>
-                : 'Enregistrer les informations'
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("subs.billing.saving")}</>
+                : t("subs.billing.save")
               }
             </Button>
           </form>
@@ -337,12 +337,11 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
         <div className="flex items-center gap-2 mb-5">
           <CreditCard className="h-5 w-5 text-muted-foreground" />
           <h3 className="font-heading text-base font-semibold text-foreground">
-            Coordonnées bancaires
+            {t("subs.card.title")}
           </h3>
         </div>
         <p className="text-xs text-muted-foreground mb-5">
-          Ces informations sont utilisées pour le prélèvement automatique mensuel de votre abonnement.
-          Le CVV n'est jamais conservé après enregistrement.
+          {t("subs.card.securityNote")}
         </p>
 
         {isLoadingCarte ? (
@@ -355,7 +354,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Titulaire */}
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="titulaire">Nom du titulaire *</Label>
+                <Label htmlFor="titulaire">{t("subs.card.holder")} *</Label>
                 <Input
                   id="titulaire"
                   value={carte.titulaire}
@@ -370,7 +369,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Numéro de carte */}
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="numero_carte">Numéro de carte *</Label>
+                <Label htmlFor="numero_carte">{t("subs.card.number")} *</Label>
                 <div className="relative">
                   <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -395,7 +394,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Date d'expiration */}
               <div className="space-y-1.5">
-                <Label htmlFor="date_expiration">Date d'expiration *</Label>
+                <Label htmlFor="date_expiration">{t("subs.card.expiry")} *</Label>
                 <Input
                   id="date_expiration"
                   value={carte.date_expiration}
@@ -411,7 +410,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* CVV */}
               <div className="space-y-1.5">
-                <Label htmlFor="cvv">CVV / CVC *</Label>
+                <Label htmlFor="cvv">{t("subs.card.cvv")} *</Label>
                 <div className="relative">
                   <Input
                     id="cvv"
@@ -438,7 +437,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Banque émettrice */}
               <div className="space-y-1.5">
-                <Label htmlFor="banque_emettrice">Banque émettrice *</Label>
+                <Label htmlFor="banque_emettrice">{t("subs.card.bank")} *</Label>
                 <Input
                   id="banque_emettrice"
                   value={carte.banque_emettrice}
@@ -453,7 +452,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
 
               {/* Type de carte */}
               <div className="space-y-1.5">
-                <Label htmlFor="type_carte">Type de carte</Label>
+                <Label htmlFor="type_carte">{t("subs.card.type")}</Label>
                 <Select
                   value={carte.type_carte}
                   onValueChange={v => mettreAJourCarte('type_carte', v as InfosCarteBancaire['type_carte'])}
@@ -473,7 +472,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
             </div>
 
             <p className="text-[11px] text-muted-foreground">
-              Vos données bancaires sont chiffrées et sécurisées. Le CVV n'est jamais stocké après validation.
+              {t("subs.card.securityNote")}
             </p>
 
             <Button
@@ -482,8 +481,8 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
               disabled={isSavingCarte}
             >
               {isSavingCarte
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Enregistrement…</>
-                : 'Enregistrer les coordonnées bancaires'
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("subs.card.saving")}</>
+                : t("subs.card.save")
               }
             </Button>
           </form>
@@ -493,7 +492,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
       {/* ══ BLOC 4 : Historique des factures ══ */}
       <div className="rounded-xl border border-border bg-card p-6 shadow-card">
         <h3 className="font-heading text-base font-semibold text-foreground mb-5">
-          Historique des factures
+          {t("subs.invoices.title")}
         </h3>
 
         {isLoadingFactures ? (
@@ -505,10 +504,10 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Montant</TableHead>
-                  <TableHead className="text-center">Statut</TableHead>
+                  <TableHead>{t("subs.invoices.date")}</TableHead>
+                  <TableHead>{t("subs.invoices.description")}</TableHead>
+                  <TableHead className="text-right">{t("subs.invoices.amount")}</TableHead>
+                  <TableHead className="text-center">{t("subs.invoices.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -533,7 +532,11 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
                             cfg.classes
                           )}>
                             <Icone className="h-3 w-3" />
-                            {cfg.label}
+                            {facture.statut === 'payé'
+                              ? t("subs.invoices.paid")
+                              : facture.statut === 'en_attente'
+                                ? t("subs.invoices.pending")
+                                : t("subs.invoices.failed")}
                           </span>
                           {/* Bouton "Réessayer" pour les factures échouées */}
                           {facture.statut === 'échoué' && (
@@ -544,7 +547,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
                               onClick={() => toast.info('Nouvelle tentative de paiement en cours…')}
                             >
                               <RefreshCw className="h-3 w-3" />
-                              Réessayer
+                              {t("subs.invoices.download")}
                             </Button>
                           )}
                         </div>

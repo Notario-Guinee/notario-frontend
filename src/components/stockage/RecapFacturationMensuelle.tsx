@@ -6,6 +6,7 @@
 import { Receipt, CalendarDays, Minus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { RecapFacturation } from '@/types/stockage';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface RecapFacturationMensuelleProps {
   recap: RecapFacturation | null;
@@ -17,16 +18,24 @@ function formatGnf(montant: number): string {
   return new Intl.NumberFormat('fr-FR').format(montant) + ' GNF';
 }
 
-/** Formate une date ISO en format lisible français */
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
 export function RecapFacturationMensuelle({ recap, isLoading }: RecapFacturationMensuelleProps) {
+  const { t, lang } = useLanguage();
+
+  /** Traduit un nom de plan à partir de son nom français */
+  const planNomMap: Record<string, string> = {
+    'Offre Essentielle': t('subs.plan.name.essentielle'),
+    'Offre Professionnelle': t('subs.plan.name.professionnelle'),
+    'Offre Premium': t('subs.plan.name.premium'),
+  };
+
+  /** Formate une date ISO en format lisible selon la langue */
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(lang === 'EN' ? 'en-GB' : 'fr-FR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
   if (isLoading || !recap) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-3">
@@ -45,7 +54,7 @@ export function RecapFacturationMensuelle({ recap, isLoading }: RecapFacturation
       <div className="flex items-center gap-2 mb-5">
         <Receipt className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-heading text-base font-semibold text-foreground">
-          Récapitulatif de facturation mensuelle
+          {t("subs.recap.title")}
         </h3>
       </div>
 
@@ -53,7 +62,7 @@ export function RecapFacturationMensuelle({ recap, isLoading }: RecapFacturation
       <div className="space-y-2.5">
         {/* Plan */}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-foreground">{recap.plan_nom}</span>
+          <span className="text-foreground">{planNomMap[recap.plan_nom] ?? recap.plan_nom}</span>
           <span className="font-medium text-foreground tabular-nums">
             {formatGnf(recap.plan_montant_gnf)}
           </span>
@@ -77,7 +86,7 @@ export function RecapFacturationMensuelle({ recap, isLoading }: RecapFacturation
 
         {/* Total */}
         <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-foreground">Total mensuel</span>
+          <span className="text-sm font-bold text-foreground">{t("subs.recap.total")}</span>
           <span className="text-base font-bold text-primary tabular-nums">
             {formatGnf(recap.total_mensuel_gnf)}
           </span>
@@ -88,7 +97,7 @@ export function RecapFacturationMensuelle({ recap, isLoading }: RecapFacturation
       <div className="mt-4 pt-4 border-t border-border flex items-center gap-2 text-sm text-muted-foreground">
         <CalendarDays className="h-4 w-4 shrink-0" />
         <span>
-          Prochaine échéance : <strong className="text-foreground">{formatDate(recap.prochaine_echeance)}</strong>
+          {t("subs.recap.nextDue")} <strong className="text-foreground">{formatDate(recap.prochaine_echeance)}</strong>
         </span>
       </div>
     </div>

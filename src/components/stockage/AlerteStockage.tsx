@@ -7,6 +7,7 @@
 import { AlertTriangle, AlertCircle, XCircle, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { NiveauAlerte, QuotaStockage } from '@/types/stockage';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface AlerteStockageProps {
   niveauAlerte: NiveauAlerte;
@@ -41,6 +42,8 @@ const configAlertes = {
 } as const;
 
 export function AlerteStockage({ niveauAlerte, quota, onAjouterStockage }: AlerteStockageProps) {
+  const { t } = useLanguage();
+
   // Rien à afficher si tout va bien
   if (niveauAlerte === 'normal' || !quota) return null;
 
@@ -51,17 +54,17 @@ export function AlerteStockage({ niveauAlerte, quota, onAjouterStockage }: Alert
 
   /** Texte principal selon le niveau */
   const titre = niveauAlerte === 'plein'
-    ? 'Stockage plein. Les téléversements sont bloqués.'
+    ? t("subs.alert.critical")
     : niveauAlerte === 'urgent'
-      ? `Seulement ${restant} GB restants !`
-      : `Vous avez utilisé ${pct}% de votre espace de stockage.`;
+      ? `${restant} GB — ${t("subs.alert.low")}`
+      : `${pct}% — ${t("subs.alert.low")}`;
 
   /** Sous-texte incitatif */
   const sousTitre = niveauAlerte === 'plein'
-    ? 'Ajoutez un pack immédiatement pour débloquer les téléversements.'
+    ? t("subs.alert.criticalSub")
     : niveauAlerte === 'urgent'
-      ? 'Ajoutez un pack pour éviter tout blocage.'
-      : 'Pensez à ajouter un pack mensuel.';
+      ? t("subs.alert.criticalSub")
+      : t("subs.alert.lowSub");
 
   return (
     <div className={`flex items-start justify-between gap-4 rounded-xl border p-4 ${cfg.classes}`}>
@@ -78,7 +81,7 @@ export function AlerteStockage({ niveauAlerte, quota, onAjouterStockage }: Alert
         onClick={onAjouterStockage}
         className="shrink-0 text-xs gap-1"
       >
-        Ajouter du stockage
+        {t("subs.alert.addStorage")}
         <ChevronRight className="h-3 w-3" />
       </Button>
     </div>

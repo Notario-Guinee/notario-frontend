@@ -17,6 +17,7 @@ import { GestionPlans } from './GestionPlans';
 import { GestionPacks } from './GestionPacks';
 import { EspaceFacturation } from './EspaceFacturation';
 import { useStockage } from '@/hooks/useStockage';
+import { useLanguage } from '@/context/LanguageContext';
 
 /** Identifiants des onglets */
 const ONGLETS = {
@@ -28,6 +29,7 @@ const ONGLETS = {
 type OngletId = typeof ONGLETS[keyof typeof ONGLETS];
 
 export default function StockagePage() {
+  const { t } = useLanguage();
   const {
     quota,
     isLoading,
@@ -62,10 +64,10 @@ export default function StockagePage() {
         </div>
         <div>
           <h1 className="font-heading text-xl font-bold text-foreground">
-            Gestion du stockage et de l'abonnement
+            {t("subs.page.title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Gérez votre plan, vos packs de stockage et votre facturation
+            {t("subs.page.subtitle")}
           </p>
         </div>
       </div>
@@ -92,13 +94,13 @@ export default function StockagePage() {
         >
           <TabsList className="w-full sm:w-auto">
             <TabsTrigger value={ONGLETS.ABONNEMENT} className="flex-1 sm:flex-none">
-              Abonnement
+              {t("subs.tab.subscription")}
             </TabsTrigger>
             <TabsTrigger value={ONGLETS.PACKS} className="flex-1 sm:flex-none">
-              Stockage supplémentaire
+              {t("subs.tab.packs")}
             </TabsTrigger>
             <TabsTrigger value={ONGLETS.FACTURATION} className="flex-1 sm:flex-none">
-              Facturation
+              {t("subs.tab.billing")}
             </TabsTrigger>
           </TabsList>
 
