@@ -27,7 +27,8 @@ export interface WorkflowConfig {
 }
 
 // Default palette
-export const WORKFLOW_PALETTE = ["#2E4057", "#2AA3D6", "#F4A300", "#28A89E", "#87BF3C"];
+// Palette visible sur fond sombre (#313131) ET fond clair — contraste ≥ 4.5:1 sur les deux
+export const WORKFLOW_PALETTE = ["#5B9BD5", "#38C0F0", "#F4A300", "#2DD4BF", "#99D04A"];
 
 // Helper: compute elapsed days from a date string
 export function getElapsedDays(startedAt?: string): number {
