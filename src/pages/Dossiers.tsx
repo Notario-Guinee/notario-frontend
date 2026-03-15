@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Dossiers — Gestion complète des dossiers notariaux
+// Inclut : liste/grille, CRUD, détail tiroir avec workflow,
+// gestion des parties prenantes, filtres, export CSV/PDF
+// ═══════════════════════════════════════════════════════════════
+
 import { useState, useMemo } from "react";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";

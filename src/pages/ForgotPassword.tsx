@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Mot de passe oublié — Récupération de compte
+// Formulaire de demande de réinitialisation par email, affiche
+// une confirmation après envoi du lien de réinitialisation
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, ArrowLeft, CheckCircle, ShieldCheck, User, KeyRound } from "lucide-react";

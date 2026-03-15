@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Mon Cabinet — Profil et paramètres du cabinet notarial
+// Inclut : informations générales, logo, coordonnées, sécurité
+// et gestion de l'avatar du gérant avec upload d'image
+// ═══════════════════════════════════════════════════════════════
+
 import { useState, useRef } from "react";
 import { Building2, Upload, User, Shield, Mail, Phone, MapPin, Camera, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";

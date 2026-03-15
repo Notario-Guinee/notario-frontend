@@ -1,4 +1,9 @@
-// Workflow Procedural - JSON Schema types
+// ═══════════════════════════════════════════════════════════════
+// Types et données du workflow procédural
+// Définit les interfaces WorkflowStep / WorkflowConfig,
+// les palettes de couleurs, les utilitaires de durée écoulée
+// et les modèles de workflow prédéfinis par type d'acte notarial
+// ═══════════════════════════════════════════════════════════════
 
 export interface WorkflowStep {
   key: string;

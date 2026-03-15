@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Archives Physiques — Gestion des archives papier du cabinet
+// Inclut : registres d'archivage, localisation physique, CRUD
+// boîtes/rayons, recherche par référence ou type d'acte
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, Package, Search, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";

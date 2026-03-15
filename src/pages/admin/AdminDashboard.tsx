@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Dashboard — Vue d'ensemble de la plateforme SaaS
+// Affiche les KPI globaux (tenants, utilisateurs, revenus) et
+// les raccourcis vers les modules d'administration principale
+// ═══════════════════════════════════════════════════════════════
+
 import { Building2, Users, Receipt, Activity, Package, Key, TrendingUp, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";

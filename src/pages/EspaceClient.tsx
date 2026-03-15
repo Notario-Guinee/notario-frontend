@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Espace Client — Interface du portail client personnel
+// Permet au client de consulter ses dossiers, documents, messages
+// et de gérer son profil et son mot de passe
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FolderOpen, FileText, MessageSquare, Bell, Settings, LogOut, Upload, CheckCircle, Clock, XCircle, AlertTriangle, Send, User, ChevronRight, Eye, EyeOff, Save, KeyRound } from "lucide-react";

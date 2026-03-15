@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Modèles de Documents — Bibliothèque de modèles notariaux
+// Inclut : création, modification, duplication et suppression de
+// modèles d'actes, filtrables par type et catégorie
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, FileText, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";

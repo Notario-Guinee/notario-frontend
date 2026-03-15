@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Journal d'Audit — Traçabilité globale de la plateforme
+// Historique de toutes les actions d'administration : connexions,
+// modifications de tenants, changements de droits et alertes
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn, searchMatch } from "@/lib/utils";
 import { Shield, Search, Download, LogIn, Edit, Trash2, Eye } from "lucide-react";

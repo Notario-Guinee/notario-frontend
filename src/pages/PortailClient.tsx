@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Portail Client — Configuration de l'espace client en ligne
+// Permet au gérant d'activer/désactiver les fonctionnalités du
+// portail, de partager des documents et d'envoyer des invitations
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Globe, FileText, Send, Bell, FolderOpen, Share2, MessageSquare, Settings, CheckCircle, XCircle, Clock, Plus, Upload, AlertTriangle, FileUp, Search } from "lucide-react";

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Connexion Admin Global — Authentification de l'admin SaaS
+// Accès sécurisé à la console d'administration globale de la
+// plateforme Notario (gestion des tenants, modules, facturation)
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, AlertTriangle } from "lucide-react";

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Tenants — Vue d'ensemble des cabinets (tenants)
+// Affiche les KPI globaux et la liste des cabinets inscrits
+// sur la plateforme avec leurs statuts et métriques
+// ═══════════════════════════════════════════════════════════════
+
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatGNF } from "@/data/mockData";

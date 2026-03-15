@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Actes & Signatures — Gestion des actes notariaux
+// Inclut : liste avec filtres, workflow procédural interactif,
+// tiroir de détail, transitions d'état (brouillon → signature → signé)
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, Search, FileText, PenLine, CheckCircle2, DollarSign, Download, Eye, X, MoreHorizontal, Edit, Trash2, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";

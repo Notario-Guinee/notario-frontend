@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Kanban — Tableau de gestion des tâches en colonnes
+// Inclut : drag & drop, CRUD tâches, tiroir de détail,
+// déplacement entre colonnes (À faire / En cours / Terminée)
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, Download, ListTodo, Clock, CheckCircle2, AlertTriangle, CalendarClock, X, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

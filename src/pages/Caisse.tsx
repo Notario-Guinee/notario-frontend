@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Caisse & Débours — Gestion de la trésorerie du cabinet
+// Inclut : soldes par mode de paiement, totaux entrées/sorties,
+// journal des opérations filtrable, CRUD des mouvements de caisse
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, TrendingUp, TrendingDown, AlertTriangle, Edit, MoreHorizontal, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Agenda — Gestion des rendez-vous du cabinet
+// Inclut : vues semaine/mois/jour/liste, création de RDV,
+// rappels de notification, détail modal par rendez-vous
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, X, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";

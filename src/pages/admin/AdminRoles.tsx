@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Rôles & Permissions — Gestion des droits d'accès
+// Configuration des rôles (admin, gérant, collaborateur) et de
+// leurs permissions sur les différents modules de la plateforme
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Shield, Users, Plus, Edit } from "lucide-react";

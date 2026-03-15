@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Comptes Bancaires — Gestion des comptes du cabinet
+// Inclut : cartes par compte, solde total consolidé, opérations
+// récentes, ajout/modification/suppression de comptes bancaires
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, TrendingUp, TrendingDown, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";

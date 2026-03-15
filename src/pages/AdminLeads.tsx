@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Leads (ancien) — Gestion des leads prospects
+// Note : ce fichier est un alias de pages/admin/AdminLeadsPage.tsx
+// ═══════════════════════════════════════════════════════════════
+
 import { StatusBadge } from "@/components/ui/status-badge";
 import { motion } from "framer-motion";
 

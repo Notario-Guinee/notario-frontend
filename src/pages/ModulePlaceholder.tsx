@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant ModulePlaceholder — Page temporaire pour modules
+// Affiche un message « en construction » pour les routes dont
+// le contenu n'est pas encore développé
+// ═══════════════════════════════════════════════════════════════
+
 import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Construction } from "lucide-react";

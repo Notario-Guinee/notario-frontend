@@ -1,4 +1,9 @@
-// Mock data with realistic Guinean names and notarial context
+// ═══════════════════════════════════════════════════════════════
+// Données fictives (mock) — Simule le backend de l'application
+// Contient : utilisateur courant, clients, dossiers, tâches,
+// factures, paiements, agenda, activités et données financières
+// Noms basés sur le contexte notarial guinéen (Conakry)
+// ═══════════════════════════════════════════════════════════════
 
 export const currentUser = {
   id: "1",

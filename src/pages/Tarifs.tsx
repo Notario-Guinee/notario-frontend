@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Moteur de Tarifs — Configuration des barèmes notariaux
+// Gestion des grilles tarifaires par type d'acte, avec calcul
+// automatique des honoraires selon le montant de la transaction
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Calculator, ChevronRight, Plus, Pencil, Trash2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

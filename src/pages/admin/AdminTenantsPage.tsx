@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Tenants — Gestion complète des cabinets (tenants)
+// Inclut : liste avec filtres et recherche, CRUD des tenants,
+// détail des modules activés, du stockage et de la facturation
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn, searchMatch } from "@/lib/utils";
 import { Building2, Users, Receipt, Activity, Search, Plus, Eye, Edit, Trash2, Package, HardDrive } from "lucide-react";

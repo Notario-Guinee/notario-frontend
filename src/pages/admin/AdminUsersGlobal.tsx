@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Utilisateurs Globaux — Gestion des comptes admin
+// Liste et CRUD des utilisateurs ayant accès à la console
+// d'administration globale de la plateforme Notario
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn, searchMatch } from "@/lib/utils";
 import { Users, Plus, Edit, Search, Clock, Shield } from "lucide-react";

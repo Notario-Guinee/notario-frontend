@@ -1,3 +1,10 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant WorkflowProcedural — Visualisation des étapes d'un
+// dossier notarial sous forme de pipeline interactif animé
+// Supporte les dispositions horizontale (≥900px) et verticale
+// Actions disponibles : Démarrer, Terminer, Revenir en arrière
+// ═══════════════════════════════════════════════════════════════
+
 import { useCallback, useEffect, useState } from "react";
 import {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,

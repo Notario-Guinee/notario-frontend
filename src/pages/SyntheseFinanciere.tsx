@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Synthèse Financière — Tableaux de bord financiers
+// Affiche KPI (revenus, dépenses), graphiques linéaire/barre/camembert
+// et analyse de la répartition par type d'acte et mode de paiement
+// ═══════════════════════════════════════════════════════════════
+
 import { KpiCard } from "@/components/ui/kpi-card";
 import { mockRevenueData, formatGNF } from "@/data/mockData";
 import { TrendingUp, TrendingDown, Wallet, Receipt } from "lucide-react";

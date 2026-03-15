@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════
+// Bouton de changement de langue — Bascule entre FR et EN
+// Affiche le code langue opposé pour inviter au changement
+// ═══════════════════════════════════════════════════════════════
+
 import { useLanguage } from "@/context/LanguageContext";
 import { Globe } from "lucide-react";
 

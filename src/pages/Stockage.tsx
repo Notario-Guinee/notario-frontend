@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Stockage — Gestion de l'espace de stockage du cabinet
+// Affiche la répartition par type de fichier, l'utilisation
+// totale et les alertes de capacité via un graphique camembert
+// ═══════════════════════════════════════════════════════════════
+
 import { HardDrive, FileText, Image, Archive, File, AlertTriangle } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Notifications — Centre de notifications de l'application
+// Inclut : fil des alertes (dossiers, paiements, RDV, sécurité),
+// marquage lu/non-lu, filtres par catégorie et préférences
+// ═══════════════════════════════════════════════════════════════
+
 import { useState, useEffect } from "react";
 import { Bell, Check, FolderOpen, Receipt, User, Calendar, Shield, CheckCheck, Clock, FileText, AlertTriangle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";

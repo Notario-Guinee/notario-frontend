@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Types d'Actions — Référentiel des types d'actes notariaux
+// Gestion des catégories d'actes (vente, succession, donation…)
+// avec activation/désactivation, statistiques et personnalisation
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { Plus, Search, FileText, CheckCircle2, XCircle, Clock, TrendingUp, Edit, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Sécurité & Audit — Journal d'activité et contrôle d'accès
+// Affiche l'historique des connexions, modifications et alertes
+// de sécurité de tous les utilisateurs du cabinet
+// ═══════════════════════════════════════════════════════════════
+
 import { Shield, LogIn, Edit, Trash2, Download, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 

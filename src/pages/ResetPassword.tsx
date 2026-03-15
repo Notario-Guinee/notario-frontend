@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Réinitialisation du mot de passe — Formulaire accessible
+// via le lien reçu par email, permet de définir un nouveau mdp
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";

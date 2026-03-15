@@ -1,3 +1,10 @@
+// ═══════════════════════════════════════════════════════════════
+// Fichier de traductions — Internationalisation (i18n)
+// Contient toutes les chaînes de l'application en FR et EN
+// Organisé par catégories : navigation, actions, messages, etc.
+// Utilisé par le hook useLanguage via la fonction t(clé)
+// ═══════════════════════════════════════════════════════════════
+
 export type Language = "FR" | "EN";
 
 export const translations: Record<Language, Record<string, string>> = {

@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Landing — Page d'accueil publique de la plateforme
+// Présente les fonctionnalités de Notario aux prospects avec
+// appels à l'action vers la connexion et l'inscription
+// ═══════════════════════════════════════════════════════════════
+
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
