@@ -62,7 +62,7 @@ export function JaugeStockage({ quota, niveauAlerte, isLoading }: JaugeStockageP
           </h2>
         </div>
         <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-          {plan_actuel.nom}
+          {t(`subs.plan.name.${plan_actuel.id.replace('plan-', '')}`)}
         </span>
       </div>
 

@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, FormEvent } from 'react';
-import { Building2, CreditCard, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, Eye, EyeOff } from 'lucide-react';
+import { Building2, CreditCard, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, Eye, EyeOff, Download, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,54 @@ interface EspaceFacturationProps {
 /** Formate un montant GNF */
 function formatGnf(montant: number): string {
   return new Intl.NumberFormat('fr-FR').format(montant) + ' GNF';
+}
+
+/** Génère et télécharge une facture au format HTML */
+function downloadFacture(facture: LigneFacture, lang: string): void {
+  const fr = lang !== 'EN';
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${fr ? 'Facture' : 'Invoice'} ${facture.id}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 40px; color: #2d3748; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+  .logo { font-size: 22px; font-weight: bold; color: #1B6B93; }
+  .cabinet { font-size: 13px; color: #718096; }
+  h1 { font-size: 28px; color: #1B6B93; margin: 0 0 4px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .label { font-size: 11px; color: #718096; text-transform: uppercase; letter-spacing: 1px; }
+  .value { font-size: 14px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #f7fafc; padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; color: #718096; }
+  td { padding: 12px 14px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+  .total-row td { font-weight: bold; border-bottom: none; font-size: 15px; color: #1B6B93; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: #c6f6d5; color: #276749; }
+</style></head>
+<body>
+<div class="header">
+  <div><div class="logo">Notario</div><div class="cabinet">Cabinet Diallo &amp; Associés · Conakry, Guinée</div></div>
+  <div><h1>${fr ? 'FACTURE' : 'INVOICE'}</h1><div style="font-size:13px;color:#718096;">${fr ? 'N°' : 'No.'} ${facture.id}</div></div>
+</div>
+<div class="meta">
+  <div><div class="label">${fr ? 'Date' : 'Date'}</div><div class="value">${facture.date}</div></div>
+  <div><div class="label">${fr ? 'Statut' : 'Status'}</div><div class="value"><span class="badge">${facture.statut}</span></div></div>
+</div>
+<table>
+  <thead><tr><th>${fr ? 'Description' : 'Description'}</th><th>${fr ? 'Montant' : 'Amount'}</th></tr></thead>
+  <tbody>
+    <tr><td>${facture.description}</td><td>${new Intl.NumberFormat('fr-FR').format(facture.montant_gnf)} GNF</td></tr>
+    <tr class="total-row"><td>Total</td><td>${new Intl.NumberFormat('fr-FR').format(facture.montant_gnf)} GNF</td></tr>
+  </tbody>
+</table>
+<p style="font-size:11px;color:#a0aec0;margin-top:40px;">Notario — Plateforme de gestion notariale · contact@notario.gn</p>
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `facture_${facture.id}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Configuration du badge de statut de facture (sans label — géré via t() dans le composant) */
@@ -97,6 +145,8 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
   const [isLoadingFactures, setIsLoadingFactures] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingCarte, setIsSavingCarte] = useState(false);
+  /** Afficher/masquer le numéro de carte */
+  const [showCardNumber, setShowCardNumber] = useState(false);
   /** Afficher/masquer le CVV */
   const [cvvVisible, setCvvVisible] = useState(false);
   /** Erreurs de validation du formulaire infos légales */
@@ -206,6 +256,22 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
     } finally {
       setIsSavingCarte(false);
     }
+  }
+
+  /** Simule une nouvelle tentative de paiement pour une facture échouée */
+  const handleRetryPayment = (factureId: string) => {
+    setFactures(prev => prev.map(f =>
+      f.id === factureId ? { ...f, statut: 'payé' as const } : f
+    ));
+    toast.success(t("factures.payRetrySuccess"));
+  };
+
+  /** Masque le numéro de carte — ne conserve que les 4 derniers chiffres */
+  function masquerCarte(num: string): string {
+    const chiffres = num.replace(/\s/g, "");
+    return chiffres.length >= 4
+      ? "**** **** **** " + chiffres.slice(-4)
+      : "****";
   }
 
   return (
@@ -370,16 +436,32 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
               {/* Numéro de carte */}
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="numero_carte">{t("subs.card.number")} *</Label>
+                {/* Prévisualisation masquée — affichée uniquement quand le champ est masqué */}
+                {!showCardNumber && carte.numero_carte && (
+                  <p className="text-xs text-muted-foreground font-mono tracking-widest mb-1">
+                    {masquerCarte(carte.numero_carte)}
+                  </p>
+                )}
                 <div className="relative">
                   <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="numero_carte"
+                    type={showCardNumber ? 'text' : 'password'}
                     value={carte.numero_carte}
                     onChange={e => mettreAJourCarte('numero_carte', formaterNumeroCarte(e.target.value))}
                     placeholder="XXXX XXXX XXXX XXXX"
                     maxLength={19}
-                    className={cn('pl-10 font-mono tracking-widest', erreursCarte.numero_carte && 'border-destructive')}
+                    className={cn('pl-10 pr-20 font-mono tracking-widest', erreursCarte.numero_carte && 'border-destructive')}
                   />
+                  {/* Bouton afficher/masquer le numéro de carte */}
+                  <button
+                    type="button"
+                    onClick={() => setShowCardNumber(v => !v)}
+                    className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showCardNumber ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                   {/* Badge type de carte détecté automatiquement */}
                   {carte.type_carte && carte.type_carte !== 'Autre' && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-primary">
@@ -500,64 +582,84 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full rounded" />)}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("subs.invoices.date")}</TableHead>
-                  <TableHead>{t("subs.invoices.description")}</TableHead>
-                  <TableHead className="text-right">{t("subs.invoices.amount")}</TableHead>
-                  <TableHead className="text-center">{t("subs.invoices.status")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {factures.map(facture => {
-                  const cfg = statutConfig[facture.statut];
-                  const { Icone } = cfg;
-                  return (
-                    <TableRow key={facture.id}>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(facture.date)}
-                      </TableCell>
-                      <TableCell className="text-sm text-foreground">
-                        {facture.description}
-                      </TableCell>
-                      <TableCell className="text-sm font-mono font-medium text-foreground text-right tabular-nums">
-                        {formatGnf(facture.montant_gnf)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
-                            cfg.classes
-                          )}>
-                            <Icone className="h-3 w-3" />
-                            {facture.statut === 'payé'
-                              ? t("subs.invoices.paid")
-                              : facture.statut === 'en_attente'
-                                ? t("subs.invoices.pending")
-                                : t("subs.invoices.failed")}
-                          </span>
-                          {/* Bouton "Réessayer" pour les factures échouées */}
-                          {facture.statut === 'échoué' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-[11px] px-2 gap-1"
-                              onClick={() => toast.info('Nouvelle tentative de paiement en cours…')}
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                              {t("subs.invoices.download")}
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <>
+            {/* Bannière d'alerte si au moins une facture est échouée */}
+            {factures.some(f => f.statut === 'échoué') && (
+              <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 mb-4">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-destructive">{t("factures.payFailed")}</p>
+                  <p className="text-xs text-destructive/80 mt-0.5">{t("factures.payFailedDesc")}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("subs.invoices.date")}</TableHead>
+                    <TableHead>{t("subs.invoices.description")}</TableHead>
+                    <TableHead className="text-right">{t("subs.invoices.amount")}</TableHead>
+                    <TableHead className="text-center">{t("subs.invoices.status")}</TableHead>
+                    <TableHead className="text-center">{t("subs.invoices.actions")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {factures.map(facture => {
+                    const cfg = statutConfig[facture.statut];
+                    const { Icone } = cfg;
+                    return (
+                      <TableRow key={facture.id}>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(facture.date)}
+                        </TableCell>
+                        <TableCell className="text-sm text-foreground">
+                          {facture.description}
+                        </TableCell>
+                        <TableCell className="text-sm font-mono font-medium text-foreground text-right tabular-nums">
+                          {formatGnf(facture.montant_gnf)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold',
+                              cfg.classes
+                            )}>
+                              <Icone className="h-3 w-3" />
+                              {facture.statut === 'payé'
+                                ? t("subs.invoices.paid")
+                                : facture.statut === 'en_attente'
+                                  ? t("subs.invoices.pending")
+                                  : t("subs.invoices.failed")}
+                            </span>
+                            {/* Bouton "Réessayer" pour les factures échouées */}
+                            {facture.statut === 'échoué' && (
+                              <button
+                                onClick={() => handleRetryPayment(facture.id)}
+                                className="mt-1 inline-flex items-center gap-1 rounded-lg bg-destructive/10 border border-destructive/30 px-2 py-1 text-[11px] font-semibold text-destructive hover:bg-destructive/20 transition-colors"
+                              >
+                                <RefreshCw className="h-3 w-3" /> {t("factures.payRetry")}
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            onClick={() => { downloadFacture(facture, lang); toast.info(t("factures.toastDownload")); }}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            aria-label={t("factures.toastDownload")}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
     </div>

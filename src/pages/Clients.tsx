@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -21,6 +22,7 @@ import { mockClients, mockDossiers, mockFactures, formatGNF, type Dossier } from
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 
 type ClientType = (typeof mockClients)[0] & { adresse?: string; description?: string };
 
@@ -63,6 +65,7 @@ const mockDocumentsClient = [
 export default function Clients() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
+  const { announce } = useAnnouncer();
   const [clients, setClients] = useState<ClientType[]>(mockClients);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -75,6 +78,7 @@ export default function Clients() {
   const [customProfession, setCustomProfession] = useState(false);
   const [customRaison, setCustomRaison] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Création de dossier depuis une action client
   const [showCreateDossierModal, setShowCreateDossierModal] = useState(false);
@@ -151,6 +155,20 @@ export default function Clients() {
 
   // Création d'un nouveau client
   const handleCreate = () => {
+    if (!form.nom?.trim()) {
+      toast.error(fr ? "Le nom est obligatoire." : "Last name is required.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (form.email && !emailRegex.test(form.email)) {
+      toast.error(fr ? "Adresse email invalide." : "Invalid email address.");
+      return;
+    }
+    if (form.telephone && form.telephone.replace(/\D/g, "").length < 8) {
+      toast.error(fr ? "Numéro de téléphone invalide." : "Invalid phone number.");
+      return;
+    }
+    setIsSubmitting(true);
     const newClient: ClientType = {
       id: String(Date.now()),
       code: `C-${1209 + clients.length - mockClients.length}`,
@@ -164,7 +182,9 @@ export default function Clients() {
     setClients(prev => [newClient, ...prev]);
     setShowCreateModal(false);
     resetForm();
+    setIsSubmitting(false);
     toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
+    announce(fr ? "Client créé avec succès" : "Client created successfully");
   };
 
   // Modification d'un client existant
@@ -185,6 +205,7 @@ export default function Clients() {
     setShowEditModal(false);
     setSelectedClient(null);
     toast.success(fr ? "Client modifié" : "Client updated");
+    announce(fr ? "Client mis à jour" : "Client updated");
   };
 
   // Suppression d'un client
@@ -195,6 +216,7 @@ export default function Clients() {
     setSelectedClient(null);
     setEditingClient(null);
     toast.success(fr ? "Client supprimé" : "Client deleted");
+    announce(fr ? "Client supprimé" : "Client deleted");
   };
 
   const openEdit = (c: ClientType) => {
@@ -313,7 +335,7 @@ export default function Clients() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={fr ? "Rechercher par nom, code, email ou téléphone..." : "Search by name, code, email or phone..."} value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} className="pl-10" />
+          <Input aria-label={fr ? "Rechercher un client" : "Search a client"} placeholder={fr ? "Rechercher par nom, code, email ou téléphone..." : "Search by name, code, email or phone..."} value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} className="pl-10" />
         </div>
         <Select value={filter} onValueChange={v => { setFilter(v); setVisibleCount(PAGE_SIZE); }}>
           <SelectTrigger className="w-[200px]"><SelectValue placeholder={fr ? "Tous les types" : "All types"} /></SelectTrigger>
@@ -409,11 +431,15 @@ export default function Clients() {
                   </td>
                 </motion.tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{fr ? "Aucun client trouvé" : "No client found"}</td></tr>
-              )}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+            <EmptyState
+              icon={Users}
+              title={fr ? "Aucun client trouvé" : "No client found"}
+              description={search ? (fr ? "Aucun client ne correspond à votre recherche." : "No client matches your search.") : (fr ? "Ajoutez votre premier client." : "Add your first client.")}
+            />
+          )}
         </div>
         {/* Chargement progressif */}
         {hasMore && (
@@ -424,7 +450,7 @@ export default function Clients() {
           </div>
         )}
         {!hasMore && filtered.length > 0 && (
-          <div className="text-center py-3 text-xs text-muted-foreground border-t border-border">
+          <div aria-live="polite" className="text-center py-3 text-xs text-muted-foreground border-t border-border">
             {filtered.length} client{filtered.length > 1 ? "s" : ""} {fr ? "affiché" : "displayed"}{filtered.length > 1 ? "s" : ""}
           </div>
         )}
@@ -452,8 +478,8 @@ export default function Clients() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="outline" size="sm" onClick={() => openEdit(selectedClient)}><Edit className="mr-1 h-3.5 w-3.5" /> {fr ? "Modifier" : "Edit"}</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(selectedClient)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                    <button onClick={() => setSelectedClient(null)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
+                    <Button variant="ghost" size="sm" className="text-destructive" aria-label={fr ? "Supprimer le client" : "Delete client"} onClick={() => openDelete(selectedClient)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <button aria-label={fr ? "Fermer" : "Close"} onClick={() => setSelectedClient(null)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
                   </div>
                 </div>
 
@@ -789,7 +815,7 @@ export default function Clients() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.nom}>{fr ? "Créer le client" : "Create client"}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.nom?.trim()}>{isSubmitting ? (fr ? "Création..." : "Creating...") : (fr ? "Créer le client" : "Create client")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

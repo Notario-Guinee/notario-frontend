@@ -85,7 +85,14 @@ export default function LoginTenant() {
             <div className="text-right">
               <button onClick={() => navigate("/forgot-password?portal=tenant")} className="text-xs text-primary hover:underline">{t("login.forgotPassword")}</button>
             </div>
-            <Button className="w-full bg-[#1a2e42] hover:bg-[#243d56] text-white font-medium h-11" onClick={() => navigate("/dashboard")}>
+            <Button
+              className="w-full bg-[#1a2e42] hover:bg-[#243d56] text-white font-medium h-11"
+              onClick={() => {
+                // Marque la session comme authentifiée pour PrivateRoute
+                localStorage.setItem("notario_auth", "true");
+                navigate("/dashboard");
+              }}
+            >
               {t("login.tenantSubmit")}
             </Button>
           </div>

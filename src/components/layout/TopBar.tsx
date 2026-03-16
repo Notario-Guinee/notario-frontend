@@ -58,7 +58,7 @@ export function TopBar() {
   /** Simuler le téléchargement d'un manuel utilisateur */
   const handleDownloadManual = (language: string) => {
     toast.info(`📖 ${t("action.download")}...`);
-    setTimeout(() => toast.success(`${language === "FR" ? "Manuel" : "Manual"} (${language}) ✓`), 1500);
+    setTimeout(() => toast.success(`${t("topbar.manualLabel")} (${language}) ✓`), 1500);
   };
 
   return (
@@ -91,10 +91,10 @@ export function TopBar() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem onClick={() => { setLang("FR"); toast.info("Langue : Français"); }}>
+          <DropdownMenuItem onClick={() => { setLang("FR"); toast.info(t("topbar.langSwitchFR")); }}>
             <span className="mr-2">🇫🇷</span> Français
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { setLang("EN"); toast.info("Language: English"); }}>
+          <DropdownMenuItem onClick={() => { setLang("EN"); toast.info(t("topbar.langSwitchEN")); }}>
             <span className="mr-2">🇬🇧</span> English
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -168,7 +168,14 @@ export function TopBar() {
             <HelpCircle className="mr-2 h-4 w-4" /> {t("topbar.help")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive" onClick={() => toast.info(lang === "FR" ? "Déconnexion..." : "Signing out...")}>
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => {
+              // Supprime la session et redirige vers la page de connexion
+              localStorage.removeItem("notario_auth");
+              navigate("/login");
+            }}
+          >
             <LogOut className="mr-2 h-4 w-4" /> {t("topbar.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>

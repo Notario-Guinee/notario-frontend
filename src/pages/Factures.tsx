@@ -5,13 +5,15 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer } from "lucide-react";
+import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { mockFactures, mockClients, mockDossiers, formatGNF, currentUser } from "@/data/mockData";
 import { searchMatch } from "@/lib/utils";
@@ -19,14 +21,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 
 type Facture = typeof mockFactures[0];
 
 export default function Factures() {
   const { t, lang } = useLanguage();
+  const { announce } = useAnnouncer();
+  const fr = lang === "FR";
   const [factures, setFactures] = useState(mockFactures);
   const [search, setSearch] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Recherche avancée dans le modal de création
   const [clientSearch, setClientSearch] = useState("");
   const [form, setForm] = useState({
@@ -36,6 +42,16 @@ export default function Factures() {
   // Modal de visualisation d'une facture
   const [viewFacture, setViewFacture] = useState<Facture | null>(null);
 
+  // Confirmation de suppression
+  const [deleteFactureId, setDeleteFactureId] = useState<string | null>(null);
+
+  // Suppression d'une facture
+  const handleDelete = (id: string) => {
+    setFactures(prev => prev.filter(f => f.id !== id));
+    toast.success(t("factures.toastDeleted") || "Facture supprimée définitivement.");
+    announce(fr ? "Facture supprimée" : "Invoice deleted");
+  };
+
   // Réinitialisation du formulaire
   const resetForm = () => {
     setForm({ client: "", dossier: "", montant: "", description: "", echeance: "", statut: "Brouillon" });
@@ -44,16 +60,26 @@ export default function Factures() {
 
   // Création d'une nouvelle facture
   const handleCreate = () => {
-    const num = `FAC-2026-${String(factures.length + 1).padStart(3, "0")}`;
-    const newFacture: Facture = {
-      id: String(Date.now()), numero: num, client: form.client,
-      montant: Number(form.montant) || 0, statut: form.statut as any,
-      dateEmission: new Date().toISOString().slice(0, 10), dossier: form.dossier,
-    };
-    setFactures(prev => [newFacture, ...prev]);
-    setShowCreateModal(false);
-    resetForm();
-    toast.success(`${num} ${t("factures.toastCreated")}`);
+    if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
+    const montant = Number(form.montant);
+    if (!montant || montant <= 0) { toast.error("Le montant doit être supérieur à 0."); return; }
+
+    setIsSubmitting(true);
+    try {
+      const num = `FAC-2026-${String(factures.length + 1).padStart(3, "0")}`;
+      const newFacture: Facture = {
+        id: String(Date.now()), numero: num, client: form.client,
+        montant: montant, statut: form.statut as any,
+        dateEmission: new Date().toISOString().slice(0, 10), dossier: form.dossier,
+      };
+      setFactures(prev => [newFacture, ...prev]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(`${num} ${t("factures.toastCreated")}`);
+      announce(fr ? "Facture créée" : "Invoice created");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Filtrer les clients par recherche (code, nom, téléphone, dossier)
@@ -93,7 +119,7 @@ export default function Factures() {
         <div className="ml-auto flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={t("factures.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
+            <Input aria-label="Rechercher une facture" placeholder={t("factures.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
           </div>
           <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> {t("factures.export")}</Button>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
@@ -102,6 +128,11 @@ export default function Factures() {
           </Button>
         </div>
       </div>
+
+      {/* Compteur de résultats pour lecteurs d'écran */}
+      <p aria-live="polite" className="sr-only">
+        {search ? (fr ? `${filtered.length} facture${filtered.length > 1 ? "s" : ""} trouvée${filtered.length > 1 ? "s" : ""}` : `${filtered.length} invoice${filtered.length > 1 ? "s" : ""} found`) : ""}
+      </p>
 
       {/* Tableau des factures */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
@@ -134,7 +165,7 @@ export default function Factures() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setViewFacture(f)}><Eye className="mr-2 h-4 w-4" /> {t("factures.actionView")}</DropdownMenuItem>
                       <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> {t("factures.actionEdit")}</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> {t("factures.actionDelete")}</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => setDeleteFactureId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("factures.actionDelete")}</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>
@@ -142,7 +173,35 @@ export default function Factures() {
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && (
+          <EmptyState
+            icon={Receipt}
+            title={t("factures.emptyTitle") || "Aucune facture trouvée"}
+            description={search ? "Aucune facture ne correspond à votre recherche." : "Commencez par créer votre première facture."}
+          />
+        )}
       </div>
+
+      {/* ═══ Confirmation de suppression de facture ═══ */}
+      <AlertDialog open={!!deleteFactureId} onOpenChange={(open) => !open && setDeleteFactureId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement la facture et ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { handleDelete(deleteFactureId!); setDeleteFactureId(null); }}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ═══ Modal de visualisation de facture (modèle) ═══ */}
       <Dialog open={!!viewFacture} onOpenChange={o => !o && setViewFacture(null)}>
@@ -246,13 +305,14 @@ export default function Factures() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  aria-label="Rechercher un client"
                   value={clientSearch}
                   onChange={e => { setClientSearch(e.target.value); if (!e.target.value) setForm(f => ({ ...f, client: "" })); }}
                   placeholder={t("factures.searchClientPlaceholder")}
                   className="pl-9"
                 />
                 {clientSearch && (
-                  <button onClick={() => { setClientSearch(""); setForm(f => ({ ...f, client: "" })); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button aria-label="Effacer la recherche client" onClick={() => { setClientSearch(""); setForm(f => ({ ...f, client: "" })); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     <X className="h-4 w-4" />
                   </button>
                 )}
@@ -343,8 +403,8 @@ export default function Factures() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("factures.btnCancel")}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.montant}>
-              {t("factures.btnGenerate")}
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.client?.trim() || !form.montant || Number(form.montant) <= 0}>
+              {isSubmitting ? "Création..." : t("factures.btnGenerate")}
             </Button>
           </DialogFooter>
         </DialogContent>

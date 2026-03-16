@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -69,6 +69,17 @@ import InscriptionClient from "./pages/InscriptionClient";
 // Instance unique du client React Query
 const queryClient = new QueryClient();
 
+// ─── Protection des routes privées ───
+// Pour la démo : vérifie localStorage.getItem("notario_auth")
+// En production : remplacer par vérification JWT/session réelle
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const isAuth = localStorage.getItem("notario_auth") === "true";
+  if (!isAuth) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
 /**
  * Composant racine — enveloppe l'arbre avec tous les providers
  * et définit la structure de routage de l'application
@@ -97,7 +108,7 @@ const App = () => (
             <Route path="/inscription-client" element={<InscriptionClient />} />
 
             {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-            <Route element={<DashboardLayout />}>
+            <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
               {/* Routes du gérant */}
               <Route index element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />

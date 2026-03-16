@@ -7,11 +7,14 @@
 import { useState, useMemo } from "react";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
+import { FocusTrap } from "@/components/ui/focus-trap";
 import { Plus, Download, Search, FolderOpen, Clock, PenLine, CheckCircle2, DollarSign, MoreHorizontal, X, Trash2, Edit, Eye, Share2, FileText, List, LayoutGrid, Archive, Receipt, UserPlus, Users, FileDown, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
 import { mockDossiers, mockClients, formatGNF, rolesParties, currentUser, type Dossier, type PartiePrenanteEntry } from "@/data/mockData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -48,6 +51,7 @@ function ProgressBar({ value, className }: { value: number; className?: string }
 export default function Dossiers() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
+  const { announce } = useAnnouncer();
   const [dossiers, setDossiers] = useState<Dossier[]>(mockDossiers);
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState<string>("all");
@@ -62,6 +66,7 @@ export default function Dossiers() {
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [drawerTab, setDrawerTab] = useState("details");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Parties prenantes modal
   const [showPartiesModal, setShowPartiesModal] = useState(false);
@@ -126,6 +131,15 @@ export default function Dossiers() {
   };
 
   const handleCreate = () => {
+    if (!form.typeActe?.trim()) {
+      toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
+      return;
+    }
+    if (!form.clients?.trim()) {
+      toast.error(fr ? "Le ou les clients sont obligatoires." : "At least one client is required.");
+      return;
+    }
+    setIsSubmitting(true);
     const clientNames = form.clients.split(",").map(c => c.trim()).filter(Boolean);
     const newDossier: Dossier = {
       id: String(Date.now()),
@@ -147,7 +161,9 @@ export default function Dossiers() {
     setDossiers(prev => [newDossier, ...prev]);
     setShowCreateModal(false);
     resetForm();
+    setIsSubmitting(false);
     toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
+    announce(fr ? "Dossier créé" : "Case created");
   };
 
   const handleEdit = () => {
@@ -174,11 +190,13 @@ export default function Dossiers() {
     setSelectedDossier(null);
     setEditingDossier(null);
     toast.success(fr ? "Dossier supprimé" : "Case deleted");
+    announce(fr ? "Dossier supprimé" : "Case deleted");
   };
 
   const handleArchive = (d: Dossier) => {
     setDossiers(prev => prev.map(dos => dos.id === d.id ? { ...dos, statut: "Archivé" as Dossier["statut"] } : dos));
     toast.success(fr ? `Dossier ${d.code} archivé` : `Case ${d.code} archived`);
+    announce(fr ? "Dossier archivé" : "Case archived");
   };
 
   const openEdit = (d: Dossier) => {
@@ -327,7 +345,7 @@ export default function Dossiers() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={fr ? "Rechercher par numéro, client, objet ou type d'acte..." : "Search by number, client, subject or deed type..."} value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} className="pl-10" />
+          <Input aria-label={fr ? "Rechercher un dossier" : "Search a case"} placeholder={fr ? "Rechercher par numéro, client, objet ou type d'acte..." : "Search by number, client, subject or deed type..."} value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} className="pl-10" />
         </div>
         <Select value={filterTypeActe} onValueChange={v => { setFilterTypeActe(v); setVisibleCount(PAGE_SIZE); }}>
           <SelectTrigger className="w-[180px]"><SelectValue placeholder={fr ? "Type d'acte" : "Deed type"} /></SelectTrigger>
@@ -423,11 +441,15 @@ export default function Dossiers() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{fr ? "Aucun dossier trouvé" : "No cases found"}</td></tr>
-                )}
               </tbody>
             </table>
+            {filtered.length === 0 && (
+              <EmptyState
+                icon={FolderOpen}
+                title={fr ? "Aucun dossier trouvé" : "No cases found"}
+                description={search ? (fr ? "Aucun dossier ne correspond à votre recherche." : "No case matches your search.") : (fr ? "Commencez par créer votre premier dossier." : "Start by creating your first case.")}
+              />
+            )}
           </div>
           {hasMore && (
             <div className="flex justify-center py-4 border-t border-border">
@@ -500,6 +522,7 @@ export default function Dossiers() {
             <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
               className="fixed right-0 top-0 z-50 h-full w-full max-w-2xl border-l border-border bg-card shadow-2xl overflow-y-auto scrollbar-thin">
+              <FocusTrap active={!!selectedDossier}>
               <div className="p-6">
                 {/* Drawer Header */}
                 <div className="flex items-start justify-between mb-6">
@@ -516,10 +539,10 @@ export default function Dossiers() {
                      <Button variant="outline" size="sm" onClick={() => openEdit(selectedDossier)}>
                        <Edit className="mr-1 h-3.5 w-3.5" /> {fr ? "Modifier" : "Edit"}
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive" onClick={() => openDelete(selectedDossier)}>
+                    <Button variant="ghost" size="sm" className="text-destructive" aria-label={fr ? "Supprimer le dossier" : "Delete case"} onClick={() => openDelete(selectedDossier)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
-                    <button onClick={() => setSelectedDossier(null)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
+                    <button aria-label={fr ? "Fermer" : "Close"} onClick={() => setSelectedDossier(null)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
                   </div>
                 </div>
 
@@ -704,6 +727,7 @@ export default function Dossiers() {
                     )}
                 </div>
               </div>
+              </FocusTrap>
             </motion.div>
           </>
         )}
@@ -758,8 +782,8 @@ export default function Dossiers() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.typeActe || !form.clients}>
-              {fr ? "Créer le dossier" : "Create case"}
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.typeActe?.trim() || !form.clients?.trim()}>
+              {isSubmitting ? (fr ? "Création..." : "Creating...") : (fr ? "Créer le dossier" : "Create case")}
             </Button>
           </DialogFooter>
         </DialogContent>

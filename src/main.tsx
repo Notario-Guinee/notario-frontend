@@ -7,6 +7,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Expression régulière pour détecter le badge Lovable
 const LOVABLE_BADGE_TEXT = /edit with lovable/i;
@@ -72,4 +73,8 @@ void purgeLegacyCaches();
 startLovableBadgeGuard();
 
 // Montage de l'application React dans l'élément #root
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

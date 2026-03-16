@@ -189,7 +189,7 @@ export default function Dashboard() {
 
           {/* Texte "Espace utilisé" */}
           <p className="text-xs text-muted-foreground mb-2">
-            {lang === "FR" ? "Espace utilisé" : "Storage used"}
+            {t("dashboard.storageUsed")}
           </p>
 
           {/* Barre de progression horizontale */}
@@ -209,10 +209,10 @@ export default function Dashboard() {
 
           {/* Détail chiffré */}
           <p className="text-xs text-muted-foreground">
-            {storageUsed} Go {lang === "FR" ? "utilisés sur" : "used of"} {storageTotal} Go {lang === "FR" ? "alloués" : "allocated"}
+            {storageUsed} Go {t("dashboard.usedOn")} {storageTotal} Go {t("dashboard.allocated")}
           </p>
           <p className={`text-xs mt-0.5 font-medium ${storagePercent > 90 ? "text-destructive" : "text-warning"}`}>
-            {(storageTotal - storageUsed).toFixed(1)} Go {lang === "FR" ? "disponibles" : "available"} — {Math.round(storagePercent)}% {lang === "FR" ? "utilisé" : "used"}
+            {(storageTotal - storageUsed).toFixed(1)} Go {t("dashboard.available")} — {Math.round(storagePercent)}% {t("dashboard.usedSingle")}
           </p>
 
           {/* Bouton d'action selon le niveau */}
@@ -226,22 +226,22 @@ export default function Dashboard() {
           >
             <Send className="inline h-3 w-3 mr-1.5" />
             {storagePercent > 90
-              ? (lang === "FR" ? "Extension urgente requise" : "Urgent extension required")
-              : (lang === "FR" ? "Demander une extension" : "Request more storage")}
+              ? t("dashboard.urgentExtension")
+              : t("dashboard.requestStorage")}
           </button>
         </div>
 
         {/* ── Détail par catégorie ── */}
         <div className="rounded-xl border border-border bg-card p-5 shadow-card">
           <h2 className="font-heading text-sm font-semibold text-foreground mb-4">
-            {lang === "FR" ? "Détail par catégorie" : "Breakdown by category"}
+            {t("dashboard.categoryBreakdown")}
           </h2>
           <div className="space-y-4">
             {[
-              { label: lang === "FR" ? "Actes notariés" : "Notarial deeds", go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
-              { label: lang === "FR" ? "Archives numériques" : "Digital archives", go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
-              { label: lang === "FR" ? "Documents clients" : "Client documents", go: 1.3, pct: 8, color: "hsl(258 60% 56%)" },
-              { label: lang === "FR" ? "Factures" : "Invoices", go: 0.9, pct: 6, color: "hsl(38 92% 50%)" },
+              { label: t("dashboard.catNotarialDeeds"), go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
+              { label: t("dashboard.catDigitalArchives"), go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
+              { label: t("dashboard.catClientDocs"), go: 1.3, pct: 8, color: "hsl(258 60% 56%)" },
+              { label: t("dashboard.catInvoices"), go: 0.9, pct: 6, color: "hsl(38 92% 50%)" },
             ].map((cat) => (
               <div key={cat.label}>
                 <div className="flex justify-between text-xs mb-1">
@@ -263,7 +263,7 @@ export default function Dashboard() {
             <span className="font-bold text-foreground">{storageUsed} Go / {storageTotal} Go</span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            {lang === "FR" ? "Dernière mise à jour" : "Last updated"} : {new Date().toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" })}
+            {t("dashboard.lastUpdated")} : {new Date().toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit", year: "numeric" })}
           </p>
         </div>
       </motion.div>

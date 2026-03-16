@@ -5,12 +5,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, Smile, Users, UserPlus, X } from "lucide-react";
+import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, MessageSquare, Smile, Users, UserPlus, X, Trash2, MoreVertical } from "lucide-react";
 import { currentUser } from "@/data/mockData";
 import { motion } from "framer-motion";
 import { searchMatch, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +111,20 @@ export default function Messagerie() {
   const [messages, setMessages] = useState(messagesData);
   const [searchQuery, setSearchQuery] = useState("");
   const [newConvOpen, setNewConvOpen] = useState(false);
+
+  // ═══ Suppression de conversation ═══
+  const [deleteConvId, setDeleteConvId] = useState<string | null>(null);
+
+  const handleDeleteConversation = (id: string) => {
+    const conv = conversations.find(c => c.id === id);
+    setConversations(prev => prev.filter(c => c.id !== id));
+    // Si la conversation supprimée était sélectionnée, basculer sur la première restante
+    if (selectedConv.id === id) {
+      const remaining = conversations.filter(c => c.id !== id);
+      if (remaining.length > 0) setSelectedConv(remaining[0]);
+    }
+    toast.success(`Conversation « ${conv?.nom} » supprimée.`);
+  };
 
   // ═══ Création de groupe ═══
   const [showGroupModal, setShowGroupModal] = useState(false);
@@ -258,48 +274,76 @@ export default function Messagerie() {
             </div>
           </div>
           <div className="flex-1 overflow-y-auto scrollbar-thin">
+            {filteredConversations.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-foreground">Aucune conversation</p>
+                <p className="text-xs text-muted-foreground mt-1">Commencez une nouvelle conversation.</p>
+              </div>
+            )}
             {filteredConversations.map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => setSelectedConv(conv)}
-                className={`w-full flex items-start gap-3 p-4 border-b border-border text-left transition-colors ${
+                className={`group relative flex items-start gap-3 p-4 border-b border-border transition-colors ${
                   selectedConv.id === conv.id
                     ? "bg-primary/5 border-l-2 border-l-primary"
                     : "hover:bg-muted/30"
                 }`}
               >
-                <div className="relative shrink-0 mt-0.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg">
-                    {conv.isGroup ? "👥" : conv.avatar}
-                  </div>
-                  {!conv.isGroup && (
-                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${presenceColor[conv.presence]}`} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold text-foreground truncate">{conv.nom}</p>
-                      {conv.isGroup && <Users className="h-3 w-3 text-muted-foreground" />}
+                {/* Zone cliquable principale */}
+                <button
+                  className="flex flex-1 items-start gap-3 text-left min-w-0"
+                  onClick={() => setSelectedConv(conv)}
+                >
+                  <div className="relative shrink-0 mt-0.5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg">
+                      {conv.isGroup ? "👥" : conv.avatar}
                     </div>
-                    {conv.unread > 0 && (
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ml-2">
-                        {conv.unread}
-                      </span>
+                    {!conv.isGroup && (
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${presenceColor[conv.presence]}`} />
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mb-1">{conv.time}</p>
-                  <p className="text-xs text-muted-foreground truncate">{conv.lastMsg}</p>
-                  {conv.dossier && (
-                    <Badge variant="outline" className="mt-1.5 text-[10px] text-primary border-primary/30 bg-primary/5">
-                      {conv.dossier}
-                    </Badge>
-                  )}
-                  {conv.isGroup && conv.members && (
-                    <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {t("msg.members")}</p>
-                  )}
-                </div>
-              </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-foreground truncate">{conv.nom}</p>
+                        {conv.isGroup && <Users className="h-3 w-3 text-muted-foreground" />}
+                      </div>
+                      {conv.unread > 0 && (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ml-2">
+                          {conv.unread}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-1">{conv.time}</p>
+                    <p className="text-xs text-muted-foreground truncate">{conv.lastMsg}</p>
+                    {conv.dossier && (
+                      <Badge variant="outline" className="mt-1.5 text-[10px] text-primary border-primary/30 bg-primary/5">
+                        {conv.dossier}
+                      </Badge>
+                    )}
+                    {conv.isGroup && conv.members && (
+                      <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {t("msg.members")}</p>
+                    )}
+                  </div>
+                </button>
+                {/* Menu contextuel — visible au survol */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-muted mt-0.5">
+                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteConvId(conv.id); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Supprimer la conversation
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ))}
           </div>
         </div>
@@ -389,6 +433,27 @@ export default function Messagerie() {
           </div>
         </div>
       </div>
+
+      {/* ═══ Confirmation de suppression de conversation ═══ */}
+      <AlertDialog open={!!deleteConvId} onOpenChange={(open) => !open && setDeleteConvId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette conversation ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement la conversation et tous ses messages. Elle ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { handleDeleteConversation(deleteConvId!); setDeleteConvId(null); }}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ═══ Modal de création de groupe ═══ */}
       <Dialog open={showGroupModal} onOpenChange={setShowGroupModal}>

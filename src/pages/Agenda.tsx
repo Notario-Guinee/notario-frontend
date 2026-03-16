@@ -5,10 +5,11 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, X, Bell } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, X, Bell, CalendarOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -17,6 +18,7 @@ import { mockClients } from "@/data/mockData";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 
 type ViewMode = "mois" | "semaine" | "jour" | "liste";
 
@@ -92,6 +94,8 @@ export default function Agenda() {
     { value: "1 jour avant", label: t("agenda.rappel.1j") },
   ];
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [form, setForm] = useState({
     titre: "", client: "", lieu: "Bureau 1", date: "", heure: "09:00",
     duree: "1h", description: "", rappel: "30 minutes avant",
@@ -100,18 +104,27 @@ export default function Agenda() {
   const resetForm = () => setForm({ titre: "", client: "", lieu: "Bureau 1", date: "", heure: "09:00", duree: "1h", description: "", rappel: "30 minutes avant" });
 
   const handleCreate = () => {
-    const newRdv: RDV = {
-      id: String(Date.now()), heure: form.heure, titre: form.titre || `RDV ${form.client}`,
-      client: form.client, lieu: form.lieu, duree: form.duree,
-      statut: "Confirmé", date: form.date, description: form.description, rappel: form.rappel,
-    };
-    setRdvData(prev => [...prev, newRdv]);
-    setShowCreateModal(false);
-    resetForm();
-    toast.success(t("agenda.toast.created"));
-    if (form.rappel) {
-      const rappelLabel = rappelOptions.find(r => r.value === form.rappel)?.label || form.rappel;
-      toast.info(`🔔 ${t("agenda.toast.reminder")} ${rappelLabel}`, { duration: 4000 });
+    if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
+    if (!form.date?.trim()) { toast.error("La date est obligatoire."); return; }
+    if (!form.heure?.trim()) { toast.error("L'heure est obligatoire."); return; }
+
+    setIsSubmitting(true);
+    try {
+      const newRdv: RDV = {
+        id: String(Date.now()), heure: form.heure, titre: form.titre || `RDV ${form.client}`,
+        client: form.client, lieu: form.lieu, duree: form.duree,
+        statut: "Confirmé", date: form.date, description: form.description, rappel: form.rappel,
+      };
+      setRdvData(prev => [...prev, newRdv]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(t("agenda.toast.created"));
+      if (form.rappel) {
+        const rappelLabel = rappelOptions.find(r => r.value === form.rappel)?.label || form.rappel;
+        toast.info(`🔔 ${t("agenda.toast.reminder")} ${rappelLabel}`, { duration: 4000 });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -137,11 +150,11 @@ export default function Agenda() {
 
       {/* Navigation */}
       <div className="flex items-center gap-3">
-        <button className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronLeft className="h-4 w-4 text-muted-foreground" /></button>
+        <button aria-label="Période précédente" className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronLeft className="h-4 w-4 text-muted-foreground" /></button>
         <h2 className="font-heading text-base font-semibold text-foreground">
           {today.toLocaleDateString(lang === "EN" ? "en-GB" : "fr-FR", { month: "long", year: "numeric" })}
         </h2>
-        <button className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>
+        <button aria-label="Période suivante" className="rounded-lg p-2 hover:bg-muted transition-colors"><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>
         <button className="ml-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">{t("agenda.today")}</button>
       </div>
 
@@ -204,6 +217,13 @@ export default function Agenda() {
               <StatusBadge status={rdv.statut} />
             </motion.div>
           ))}
+          {rdvData.length === 0 && (
+            <EmptyState
+              icon={CalendarOff}
+              title={t("agenda.emptyTitle") || "Aucun rendez-vous"}
+              description="Aucun rendez-vous planifié. Créez votre premier rendez-vous."
+            />
+          )}
         </div>
       )}
 
@@ -280,7 +300,7 @@ export default function Agenda() {
               <div className="flex items-center gap-2"><StatusBadge status={selectedRdv.statut} /></div>
             </div>
             <div className="mt-5 flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setSelectedRdv(null)}>{t("agenda.detail.close")}</Button>
+              <Button variant="outline" size="sm" aria-label="Fermer le détail du rendez-vous" onClick={() => setSelectedRdv(null)}>{t("agenda.detail.close")}</Button>
               <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">{t("agenda.detail.edit")}</Button>
             </div>
           </motion.div>
@@ -358,8 +378,8 @@ export default function Agenda() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("agenda.cancel")}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.date}>
-              {t("agenda.createRdv")}
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.client?.trim() || !form.date?.trim()}>
+              {isSubmitting ? "Création..." : t("agenda.createRdv") || "Créer le rendez-vous"}
             </Button>
           </DialogFooter>
         </DialogContent>
