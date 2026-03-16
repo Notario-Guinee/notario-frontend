@@ -29,12 +29,15 @@ interface ActionType {
 const categories = ["Vente", "Donation", "Entreprise", "Succession", "Bail", "Sûreté"];
 
 const initialActions: ActionType[] = [
-  { id: "1", libelle: "Acte de vente", description: "Vente immobilière, véhicules, biens meubles", categorie: "Vente", prix: 150000, duree: "2-3 jours", etat: "actif", utilisations: 45 },
-  { id: "2", libelle: "Donation", description: "Donation entre vifs, donation-partage", categorie: "Donation", prix: 120000, duree: "1-2 jours", etat: "actif", utilisations: 23 },
-  { id: "3", libelle: "Statuts SARL", description: "Constitution de société à responsabilité limitée", categorie: "Entreprise", prix: 200000, duree: "3-5 jours", etat: "actif", utilisations: 12 },
-  { id: "4", libelle: "Testament", description: "Testament authentique, testament mystique", categorie: "Succession", prix: 80000, duree: "1 jour", etat: "actif", utilisations: 8 },
-  { id: "5", libelle: "Bail commercial", description: "Bail commercial, bail professionnel", categorie: "Bail", prix: 100000, duree: "1-2 jours", etat: "brouillon", utilisations: 0 },
-  { id: "6", libelle: "Hypothèque", description: "Hypothèque conventionnelle, hypothèque légale", categorie: "Sûreté", prix: 180000, duree: "2-4 jours", etat: "inactif", utilisations: 3 },
+  { id: "1", libelle: "Acte de dépôt", description: "Dépôt d'actes sous seing privé, dépôt de documents officiels", categorie: "Vente", prix: 80000, duree: "1 jour", etat: "actif", utilisations: 18 },
+  { id: "2", libelle: "Acte de notoriété", description: "Attestation de notoriété successorale, qualité d'héritier", categorie: "Succession", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 31 },
+  { id: "3", libelle: "Bail", description: "Bail d'habitation, bail commercial, bail professionnel", categorie: "Bail", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 14 },
+  { id: "4", libelle: "Cession de parts & nouveaux statuts", description: "Cession de parts sociales et mise à jour des statuts de la société", categorie: "Entreprise", prix: 220000, duree: "3-5 jours", etat: "actif", utilisations: 9 },
+  { id: "5", libelle: "Cession de succession", description: "Cession de droits successoraux entre cohéritiers ou à un tiers", categorie: "Succession", prix: 180000, duree: "2-4 jours", etat: "actif", utilisations: 6 },
+  { id: "6", libelle: "Création de la société", description: "Constitution de sociétés (SARL, SA, SNC, SCS…), rédaction des statuts", categorie: "Entreprise", prix: 250000, duree: "3-5 jours", etat: "actif", utilisations: 12 },
+  { id: "7", libelle: "Donation", description: "Donation entre vifs, donation-partage, donation avec réserve d'usufruit", categorie: "Donation", prix: 150000, duree: "1-2 jours", etat: "actif", utilisations: 23 },
+  { id: "8", libelle: "Mainlevée", description: "Mainlevée d'hypothèque, mainlevée de saisie, mainlevée de gage", categorie: "Sûreté", prix: 130000, duree: "1-2 jours", etat: "actif", utilisations: 7 },
+  { id: "9", libelle: "Procuration", description: "Procuration générale ou spéciale, mandat notarié", categorie: "Vente", prix: 60000, duree: "1 jour", etat: "actif", utilisations: 41 },
 ];
 
 const catColors: Record<string, string> = {
