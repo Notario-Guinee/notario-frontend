@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface User {
   id: number;
@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -23,9 +24,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
-    localStorage.getItem("accessToken")
-  );
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem("accessToken");
+    if (savedToken) {
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setUser(data.data);
+            setToken(savedToken);
+          } else {
+            localStorage.removeItem("accessToken");
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem("accessToken");
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
     const response = await fetch("/api/auth/login", {
@@ -61,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated: !!token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

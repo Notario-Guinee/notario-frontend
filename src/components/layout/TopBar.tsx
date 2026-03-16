@@ -7,7 +7,7 @@
 import { Bell, Wifi, WifiOff, Sun, Moon, User, Settings, LogOut, HelpCircle, Shield, Globe, BookDown } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { currentUser } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -26,6 +26,7 @@ export function TopBar() {
   const [online] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const { lang, setLang, t } = useLanguage();
+  const { user, logout } = useAuth();
 
   // Correspondance chemin → nom de page traduit
   const pathNames: Record<string, string> = {
@@ -144,14 +145,14 @@ export function TopBar() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 font-heading text-xs font-bold text-primary cursor-pointer hover:bg-primary/30 transition-colors shrink-0 outline-none">
-            {currentUser.firstName.charAt(0)}
+            {user?.initiales ?? "U"}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-foreground">{currentUser.name}</span>
-              <span className="text-xs text-muted-foreground">{currentUser.email}</span>
+              <span className="text-sm font-medium text-foreground">{user?.nomComplet ?? "Utilisateur"}</span>
+              <span className="text-xs text-muted-foreground">{user?.email ?? ""}</span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -168,7 +169,7 @@ export function TopBar() {
             <HelpCircle className="mr-2 h-4 w-4" /> {t("topbar.help")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive" onClick={() => toast.info(lang === "FR" ? "Déconnexion..." : "Signing out...")}>
+          <DropdownMenuItem className="text-destructive" onClick={() => { logout(); navigate("/login"); }}>
             <LogOut className="mr-2 h-4 w-4" /> {t("topbar.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -74,10 +74,11 @@ const queryClient = new QueryClient();
  * Utilisé pour protéger toutes les routes du dashboard
  */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
-
 /**
  * Composant racine — enveloppe l'arbre avec tous les providers
  * et définit la structure de routage de l'application
