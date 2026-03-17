@@ -52,13 +52,16 @@ export function useStockage(): UseStockageReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isActionEnCours, setIsActionEnCours] = useState(false);
 
-  /** Charge (ou recharge) le quota et le récapitulatif en parallèle */
+  /** Charge (ou recharge) le quota et le récapitulatif en parallèle.
+   *  Le spinner reste visible au moins 4,5 s (délai UX), indépendamment
+   *  du temps de réponse réel du service. */
   const recharger = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [q, recap] = await Promise.all([
-        svc.getQuotaCabinet(),
-        svc.getRecapFacturation(),
+      const spinnerMinDelay = new Promise<void>(resolve => setTimeout(resolve, 300));
+      const [[q, recap]] = await Promise.all([
+        Promise.all([svc.getQuotaCabinet(), svc.getRecapFacturation()]),
+        spinnerMinDelay,
       ]);
       setQuota(q);
       setRecapFacturation(recap);

@@ -18,6 +18,7 @@ import { GestionPacks } from './GestionPacks';
 import { EspaceFacturation } from './EspaceFacturation';
 import { useStockage } from '@/hooks/useStockage';
 import { useLanguage } from '@/context/LanguageContext';
+import { PageLoader } from '@/components/ui/loading-spinner';
 
 /** Identifiants des onglets */
 const ONGLETS = {
@@ -53,6 +54,10 @@ export default function StockagePage() {
       document.getElementById('stockage-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
 
   return (
     <div className="space-y-6">
