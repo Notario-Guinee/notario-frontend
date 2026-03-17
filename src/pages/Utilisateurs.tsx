@@ -174,7 +174,7 @@ export default function Utilisateurs() {
 
       {/* ═══ Modal de création d'utilisateur avec champs facultatifs ═══ */}
       <Dialog open={showNew} onOpenChange={setShowNew}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("users.modalNewTitle")}</DialogTitle>
             <DialogDescription>{t("users.modalNewDesc")}</DialogDescription>
@@ -237,7 +237,7 @@ export default function Utilisateurs() {
 
       {/* ═══ Modal de modification d'utilisateur ═══ */}
       <Dialog open={!!editing} onOpenChange={o => !o && setEditing(null)}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("users.modalEditTitle")}</DialogTitle>
             <DialogDescription>{editing?.prenom} {editing?.nom}</DialogDescription>

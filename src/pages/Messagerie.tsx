@@ -4,7 +4,7 @@
 // ajout d'employés, messages avec priorités et dossiers liés
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, MessageSquare, Smile, Users, UserPlus, X, Trash2, MoreVertical } from "lucide-react";
 import { currentUser } from "@/data/mockData";
 import { motion } from "framer-motion";
@@ -87,6 +87,9 @@ const messagesData: Record<string, ChatMessage[]> = {
   ],
 };
 
+// Emojis fréquents pour le picker
+const EMOJI_LIST = ["😀","😂","😊","😍","🥰","😎","🤔","😅","👍","👎","❤️","🎉","🙏","👋","✅","⚠️","🔥","💡","📎","📄","📅","🗂️","⚖️","🏛️","✍️","📝","💬","📞","📧","🕐"];
+
 // Styles pour les priorités des messages
 const priorityStyles: Record<string, string> = {
   urgente: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -112,6 +115,25 @@ export default function Messagerie() {
   const [searchQuery, setSearchQuery] = useState("");
   const [newConvOpen, setNewConvOpen] = useState(false);
 
+  // ═══ Emoji picker + pièce jointe ═══
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<string[]>([]);
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const names = files.map(f => f.name);
+    setAttachments(prev => [...prev, ...names]);
+    toast.success(files.length === 1 ? `Fichier joint : ${files[0].name}` : `${files.length} fichiers joints`);
+    e.target.value = "";
+  };
+
   // ═══ Suppression de conversation ═══
   const [deleteConvId, setDeleteConvId] = useState<string | null>(null);
 
@@ -133,11 +155,12 @@ export default function Messagerie() {
 
   // Envoyer un message dans la conversation sélectionnée
   const envoyer = () => {
-    if (!message.trim()) return;
+    if (!message.trim() && attachments.length === 0) return;
+    const text = [message, ...attachments.map(a => `📎 ${a}`)].filter(Boolean).join("\n");
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       from: currentUser.firstName,
-      text: message,
+      text,
       time: t("msg.justNow"),
       mine: true,
     };
@@ -146,6 +169,8 @@ export default function Messagerie() {
       [selectedConv.id]: [...(prev[selectedConv.id] || []), newMsg],
     }));
     setMessage("");
+    setAttachments([]);
+    setShowEmojiPicker(false);
   };
 
   // Créer un nouveau groupe
@@ -411,18 +436,47 @@ export default function Messagerie() {
           </div>
 
           {/* Zone de saisie de message */}
-          <div className="border-t border-border bg-card p-4">
+          <div className="border-t border-border bg-card p-4 space-y-2">
+            {/* Pièces jointes en attente */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((name, i) => (
+                  <span key={i} className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+                    <Paperclip className="h-3 w-3 text-muted-foreground" />
+                    {name}
+                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} className="ml-0.5 text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Emoji picker */}
+            {showEmojiPicker && (
+              <div className="rounded-xl border border-border bg-card shadow-lg p-3">
+                <div className="grid grid-cols-10 gap-1">
+                  {EMOJI_LIST.map(emoji => (
+                    <button key={emoji} onClick={() => handleEmojiSelect(emoji)}
+                      className="flex items-center justify-center h-8 w-8 rounded-md text-lg hover:bg-muted transition-colors">
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2">
-              <button className="rounded-lg p-2 hover:bg-muted transition-colors">
+              <button onClick={() => setShowEmojiPicker(v => !v)}
+                className={cn("rounded-lg p-2 hover:bg-muted transition-colors", showEmojiPicker && "bg-muted")}>
                 <Smile className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button className="rounded-lg p-2 hover:bg-muted transition-colors">
+              <button onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2 hover:bg-muted transition-colors">
                 <Paperclip className="h-4 w-4 text-muted-foreground" />
               </button>
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
               <input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && envoyer()}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && envoyer()}
                 placeholder={t("msg.writeMessage")}
                 className="flex-1 rounded-lg bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none"
               />

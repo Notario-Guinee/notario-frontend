@@ -1370,6 +1370,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "subs.invoices.pending": "En attente",
     "subs.invoices.failed": "Échoué",
     "subs.invoices.download": "Télécharger",
+    "subs.invoices.actions": "Actions",
 
     "synth.title": "Synthèse Financière",
     "synth.period.7d": "7j",
@@ -2794,5 +2795,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "subs.invoices.pending": "Pending",
     "subs.invoices.failed": "Failed",
     "subs.invoices.download": "Download",
+    "subs.invoices.actions": "Actions",
   },
 };

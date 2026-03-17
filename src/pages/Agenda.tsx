@@ -47,6 +47,8 @@ const hours = Array.from({ length: 9 }, (_, i) => `${i + 8}:00`);
 
 export default function Agenda() {
   const { t, lang } = useLanguage();
+  const fr = lang === "FR";
+  const { announce } = useAnnouncer();
   const [rdvData, setRdvData] = useState<RDV[]>(initialRdvData);
   const [view, setView] = useState<ViewMode>("semaine");
   const [selectedRdv, setSelectedRdv] = useState<RDV | null>(null);
@@ -119,6 +121,7 @@ export default function Agenda() {
       setShowCreateModal(false);
       resetForm();
       toast.success(t("agenda.toast.created"));
+      announce(fr ? "Rendez-vous créé" : "Appointment created");
       if (form.rappel) {
         const rappelLabel = rappelOptions.find(r => r.value === form.rappel)?.label || form.rappel;
         toast.info(`🔔 ${t("agenda.toast.reminder")} ${rappelLabel}`, { duration: 4000 });

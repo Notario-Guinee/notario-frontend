@@ -723,7 +723,7 @@ export default function Clients() {
 
       {/* ═══ Modal de création de client ═══ */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-heading">{fr ? "Nouveau client" : "New client"}</DialogTitle>
             <DialogDescription>{fr ? "Ajoutez un nouveau client au cabinet" : "Add a new client to the office"}</DialogDescription>
@@ -822,7 +822,7 @@ export default function Clients() {
 
       {/* ═══ Modal de modification de client ═══ */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-heading">{fr ? "Modifier le client" : "Edit client"}</DialogTitle>
             <DialogDescription>{fr ? "Modifiez les informations de" : "Edit information for"} {editingClient?.nom} {editingClient?.prenom}</DialogDescription>
@@ -916,7 +916,7 @@ export default function Clients() {
 
       {/* ═══ Modal de création de dossier depuis un client ═══ */}
       <Dialog open={showCreateDossierModal} onOpenChange={setShowCreateDossierModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-heading">{fr ? "Nouveau dossier" : "New case"}</DialogTitle>
             <DialogDescription>{fr ? "Créer un dossier pour" : "Create a case for"} <strong>{dossierClient?.nom} {dossierClient?.prenom}</strong></DialogDescription>
@@ -977,7 +977,7 @@ export default function Clients() {
 
       {/* ═══ Modal de création de facture depuis un client ═══ */}
       <Dialog open={showCreateFactureModal} onOpenChange={setShowCreateFactureModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-heading">{fr ? "Nouvelle facture" : "New invoice"}</DialogTitle>
             <DialogDescription>{fr ? "Générer une facture pour" : "Generate an invoice for"} <strong>{factureClient?.nom} {factureClient?.prenom}</strong></DialogDescription>

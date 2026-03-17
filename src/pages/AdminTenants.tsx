@@ -28,7 +28,8 @@ export default function AdminTenants() {
         <KpiCard title="Utilisateurs totaux" value="13" icon={Users} accentColor="teal"/>
       </div>
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
-        <table className="w-full"><thead><tr className="border-b border-border">{["Cabinet","Gérant","Sous-domaine","Utilisateurs","Modules","Statut","Date création"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[800px]"><thead><tr className="border-b border-border">{["Cabinet","Gérant","Sous-domaine","Utilisateurs","Modules","Statut","Date création"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
         <tbody>{tenants.map(t=>(
           <motion.tr key={t.id} initial={{opacity:0}} animate={{opacity:1}} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
             <td className="px-4 py-3 text-sm font-medium text-foreground">{t.nom}</td>
@@ -40,6 +41,7 @@ export default function AdminTenants() {
             <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(t.date).toLocaleDateString('fr-FR')}</td>
           </motion.tr>
         ))}</tbody></table>
+        </div>
       </div>
     </div>
   );
