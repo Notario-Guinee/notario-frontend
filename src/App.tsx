@@ -4,6 +4,7 @@
 // React Query) et définit toutes les routes client-side
 // ═══════════════════════════════════════════════════════════════
 
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,57 +15,67 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { RoleProvider } from "@/context/RoleContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-
-// ─── Pages principales de l'application ───
-import Dashboard from "./pages/Dashboard";
-import Clients from "./pages/Clients";
-import Dossiers from "./pages/Dossiers";
-import TypesActions from "./pages/TypesActions";
-import ActesSignatures from "./pages/ActesSignatures";
-import Factures from "./pages/Factures";
-import Kanban from "./pages/Kanban";
-import SyntheseFinanciere from "./pages/SyntheseFinanciere";
-import Agenda from "./pages/Agenda";
-import Paiements from "./pages/Paiements";
-import ComptesBancaires from "./pages/ComptesBancaires";
-import Caisse from "./pages/Caisse";
-import Tarifs from "./pages/Tarifs";
-import ArchivesNumeriques from "./pages/ArchivesNumeriques";
-import ArchivesPhysiques from "./pages/ArchivesPhysiques";
-import ModelesDocuments from "./pages/ModelesDocuments";
-import Messagerie from "./pages/Messagerie";
-import NotificationsPage from "./pages/NotificationsPage";
-import Formation from "./pages/Formation";
-import PortailClient from "./pages/PortailClient";
-import Administration from "./pages/Administration";
-import Utilisateurs from "./pages/Utilisateurs";
-import MonCabinet from "./pages/MonCabinet";
-import StockagePage from "./components/stockage/StockagePage";
-import NotFound from "./pages/NotFound";
-
-// ─── Pages d'administration globale ───
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminTenantsPage from "./pages/admin/AdminTenantsPage";
-import AdminModulesOffres from "./pages/admin/AdminModulesOffres";
-import AdminLeadsPage from "./pages/admin/AdminLeadsPage";
-import AdminLicenses from "./pages/admin/AdminLicenses";
-import AdminUsersGlobal from "./pages/admin/AdminUsersGlobal";
-import AdminRoles from "./pages/admin/AdminRoles";
-import AdminAudit from "./pages/admin/AdminAudit";
-import AdminBilling from "./pages/admin/AdminBilling";
-import AdminMonitoring from "./pages/AdminMonitoring";
-import AdminSecurityPolicies from "./pages/admin/AdminSecurityPolicies";
+import { PageLoader } from "@/components/ui/loading-spinner";
 
 // ─── Pages d'authentification ───
-import LoginTenant from "./pages/LoginTenant";
-import LoginAdmin from "./pages/LoginAdmin";
-import LoginPortailClient from "./pages/LoginPortailClient";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
+// Chunk « auth » — chargé uniquement sur /login, /admin/login, etc.
+const LoginTenant         = lazy(() => import("./pages/LoginTenant"));
+const LoginAdmin          = lazy(() => import("./pages/LoginAdmin"));
+const LoginPortailClient  = lazy(() => import("./pages/LoginPortailClient"));
+const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
 
-// ─── Espace client (portail externe) ───
-import EspaceClient from "./pages/EspaceClient";
-import InscriptionClient from "./pages/InscriptionClient";
+// ─── Portail client (espace externe) ───
+// Chunk « portail » — utilisateurs non-collaborateurs
+const EspaceClient      = lazy(() => import("./pages/EspaceClient"));
+const InscriptionClient = lazy(() => import("./pages/InscriptionClient"));
+const PortailClient     = lazy(() => import("./pages/PortailClient"));
+
+// ─── Pages principales du gérant ───
+// Chunk « app » — pages métier quotidiennes
+const Dashboard         = lazy(() => import("./pages/Dashboard"));
+const Clients           = lazy(() => import("./pages/Clients"));
+const Dossiers          = lazy(() => import("./pages/Dossiers"));
+const TypesActions      = lazy(() => import("./pages/TypesActions"));
+const ActesSignatures   = lazy(() => import("./pages/ActesSignatures"));
+const Factures          = lazy(() => import("./pages/Factures"));
+const Kanban            = lazy(() => import("./pages/Kanban"));
+const SyntheseFinanciere = lazy(() => import("./pages/SyntheseFinanciere"));
+const Agenda            = lazy(() => import("./pages/Agenda"));
+const Paiements         = lazy(() => import("./pages/Paiements"));
+const ComptesBancaires  = lazy(() => import("./pages/ComptesBancaires"));
+const Caisse            = lazy(() => import("./pages/Caisse"));
+const Tarifs            = lazy(() => import("./pages/Tarifs"));
+const Messagerie        = lazy(() => import("./pages/Messagerie"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const Formation         = lazy(() => import("./pages/Formation"));
+const Administration    = lazy(() => import("./pages/Administration"));
+const Utilisateurs      = lazy(() => import("./pages/Utilisateurs"));
+const MonCabinet        = lazy(() => import("./pages/MonCabinet"));
+const StockagePage      = lazy(() => import("./components/stockage/StockagePage"));
+
+// ─── Pages archives & documents ───
+// Chunk « archives » — chargé à la demande
+const ArchivesNumeriques = lazy(() => import("./pages/ArchivesNumeriques"));
+const ArchivesPhysiques  = lazy(() => import("./pages/ArchivesPhysiques"));
+const ModelesDocuments   = lazy(() => import("./pages/ModelesDocuments"));
+
+// ─── Pages d'administration globale ───
+// Chunk « admin » — réservé aux super-admins
+const AdminDashboard        = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminTenantsPage      = lazy(() => import("./pages/admin/AdminTenantsPage"));
+const AdminModulesOffres    = lazy(() => import("./pages/admin/AdminModulesOffres"));
+const AdminLeadsPage        = lazy(() => import("./pages/admin/AdminLeadsPage"));
+const AdminLicenses         = lazy(() => import("./pages/admin/AdminLicenses"));
+const AdminUsersGlobal      = lazy(() => import("./pages/admin/AdminUsersGlobal"));
+const AdminRoles            = lazy(() => import("./pages/admin/AdminRoles"));
+const AdminAudit            = lazy(() => import("./pages/admin/AdminAudit"));
+const AdminBilling          = lazy(() => import("./pages/admin/AdminBilling"));
+const AdminMonitoring       = lazy(() => import("./pages/AdminMonitoring"));
+const AdminSecurityPolicies = lazy(() => import("./pages/admin/AdminSecurityPolicies"));
+
+// ─── Page 404 ───
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Instance unique du client React Query
 const queryClient = new QueryClient();
@@ -95,65 +106,67 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
-            <Route path="/login" element={<LoginTenant />} />
-            <Route path="/admin/login" element={<LoginAdmin />} />
-            <Route path="/client/login" element={<LoginPortailClient />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
+              <Route path="/login"           element={<LoginTenant />} />
+              <Route path="/admin/login"     element={<LoginAdmin />} />
+              <Route path="/client/login"    element={<LoginPortailClient />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password"  element={<ResetPassword />} />
 
-            {/* ═══ Portail client (hors layout dashboard) ═══ */}
-            <Route path="/espace-client" element={<EspaceClient />} />
-            <Route path="/inscription-client" element={<InscriptionClient />} />
+              {/* ═══ Portail client (hors layout dashboard) ═══ */}
+              <Route path="/espace-client"      element={<EspaceClient />} />
+              <Route path="/inscription-client" element={<InscriptionClient />} />
 
-            {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-            <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
-              {/* Routes du gérant */}
-              <Route index element={<Dashboard />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/dossiers" element={<Dossiers />} />
-              <Route path="/types-actions" element={<TypesActions />} />
-              <Route path="/actes" element={<ActesSignatures />} />
-              <Route path="/factures" element={<Factures />} />
-              <Route path="/kanban" element={<Kanban />} />
-              <Route path="/synthese" element={<SyntheseFinanciere />} />
-              <Route path="/agenda" element={<Agenda />} />
-              <Route path="/paiements" element={<Paiements />} />
-              <Route path="/comptes" element={<ComptesBancaires />} />
-              <Route path="/caisse" element={<Caisse />} />
-              <Route path="/tarifs" element={<Tarifs />} />
-              <Route path="/archives-numeriques" element={<ArchivesNumeriques />} />
-              <Route path="/archives-physiques" element={<ArchivesPhysiques />} />
-              <Route path="/modeles" element={<ModelesDocuments />} />
-              <Route path="/messagerie" element={<Messagerie />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/formation" element={<Formation />} />
-              <Route path="/portail" element={<PortailClient />} />
-              <Route path="/administration" element={<Administration />} />
-              <Route path="/utilisateurs" element={<Utilisateurs />} />
-              <Route path="/cabinet" element={<MonCabinet />} />
-              {/* Gestion du stockage et de l'abonnement */}
-              <Route path="/stockage" element={<StockagePage />} />
+              {/* ═══ Routes protégées avec layout Dashboard ═══ */}
+              <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+                {/* Routes du gérant */}
+                <Route index                      element={<Dashboard />} />
+                <Route path="/dashboard"          element={<Dashboard />} />
+                <Route path="/clients"            element={<Clients />} />
+                <Route path="/dossiers"           element={<Dossiers />} />
+                <Route path="/types-actions"      element={<TypesActions />} />
+                <Route path="/actes"              element={<ActesSignatures />} />
+                <Route path="/factures"           element={<Factures />} />
+                <Route path="/kanban"             element={<Kanban />} />
+                <Route path="/synthese"           element={<SyntheseFinanciere />} />
+                <Route path="/agenda"             element={<Agenda />} />
+                <Route path="/paiements"          element={<Paiements />} />
+                <Route path="/comptes"            element={<ComptesBancaires />} />
+                <Route path="/caisse"             element={<Caisse />} />
+                <Route path="/tarifs"             element={<Tarifs />} />
+                <Route path="/archives-numeriques" element={<ArchivesNumeriques />} />
+                <Route path="/archives-physiques"  element={<ArchivesPhysiques />} />
+                <Route path="/modeles"            element={<ModelesDocuments />} />
+                <Route path="/messagerie"         element={<Messagerie />} />
+                <Route path="/notifications"      element={<NotificationsPage />} />
+                <Route path="/formation"          element={<Formation />} />
+                <Route path="/portail"            element={<PortailClient />} />
+                <Route path="/administration"     element={<Administration />} />
+                <Route path="/utilisateurs"       element={<Utilisateurs />} />
+                <Route path="/cabinet"            element={<MonCabinet />} />
+                {/* Gestion du stockage et de l'abonnement */}
+                <Route path="/stockage"           element={<StockagePage />} />
 
-              {/* Routes d'administration globale */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/tenants" element={<AdminTenantsPage />} />
-              <Route path="/admin/modules" element={<AdminModulesOffres />} />
-              <Route path="/admin/leads" element={<AdminLeadsPage />} />
-              <Route path="/admin/licenses" element={<AdminLicenses />} />
-              <Route path="/admin/users" element={<AdminUsersGlobal />} />
-              <Route path="/admin/roles" element={<AdminRoles />} />
-              <Route path="/admin/audit" element={<AdminAudit />} />
-              <Route path="/admin/billing" element={<AdminBilling />} />
-              <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-              <Route path="/admin/security" element={<AdminSecurityPolicies />} />
-            </Route>
+                {/* Routes d'administration globale */}
+                <Route path="/admin/dashboard"  element={<AdminDashboard />} />
+                <Route path="/admin/tenants"    element={<AdminTenantsPage />} />
+                <Route path="/admin/modules"    element={<AdminModulesOffres />} />
+                <Route path="/admin/leads"      element={<AdminLeadsPage />} />
+                <Route path="/admin/licenses"   element={<AdminLicenses />} />
+                <Route path="/admin/users"      element={<AdminUsersGlobal />} />
+                <Route path="/admin/roles"      element={<AdminRoles />} />
+                <Route path="/admin/audit"      element={<AdminAudit />} />
+                <Route path="/admin/billing"    element={<AdminBilling />} />
+                <Route path="/admin/monitoring" element={<AdminMonitoring />} />
+                <Route path="/admin/security"   element={<AdminSecurityPolicies />} />
+              </Route>
 
-            {/* Page 404 — route de secours */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* Page 404 — route de secours */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

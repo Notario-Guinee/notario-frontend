@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useRef } from "react";
+import { sanitizeInput } from "@/lib/sanitize";
 import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, MessageSquare, Smile, Users, UserPlus, X, Trash2, MoreVertical } from "lucide-react";
 import { currentUser } from "@/data/mockData";
 import { motion } from "framer-motion";
@@ -156,7 +157,7 @@ export default function Messagerie() {
   // Envoyer un message dans la conversation sélectionnée
   const envoyer = () => {
     if (!message.trim() && attachments.length === 0) return;
-    const text = [message, ...attachments.map(a => `📎 ${a}`)].filter(Boolean).join("\n");
+    const text = [sanitizeInput(message), ...attachments.map(a => `📎 ${sanitizeInput(a)}`)].filter(Boolean).join("\n");
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       from: currentUser.firstName,
