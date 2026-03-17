@@ -4,7 +4,7 @@
 // du jour, les dossiers récents, les tâches et l'activité
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Receipt, CheckCircle, AlertTriangle, FolderOpen, Clock, Users, FileText, Activity, Loader2, HardDrive, Send } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -37,9 +37,25 @@ export default function Dashboard() {
   const [loading] = useState(false); // État de chargement (prêt pour connexion API)
   const storageUsed = 15.5;
   const storageTotal = 20;
-  const storagePercent = (storageUsed / storageTotal) * 100;
+
+  const storagePercent = useMemo(
+    () => (storageUsed / storageTotal) * 100,
+    [storageUsed, storageTotal]
+  );
 
   const dateLocale = lang === "FR" ? "fr-FR" : "en-US";
+
+  const handleNavigateStorage = useCallback(() => {
+    navigate('/stockage');
+  }, [navigate]);
+
+  // Catégories de stockage — recalculées seulement si la langue change
+  const storageCategories = useMemo(() => [
+    { label: t("dashboard.catNotarialDeeds"), go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
+    { label: t("dashboard.catDigitalArchives"), go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
+    { label: t("dashboard.catClientDocs"), go: 1.3, pct: 8, color: "hsl(258 60% 56%)" },
+    { label: t("dashboard.catInvoices"), go: 0.9, pct: 6, color: "hsl(38 92% 50%)" },
+  ], [t]);
 
   // ═══ Squelettes de chargement ═══
   if (loading) {
@@ -217,7 +233,7 @@ export default function Dashboard() {
 
           {/* Bouton d'action selon le niveau */}
           <button
-            onClick={() => navigate('/stockage')}
+            onClick={handleNavigateStorage}
             className={`mt-4 w-full rounded-lg border px-4 py-2 text-xs font-semibold transition-colors ${
               storagePercent > 90
                 ? "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20"
@@ -237,12 +253,7 @@ export default function Dashboard() {
             {t("dashboard.categoryBreakdown")}
           </h2>
           <div className="space-y-4">
-            {[
-              { label: t("dashboard.catNotarialDeeds"), go: 9.3, pct: 60, color: "hsl(211 55% 48%)" },
-              { label: t("dashboard.catDigitalArchives"), go: 4.0, pct: 26, color: "hsl(160 60% 42%)" },
-              { label: t("dashboard.catClientDocs"), go: 1.3, pct: 8, color: "hsl(258 60% 56%)" },
-              { label: t("dashboard.catInvoices"), go: 0.9, pct: 6, color: "hsl(38 92% 50%)" },
-            ].map((cat) => (
+            {storageCategories.map((cat) => (
               <div key={cat.label}>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-muted-foreground">{cat.label}</span>

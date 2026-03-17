@@ -4,7 +4,7 @@
 // création de facture, vue modèle de facture
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,11 +46,11 @@ export default function Factures() {
   const [deleteFactureId, setDeleteFactureId] = useState<string | null>(null);
 
   // Suppression d'une facture
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     setFactures(prev => prev.filter(f => f.id !== id));
     toast.success(t("factures.toastDeleted") || "Facture supprimée définitivement.");
     announce(fr ? "Facture supprimée" : "Invoice deleted");
-  };
+  }, [t, announce, fr]);
 
   // Réinitialisation du formulaire
   const resetForm = () => {
@@ -59,7 +59,7 @@ export default function Factures() {
   };
 
   // Création d'une nouvelle facture
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
     const montant = Number(form.montant);
     if (!montant || montant <= 0) { toast.error("Le montant doit être supérieur à 0."); return; }
@@ -83,12 +83,11 @@ export default function Factures() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [form, factures.length, t, announce, fr, resetForm]);
 
   // Filtrer les clients par recherche (code, nom, téléphone, dossier)
-  const filteredClients = clientSearch.length >= 1
+  const filteredClients = useMemo(() => clientSearch.length >= 1
     ? mockClients.filter(c => {
-        const searchStr = clientSearch.toLowerCase();
         // Recherche par code client, nom, prénom, téléphone
         if (searchMatch(c.code, clientSearch)) return true;
         if (searchMatch(c.nom, clientSearch)) return true;
@@ -101,18 +100,20 @@ export default function Factures() {
         if (clientDossiers.some(d => searchMatch(d.code, clientSearch))) return true;
         return false;
       })
-    : mockClients;
+    : mockClients,
+  [clientSearch]);
 
   // Dossiers associés au client sélectionné
-  const clientDossiers = form.client
+  const clientDossiers = useMemo(() => form.client
     ? mockDossiers.filter(d => d.clients.some(c => c.toLowerCase().includes(form.client.split(" ")[0]?.toLowerCase() || "")))
-    : mockDossiers;
+    : mockDossiers,
+  [form.client]);
 
   // Filtrage global dans la liste
-  const filtered = factures.filter(f => {
+  const filtered = useMemo(() => factures.filter(f => {
     if (!search) return true;
     return [f.numero, f.client, f.dossier, String(f.montant), f.statut, f.dateEmission].some(field => searchMatch(field, search));
-  });
+  }), [factures, search]);
 
   return (
     <div className="space-y-6">

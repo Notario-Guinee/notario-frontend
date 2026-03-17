@@ -129,6 +129,4 @@ export const mockAgendaToday = [
   { id: "4", heure: "16:00", titre: "Réunion équipe", lieu: "Salle de conférence", duree: "1h" },
 ];
 
-export const formatGNF = (amount: number): string => {
-  return new Intl.NumberFormat('fr-GN', { style: 'decimal' }).format(amount) + ' GNF';
-};
+export { formatGNF } from '@/lib/formatters';

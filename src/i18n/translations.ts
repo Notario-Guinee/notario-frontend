@@ -410,12 +410,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "paiements.registerPaymentAction": "Enregistrer le paiement",
     "paiements.registerReceived": "Enregistrez un paiement reçu",
     "paiements.associatedInvoice": "Facture associée",
-    "paiements.selectInvoice": "Sélectionner une facture...",
     "paiements.paymentMode": "Mode de paiement",
 
-    // Comptes
-    "comptes.addAccount": "Ajouter un compte",
-    "comptes.totalBalance": "Solde total consolidé",
+    // Comptes (aliases pour rétrocompatibilité)
     "comptes.accountName": "Nom du compte",
     "comptes.bank": "Banque",
     "comptes.accountType": "Type de compte",
@@ -425,10 +422,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "comptes.editAccount": "Modifier le compte",
     "comptes.editInfo": "Modifiez les informations du compte",
     "comptes.addNew": "Ajoutez un nouveau compte bancaire",
-    "comptes.recentOps": "Opérations récentes",
     "comptes.thisMonth": "+8.3% ce mois",
 
-    // Caisse
+    // Caisse (aliases pour rétrocompatibilité)
     "caisse.newOperation": "Nouvelle opération",
     "caisse.editOperation": "Modifier l'opération",
     "caisse.addOperation": "Enregistrez une nouvelle opération de caisse",
@@ -436,9 +432,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "caisse.operationType": "Type d'opération",
     "caisse.label": "Libellé",
     "caisse.associatedCase": "Dossier associé",
-    "caisse.totalEntries": "Total Entrées",
     "caisse.totalExits": "Total Sorties",
-    "caisse.netBalance": "Solde net",
     "caisse.entry": "Entrée",
     "caisse.exit": "Sortie",
     "caisse.disbursement": "Débours",
@@ -1820,9 +1814,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "paiements.selectInvoice": "Select an invoice...",
     "paiements.paymentMode": "Payment method",
 
-    // Comptes
-    "comptes.addAccount": "Add Account",
-    "comptes.totalBalance": "Total Consolidated Balance",
+    // Comptes (legacy aliases)
     "comptes.accountName": "Account name",
     "comptes.bank": "Bank",
     "comptes.accountType": "Account type",
@@ -1832,10 +1824,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "comptes.editAccount": "Edit account",
     "comptes.editInfo": "Edit account information",
     "comptes.addNew": "Add a new bank account",
-    "comptes.recentOps": "Recent operations",
     "comptes.thisMonth": "+8.3% this month",
 
-    // Caisse
+    // Caisse (legacy aliases)
     "caisse.newOperation": "New Operation",
     "caisse.editOperation": "Edit Operation",
     "caisse.addOperation": "Register a new cash operation",
@@ -1843,9 +1834,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "caisse.operationType": "Operation type",
     "caisse.label": "Label",
     "caisse.associatedCase": "Associated case",
-    "caisse.totalEntries": "Total Entries",
     "caisse.totalExits": "Total Exits",
-    "caisse.netBalance": "Net Balance",
     "caisse.entry": "Entry",
     "caisse.exit": "Exit",
     "caisse.disbursement": "Disbursement",

@@ -4,7 +4,7 @@
 // gestion des parties prenantes, filtres, export CSV/PDF
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import { mockDossiers, mockClients, formatGNF, rolesParties, currentUser, type Dossier, type PartiePrenanteEntry } from "@/data/mockData";
+import { TYPES_ACTE } from "@/data/constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,7 +31,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const typesActe = ["Vente immobilière", "Succession", "Constitution société", "Donation", "Bail commercial", "Hypothèque", "Procuration"];
+const typesActe = TYPES_ACTE;
 const statuts: Dossier["statut"][] = ["En cours", "En signature", "En attente pièces", "Terminé", "Suspendu", "Archivé"];
 const priorites: Dossier["priorite"][] = ["Basse", "Normale", "Haute", "Urgente"];
 
@@ -104,7 +105,7 @@ export default function Dossiers() {
     priorite: "Normale" as Dossier["priorite"], notaire: "Maître Notario", notes: "",
   });
 
-  const resetForm = () => setForm({ typeActe: "", objet: "", clients: "", montant: "", statut: "En cours", priorite: "Normale", notaire: "Maître Notario", notes: "" });
+  const resetForm = useCallback(() => setForm({ typeActe: "", objet: "", clients: "", montant: "", statut: "En cours", priorite: "Normale", notaire: "Maître Notario", notes: "" }), []);
 
   const filtered = useMemo(() => dossiers.filter((d) => {
     if (filterStatut !== "all" && d.statut !== filterStatut) return false;
@@ -121,16 +122,16 @@ export default function Dossiers() {
   const visibleDossiers = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: dossiers.length,
     enCours: dossiers.filter(d => d.statut === "En cours").length,
     enSignature: dossiers.filter(d => d.statut === "En signature").length,
     enAttente: dossiers.filter(d => d.statut === "En attente pièces").length,
     termines: dossiers.filter(d => d.statut === "Terminé").length,
     totalMontant: dossiers.reduce((s, d) => s + d.montant, 0),
-  };
+  }), [dossiers]);
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     if (!form.typeActe?.trim()) {
       toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
       return;
@@ -170,9 +171,9 @@ export default function Dossiers() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [form, fr, dossiers.length, announce, resetForm]);
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (!editingDossier) return;
     setDossiers(prev => prev.map(d => d.id === editingDossier.id ? {
       ...editingDossier,
@@ -187,9 +188,9 @@ export default function Dossiers() {
     setShowEditModal(false);
     setSelectedDossier(null);
     toast.success(fr ? "Dossier modifié avec succès" : "Case updated successfully");
-  };
+  }, [editingDossier, form, fr]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (!editingDossier) return;
     try {
       setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
@@ -202,15 +203,15 @@ export default function Dossiers() {
       toast.error(fr ? "Erreur lors de la suppression" : "Error deleting case");
       console.error(err);
     }
-  };
+  }, [editingDossier, fr, announce]);
 
-  const handleArchive = (d: Dossier) => {
+  const handleArchive = useCallback((d: Dossier) => {
     setDossiers(prev => prev.map(dos => dos.id === d.id ? { ...dos, statut: "Archivé" as Dossier["statut"] } : dos));
     toast.success(fr ? `Dossier ${d.code} archivé` : `Case ${d.code} archived`);
     announce(fr ? "Dossier archivé" : "Case archived");
-  };
+  }, [fr, announce]);
 
-  const openEdit = (d: Dossier) => {
+  const openEdit = useCallback((d: Dossier) => {
     setEditingDossier(d);
     setForm({
       typeActe: d.typeActe, objet: d.objet, clients: d.clients.join(", "),
@@ -218,12 +219,12 @@ export default function Dossiers() {
       notaire: d.notaire, notes: "",
     });
     setShowEditModal(true);
-  };
+  }, []);
 
-  const openDelete = (d: Dossier) => {
+  const openDelete = useCallback((d: Dossier) => {
     setEditingDossier(d);
     setShowDeleteDialog(true);
-  };
+  }, []);
 
   // Parties prenantes
   const openPartiesModal = (d: Dossier) => {
