@@ -140,30 +140,36 @@ export default function Dossiers() {
       return;
     }
     setIsSubmitting(true);
-    const clientNames = form.clients.split(",").map(c => c.trim()).filter(Boolean);
-    const newDossier: Dossier = {
-      id: String(Date.now()),
-      code: `N-2025-${(107 + dossiers.length).toString().padStart(3, "0")}`,
-      typeActe: form.typeActe,
-      objet: form.objet || form.typeActe,
-      clients: clientNames,
-      clientDate: new Date().toLocaleDateString("fr-FR"),
-      montant: Number(form.montant) || 0,
-      statut: form.statut,
-      priorite: form.priorite,
-      avancement: 0,
-      nbActes: 0,
-      nbPieces: 0,
-      date: new Date().toISOString().slice(0, 10),
-      notaire: form.notaire,
-      parties: [],
-    };
-    setDossiers(prev => [newDossier, ...prev]);
-    setShowCreateModal(false);
-    resetForm();
-    setIsSubmitting(false);
-    toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
-    announce(fr ? "Dossier créé" : "Case created");
+    try {
+      const clientNames = form.clients.split(",").map(c => c.trim()).filter(Boolean);
+      const newDossier: Dossier = {
+        id: String(Date.now()),
+        code: `N-2025-${(107 + dossiers.length).toString().padStart(3, "0")}`,
+        typeActe: form.typeActe,
+        objet: form.objet || form.typeActe,
+        clients: clientNames,
+        clientDate: new Date().toLocaleDateString("fr-FR"),
+        montant: Number(form.montant) || 0,
+        statut: form.statut,
+        priorite: form.priorite,
+        avancement: 0,
+        nbActes: 0,
+        nbPieces: 0,
+        date: new Date().toISOString().slice(0, 10),
+        notaire: form.notaire,
+        parties: [],
+      };
+      setDossiers(prev => [newDossier, ...prev]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
+      announce(fr ? "Dossier créé" : "Case created");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la création" : "Error creating case");
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEdit = () => {
@@ -185,12 +191,17 @@ export default function Dossiers() {
 
   const handleDelete = () => {
     if (!editingDossier) return;
-    setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
-    setShowDeleteDialog(false);
-    setSelectedDossier(null);
-    setEditingDossier(null);
-    toast.success(fr ? "Dossier supprimé" : "Case deleted");
-    announce(fr ? "Dossier supprimé" : "Case deleted");
+    try {
+      setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
+      setShowDeleteDialog(false);
+      setSelectedDossier(null);
+      setEditingDossier(null);
+      toast.success(fr ? "Dossier supprimé" : "Case deleted");
+      announce(fr ? "Dossier supprimé" : "Case deleted");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la suppression" : "Error deleting case");
+      console.error(err);
+    }
   };
 
   const handleArchive = (d: Dossier) => {

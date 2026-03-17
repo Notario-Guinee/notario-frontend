@@ -133,18 +133,14 @@ describe('stockageService', () => {
       await flush();
       await p1;
 
-      // Tenter de rétrograder vers pack-50
-      let errorThrown: Error | null = null;
-      try {
-        const p2 = service.souscrirePack('pack-50');
-        await flush();
-        await p2;
-      } catch (err) {
-        errorThrown = err as Error;
-      }
-
-      expect(errorThrown).not.toBeNull();
-      expect(errorThrown!.message).toMatch(/rétrogradation/i);
+      // Tenter de rétrograder vers pack-50 — doit rejeter
+      let errorMessage = '';
+      const p2 = service.souscrirePack('pack-50');
+      // Attache .catch immédiatement pour éviter un unhandled rejection
+      const caught = p2.catch((err: Error) => { errorMessage = err.message; });
+      await flush();
+      await caught;
+      expect(errorMessage).toMatch(/rétrogradation/i);
     });
   });
 

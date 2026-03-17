@@ -69,7 +69,7 @@ export default function Factures() {
       const num = `FAC-2026-${String(factures.length + 1).padStart(3, "0")}`;
       const newFacture: Facture = {
         id: String(Date.now()), numero: num, client: form.client,
-        montant: montant, statut: form.statut as any,
+        montant: montant, statut: form.statut as Facture["statut"],
         dateEmission: new Date().toISOString().slice(0, 10), dossier: form.dossier,
       };
       setFactures(prev => [newFacture, ...prev]);
@@ -77,6 +77,9 @@ export default function Factures() {
       resetForm();
       toast.success(`${num} ${t("factures.toastCreated")}`);
       announce(fr ? "Facture créée" : "Invoice created");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la création" : "Error creating invoice");
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }

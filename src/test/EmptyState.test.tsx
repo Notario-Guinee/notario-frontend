@@ -1,7 +1,6 @@
 // Tests pour le composant EmptyState
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { LucideIcon } from 'lucide-react';
 
@@ -51,9 +50,8 @@ describe('EmptyState', () => {
     expect(screen.getByRole('button', { name: 'Ajouter un client' })).toBeInTheDocument();
   });
 
-  it('clic sur le bouton action → le callback est appelé', async () => {
+  it('clic sur le bouton action → le callback est appelé', () => {
     const handleClick = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <EmptyState
@@ -62,7 +60,7 @@ describe('EmptyState', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Créer une facture' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Créer une facture' }));
     expect(handleClick).toHaveBeenCalledOnce();
   });
 

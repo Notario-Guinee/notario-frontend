@@ -178,7 +178,7 @@ export default function AdminSecurityPolicies() {
                         </div>
                         <Switch
                           checked={policyData.enabled}
-                          onCheckedChange={() => togglePolicy(cab.cabinetId, p.key as any)}
+                          onCheckedChange={() => togglePolicy(cab.cabinetId, p.key as "mfa" | "passwordComplexity" | "sessionDuration" | "ipRestriction")}
                         />
                       </div>
                     );

@@ -169,43 +169,54 @@ export default function Clients() {
       return;
     }
     setIsSubmitting(true);
-    const newClient: ClientType = {
-      id: String(Date.now()),
-      code: `C-${1209 + clients.length - mockClients.length}`,
-      nom: form.nom, prenom: form.prenom, type: form.type,
-      telephone: form.telephone, email: form.email,
-      profession: form.profession, statut: form.statut as any,
-      adresse: form.adresse,
-      description: form.description,
-      dateInscription: new Date().toISOString().slice(0, 10),
-    };
-    setClients(prev => [newClient, ...prev]);
-    setShowCreateModal(false);
-    resetForm();
-    setIsSubmitting(false);
-    toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
-    announce(fr ? "Client créé avec succès" : "Client created successfully");
+    try {
+      const newClient: ClientType = {
+        id: String(Date.now()),
+        code: `C-${1209 + clients.length - mockClients.length}`,
+        nom: form.nom, prenom: form.prenom, type: form.type,
+        telephone: form.telephone, email: form.email,
+        profession: form.profession, statut: form.statut as ClientType["statut"],
+        adresse: form.adresse,
+        description: form.description,
+        dateInscription: new Date().toISOString().slice(0, 10),
+      };
+      setClients(prev => [newClient, ...prev]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
+      announce(fr ? "Client créé avec succès" : "Client created successfully");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la création" : "Error creating client");
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Modification d'un client existant
   const handleEdit = () => {
     if (!editingClient) return;
-    setClients(prev => prev.map(c => c.id === editingClient.id ? {
-      ...editingClient,
-      nom: form.nom || editingClient.nom,
-      prenom: form.prenom ?? editingClient.prenom,
-      type: form.type,
-      telephone: form.telephone || editingClient.telephone,
-      email: form.email || editingClient.email,
-      profession: form.profession || editingClient.profession,
-      statut: form.statut as any,
-      adresse: form.adresse,
-      description: form.description,
-    } : c));
-    setShowEditModal(false);
-    setSelectedClient(null);
-    toast.success(fr ? "Client modifié" : "Client updated");
-    announce(fr ? "Client mis à jour" : "Client updated");
+    try {
+      setClients(prev => prev.map(c => c.id === editingClient.id ? {
+        ...editingClient,
+        nom: form.nom || editingClient.nom,
+        prenom: form.prenom ?? editingClient.prenom,
+        type: form.type,
+        telephone: form.telephone || editingClient.telephone,
+        email: form.email || editingClient.email,
+        profession: form.profession || editingClient.profession,
+        statut: form.statut as ClientType["statut"],
+        adresse: form.adresse,
+        description: form.description,
+      } : c));
+      setShowEditModal(false);
+      setSelectedClient(null);
+      toast.success(fr ? "Client modifié" : "Client updated");
+      announce(fr ? "Client mis à jour" : "Client updated");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la modification" : "Error updating client");
+      console.error(err);
+    }
   };
 
   // Suppression d'un client
