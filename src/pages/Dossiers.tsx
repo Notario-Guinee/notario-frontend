@@ -101,6 +101,26 @@ export default function Dossiers() {
   const pieceInputRef = useRef<HTMLInputElement>(null);
   const factureImportRef = useRef<HTMLInputElement>(null);
 
+  // ═══ Commentaires par étape de workflow (dossierId → stepKey → []) ═══
+  const [stepComments, setStepComments] = useState<Record<string, Record<string, { user: string; text: string; date: string }[]>>>({});
+
+  const handleAddStepComment = (dossierId: string, stepKey: string, text: string) => {
+    if (!text.trim()) return;
+    const entry = {
+      user: currentUser.name,
+      text: text.trim(),
+      date: new Date().toLocaleDateString("fr-FR") + " " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+    };
+    setStepComments(prev => ({
+      ...prev,
+      [dossierId]: {
+        ...(prev[dossierId] ?? {}),
+        [stepKey]: [...(prev[dossierId]?.[stepKey] ?? []), entry],
+      },
+    }));
+    toast.success(fr ? "Commentaire ajouté à l'étape" : "Comment added to step");
+  };
+
   // ═══ Workflows par dossier ═══
   const [dossierWorkflows, setDossierWorkflows] = useState<Record<string, WorkflowConfig>>({});
 
@@ -1022,6 +1042,8 @@ export default function Dossiers() {
                   onStart={(_actionId, stepKey) => handleWorkflowStart(selectedDossier.id, stepKey)}
                   onRevert={(stepKey) => handleWorkflowRevert(selectedDossier.id, stepKey)}
                   onComplete={(stepKey) => handleWorkflowComplete(selectedDossier.id, stepKey)}
+                  stepComments={stepComments[selectedDossier.id] ?? {}}
+                  onAddComment={(stepKey, text) => handleAddStepComment(selectedDossier.id, stepKey, text)}
                 />
               </div>
             </div>
