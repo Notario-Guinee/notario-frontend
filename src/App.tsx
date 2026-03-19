@@ -14,6 +14,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { RoleProvider } from "@/context/RoleContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageLoader } from "@/components/ui/loading-spinner";
 
@@ -92,12 +93,24 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Garde de route — redirige vers /login si l'utilisateur n'est pas connecté
+ * Utilisé pour protéger toutes les routes du dashboard
+ */
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
+/**
  * Composant racine — enveloppe l'arbre avec tous les providers
  * et définit la structure de routage de l'application
  */
 const App = () => (
   <ThemeProvider>
     <LanguageProvider>
+    {/* AuthProvider ajouté pour gérer l'authentification JWT avec le backend */}
+    <AuthProvider>
     <RoleProvider>
     <SidebarProvider>
     <QueryClientProvider client={queryClient}>
@@ -172,6 +185,7 @@ const App = () => (
     </QueryClientProvider>
     </SidebarProvider>
     </RoleProvider>
+    </AuthProvider>
     </LanguageProvider>
   </ThemeProvider>
 );

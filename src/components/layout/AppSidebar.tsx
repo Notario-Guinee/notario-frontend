@@ -37,7 +37,6 @@ export function AppSidebar() {
       items: [
         { title: t("nav.clients"), path: "/clients", icon: Users },
         { title: t("nav.dossiers"), path: "/dossiers", icon: FolderOpen },
-        { title: t("nav.typesActions"), path: "/types-actions", icon: Scale },
         { title: t("nav.actesSignatures"), path: "/actes", icon: FileText },
         { title: t("nav.agenda"), path: "/agenda", icon: Calendar },
         { title: t("nav.kanban"), path: "/kanban", icon: CheckSquare },

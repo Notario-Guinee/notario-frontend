@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { Plus, Search, FileText, CheckCircle2, XCircle, Clock, TrendingUp, Edit, Archive } from "lucide-react";
+import { Plus, Search, FileText, CheckCircle2, XCircle, Clock, TrendingUp, Edit, Archive, GitBranch, ChevronUp, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn, searchMatch } from "@/lib/utils";
@@ -14,6 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import { formatGNF } from "@/data/mockData";
 import { useLanguage } from "@/context/LanguageContext";
+
+interface WorkflowStep {
+  id: string;
+  libelle: string;
+}
 
 interface ActionType {
   id: string;
@@ -24,20 +29,21 @@ interface ActionType {
   duree: string;
   etat: "actif" | "inactif" | "brouillon";
   utilisations: number;
+  workflow: WorkflowStep[];
 }
 
 const categories = ["Vente", "Donation", "Entreprise", "Succession", "Bail", "Sûreté"];
 
 const initialActions: ActionType[] = [
-  { id: "1", libelle: "Acte de dépôt", description: "Dépôt d'actes sous seing privé, dépôt de documents officiels", categorie: "Vente", prix: 80000, duree: "1 jour", etat: "actif", utilisations: 18 },
-  { id: "2", libelle: "Acte de notoriété", description: "Attestation de notoriété successorale, qualité d'héritier", categorie: "Succession", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 31 },
-  { id: "3", libelle: "Bail", description: "Bail d'habitation, bail commercial, bail professionnel", categorie: "Bail", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 14 },
-  { id: "4", libelle: "Cession de parts & nouveaux statuts", description: "Cession de parts sociales et mise à jour des statuts de la société", categorie: "Entreprise", prix: 220000, duree: "3-5 jours", etat: "actif", utilisations: 9 },
-  { id: "5", libelle: "Cession de succession", description: "Cession de droits successoraux entre cohéritiers ou à un tiers", categorie: "Succession", prix: 180000, duree: "2-4 jours", etat: "actif", utilisations: 6 },
-  { id: "6", libelle: "Création de la société", description: "Constitution de sociétés (SARL, SA, SNC, SCS…), rédaction des statuts", categorie: "Entreprise", prix: 250000, duree: "3-5 jours", etat: "actif", utilisations: 12 },
-  { id: "7", libelle: "Donation", description: "Donation entre vifs, donation-partage, donation avec réserve d'usufruit", categorie: "Donation", prix: 150000, duree: "1-2 jours", etat: "actif", utilisations: 23 },
-  { id: "8", libelle: "Mainlevée", description: "Mainlevée d'hypothèque, mainlevée de saisie, mainlevée de gage", categorie: "Sûreté", prix: 130000, duree: "1-2 jours", etat: "actif", utilisations: 7 },
-  { id: "9", libelle: "Procuration", description: "Procuration générale ou spéciale, mandat notarié", categorie: "Vente", prix: 60000, duree: "1 jour", etat: "actif", utilisations: 41 },
+  { id: "1", libelle: "Acte de dépôt", description: "Dépôt d'actes sous seing privé, dépôt de documents officiels", categorie: "Vente", prix: 80000, duree: "1 jour", etat: "actif", utilisations: 18, workflow: ["Réception des documents", "Vérification de conformité", "Rédaction de l'acte", "Signature des parties", "Enregistrement"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "2", libelle: "Acte de notoriété", description: "Attestation de notoriété successorale, qualité d'héritier", categorie: "Succession", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 31, workflow: ["Réception de la demande", "Vérification des héritiers", "Rédaction de l'attestation", "Signature notariale", "Délivrance"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "3", libelle: "Bail", description: "Bail d'habitation, bail commercial, bail professionnel", categorie: "Bail", prix: 100000, duree: "1-2 jours", etat: "actif", utilisations: 14, workflow: ["Réception des parties", "Vérification d'identité", "Rédaction du contrat", "Lecture & approbation", "Signature", "Enregistrement"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "4", libelle: "Cession de parts & nouveaux statuts", description: "Cession de parts sociales et mise à jour des statuts de la société", categorie: "Entreprise", prix: 220000, duree: "3-5 jours", etat: "actif", utilisations: 9, workflow: ["Dépôt du dossier", "Vérification juridique", "Rédaction de l'acte de cession", "Mise à jour des statuts", "Signature", "Publication légale"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "5", libelle: "Cession de succession", description: "Cession de droits successoraux entre cohéritiers ou à un tiers", categorie: "Succession", prix: 180000, duree: "2-4 jours", etat: "actif", utilisations: 6, workflow: ["Ouverture du dossier", "Inventaire successoral", "Évaluation des biens", "Rédaction de l'acte", "Signature des cohéritiers", "Enregistrement"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "6", libelle: "Création de la société", description: "Constitution de sociétés (SARL, SA, SNC, SCS…), rédaction des statuts", categorie: "Entreprise", prix: 250000, duree: "3-5 jours", etat: "actif", utilisations: 12, workflow: ["Réception du projet", "Vérification de la dénomination", "Rédaction des statuts", "Assemblée constitutive", "Signature", "Dépôt du capital", "Immatriculation"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "7", libelle: "Donation", description: "Donation entre vifs, donation-partage, donation avec réserve d'usufruit", categorie: "Donation", prix: 150000, duree: "1-2 jours", etat: "actif", utilisations: 23, workflow: ["Réception de la demande", "Évaluation des biens donnés", "Rédaction de l'acte", "Information fiscale", "Signature", "Publication"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "8", libelle: "Mainlevée", description: "Mainlevée d'hypothèque, mainlevée de saisie, mainlevée de gage", categorie: "Sûreté", prix: 130000, duree: "1-2 jours", etat: "actif", utilisations: 7, workflow: ["Réception de la demande", "Vérification du remboursement", "Rédaction de la mainlevée", "Signature du créancier", "Radiation au registre"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
+  { id: "9", libelle: "Procuration", description: "Procuration générale ou spéciale, mandat notarié", categorie: "Vente", prix: 60000, duree: "1 jour", etat: "actif", utilisations: 41, workflow: ["Réception de la demande", "Vérification d'identité", "Rédaction de la procuration", "Lecture & acceptation", "Signature", "Remise de l'original"].map((l, i) => ({ id: String(i + 1), libelle: l })) },
 ];
 
 const catColors: Record<string, string> = {
@@ -56,7 +62,8 @@ const etatColors: Record<string, string> = {
 };
 
 export default function TypesActions() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const fr = lang === "FR";
   const [actions, setActions] = useState<ActionType[]>(initialActions);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all-categories");
@@ -64,6 +71,9 @@ export default function TypesActions() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<ActionType | null>(null);
   const [form, setForm] = useState({ libelle: "", description: "", categorie: "Vente", prix: "", duree: "", etat: "actif" as ActionType["etat"] });
+  const [workflowAction, setWorkflowAction] = useState<ActionType | null>(null);
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [newStepLabel, setNewStepLabel] = useState("");
 
   const filtered = actions.filter((a) => {
     if (filterCat !== "all-categories" && a.categorie !== filterCat) return false;
@@ -92,6 +102,7 @@ export default function TypesActions() {
       duree: form.duree || "1 jour",
       etat: form.etat,
       utilisations: 0,
+      workflow: [],
     };
     setActions(prev => [...prev, newAction]);
     setShowCreate(false);
@@ -109,6 +120,39 @@ export default function TypesActions() {
   const handleArchive = (id: string) => {
     setActions(prev => prev.map(a => a.id === id ? { ...a, etat: a.etat === "inactif" ? "actif" : "inactif" as ActionType["etat"] } : a));
     toast.success(t("typesActions.toastArchived"));
+  };
+
+  const openWorkflow = (action: ActionType) => {
+    setWorkflowAction(action);
+    setWorkflowSteps(action.workflow.map(s => ({ ...s })));
+    setNewStepLabel("");
+  };
+
+  const moveStep = (index: number, direction: "up" | "down") => {
+    setWorkflowSteps(prev => {
+      const steps = [...prev];
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= steps.length) return steps;
+      [steps[index], steps[targetIndex]] = [steps[targetIndex], steps[index]];
+      return steps;
+    });
+  };
+
+  const removeStep = (id: string) => {
+    setWorkflowSteps(prev => prev.filter(s => s.id !== id));
+  };
+
+  const addStep = () => {
+    if (!newStepLabel.trim()) return;
+    setWorkflowSteps(prev => [...prev, { id: String(Date.now()), libelle: newStepLabel.trim() }]);
+    setNewStepLabel("");
+  };
+
+  const saveWorkflow = () => {
+    if (!workflowAction) return;
+    setActions(prev => prev.map(a => a.id === workflowAction.id ? { ...a, workflow: workflowSteps } : a));
+    setWorkflowAction(null);
+    toast.success(t("typesActions.workflowSaved") || (fr ? `Workflow enregistré pour « ${workflowAction.libelle} »` : `Workflow saved for "${workflowAction.libelle}"`));
   };
 
   return (
@@ -195,6 +239,15 @@ export default function TypesActions() {
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setEditing({ ...a })}>{t("typesActions.edit")}</Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        title={fr ? "Configurer le workflow" : "Configure workflow"}
+                        onClick={() => openWorkflow(a)}
+                      >
+                        <GitBranch className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground" onClick={() => handleArchive(a.id)}>{t("typesActions.archive")}</Button>
                     </div>
                   </td>
@@ -306,6 +359,84 @@ export default function TypesActions() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>{t("typesActions.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleUpdate}>{t("typesActions.save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Modale configurateur de workflow ═══ */}
+      <Dialog open={!!workflowAction} onOpenChange={open => !open && setWorkflowAction(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="font-heading flex items-center gap-2">
+              <GitBranch className="h-5 w-5 text-primary" />
+              {fr ? "Workflow procédural" : "Procedural Workflow"}
+            </DialogTitle>
+            <DialogDescription>
+              {workflowAction?.libelle} — {fr ? "Configurez les étapes du workflow" : "Configure workflow steps"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-2 py-2">
+            {workflowSteps.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {fr ? "Aucune étape définie" : "No steps defined"}
+              </p>
+            )}
+            {workflowSteps.map((step, index) => (
+              <div key={step.id} className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border group">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+                  {index + 1}
+                </span>
+                <span className="flex-1 text-sm text-foreground">{step.libelle}</span>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    disabled={index === 0}
+                    onClick={() => moveStep(index, "up")}
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    disabled={index === workflowSteps.length - 1}
+                    onClick={() => moveStep(index, "down")}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => removeStep(step.id)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Ajouter une étape */}
+          <div className="border-t border-border pt-3 space-y-3">
+            <div className="flex gap-2">
+              <Input
+                value={newStepLabel}
+                onChange={e => setNewStepLabel(e.target.value)}
+                placeholder={fr ? "Nom de la nouvelle étape..." : "New step name..."}
+                onKeyDown={e => e.key === "Enter" && addStep()}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={addStep} disabled={!newStepLabel.trim()}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setWorkflowAction(null)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button className="bg-primary text-primary-foreground" onClick={saveWorkflow}>
+              {fr ? "Enregistrer le workflow" : "Save workflow"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

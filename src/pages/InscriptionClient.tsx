@@ -20,7 +20,7 @@ export default function InscriptionClient() {
   const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [searchParams] = useSearchParams();
-  const cabinetName = searchParams.get("cabinet") || "Cabinet Maître Sylla";
+  const cabinetName = searchParams.get("cabinet") || "Notario";
   const fr = lang === "FR";
 
   const [form, setForm] = useState({

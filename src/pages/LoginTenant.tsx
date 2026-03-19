@@ -11,16 +11,35 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginTenant() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const cabinetName = "Cabinet Maître Sylla";
-  const subdomain = "sylla.notariale.com";
+  // Appel réel au backend — remplace l'ancien navigate("/dashboard") direct
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Veuillez remplir tous les champs");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Erreur de connexion");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative">
@@ -40,8 +59,8 @@ export default function LoginTenant() {
             <div className="flex items-center gap-3 mb-10">
               <div className="w-10 h-10 rounded-xl bg-[#2AA3D6] flex items-center justify-center text-white font-bold text-lg shadow-lg">N</div>
               <div>
-                <p className="text-white font-medium text-[15px]">{cabinetName}</p>
-                <p className="text-[#8ba5be] text-[11px]">{subdomain}</p>
+                <p className="text-white font-medium text-[15px]">Notario</p>
+                <p className="text-[#8ba5be] text-[11px]">{t("login.tenantPlatform")}</p>
               </div>
             </div>
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">{t("login.tenantWelcome")}</h2>
@@ -76,12 +95,22 @@ export default function LoginTenant() {
               <label className="text-xs font-medium text-muted-foreground">{t("login.password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10" />
+                <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
                 <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
+
+            {/* Message d'erreur affiché si le login échoue */}
+            {error && (
+              <div className="text-red-500 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
             <div className="text-right">
               <button onClick={() => navigate("/forgot-password?portal=tenant")} className="text-xs text-primary hover:underline">{t("login.forgotPassword")}</button>
             </div>
@@ -108,7 +137,7 @@ export default function LoginTenant() {
           <div className="mt-6 rounded-lg bg-muted/50 px-3.5 py-2.5 flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-[11px] text-muted-foreground">
-              {t("login.tenantSpace")} : <strong className="text-foreground">{subdomain}</strong>
+              {t("login.tenantSecureAccess")}
             </span>
           </div>
         </div>
