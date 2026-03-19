@@ -15,6 +15,8 @@ import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { RoleProvider } from "@/context/RoleContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { DossierTabsProvider } from "@/context/DossierTabsContext";
+import { ActeStepsProvider } from "@/context/ActeStepsContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageLoader } from "@/components/ui/loading-spinner";
 
@@ -113,6 +115,8 @@ const App = () => (
     <AuthProvider>
     <RoleProvider>
     <SidebarProvider>
+    <DossierTabsProvider>
+    <ActeStepsProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         {/* Systèmes de notifications toast */}
@@ -183,6 +187,8 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    </ActeStepsProvider>
+    </DossierTabsProvider>
     </SidebarProvider>
     </RoleProvider>
     </AuthProvider>

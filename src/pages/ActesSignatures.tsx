@@ -20,6 +20,7 @@ import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
 import { workflowTemplates, type WorkflowConfig } from "@/components/workflow/workflow-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { CATEGORIES_ACTES, type CategorieActe } from "@/data/constants";
+import { useActeSteps } from "@/context/ActeStepsContext";
 
 interface Acte {
   id: string;
@@ -97,23 +98,13 @@ export default function ActesSignatures() {
   const [form, setForm] = useState({ categorieActe: "", type: "" });
 
   // ── Steps per act (catalogue) ─────────────────────────────────
-  const DEFAULT_STEPS = ["ENQUÊTE", "CONSTITUTION", "RÉDACTION", "SIGNATURE", "PAIEMENT", "FORMALITÉS", "EXPÉDITION", "ARCHIVAGE"];
-  const getDefaultSteps = (acteLabel: string): string[] => {
-    const wf = workflowTemplates[acteLabel];
-    if (wf) return wf.steps.map(s => s.label ?? s.key.toUpperCase());
-    // Partial match
-    const key = Object.keys(workflowTemplates).find(k =>
-      acteLabel.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(acteLabel.toLowerCase())
-    );
-    return key ? workflowTemplates[key].steps.map(s => s.label ?? s.key.toUpperCase()) : [...DEFAULT_STEPS];
-  };
-  const [acteSteps, setActeSteps] = useState<Record<string, string[]>>({});
+  const { acteSteps, setActeSteps, getSteps: getStepsFromContext } = useActeSteps();
   const [expandedActeSteps, setExpandedActeSteps] = useState<Set<string>>(new Set());
   const [editingStep, setEditingStep] = useState<{ key: string; idx: number; label: string } | null>(null);
   const [addStepFor, setAddStepFor] = useState<string | null>(null);
   const [newStepLabel, setNewStepLabel] = useState("");
 
-  const getSteps = (acteLabel: string) => acteSteps[acteLabel] ?? getDefaultSteps(acteLabel);
+  const getSteps = (acteLabel: string) => getStepsFromContext(acteLabel);
 
   const toggleActeSteps = (key: string) => {
     setExpandedActeSteps(prev => {

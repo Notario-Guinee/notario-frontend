@@ -30,7 +30,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
-import { workflowTemplates, type WorkflowConfig } from "@/components/workflow/workflow-types";
+import { workflowTemplates, WORKFLOW_PALETTE, type WorkflowConfig, type WorkflowStep } from "@/components/workflow/workflow-types";
+import { useDossierTabs } from "@/context/DossierTabsContext";
+import { useActeSteps } from "@/context/ActeStepsContext";
 
 const categoriesActes = CATEGORIES_ACTES;
 const statuts: Dossier["statut"][] = ["En cours", "En signature", "En attente pièces", "Terminé", "Suspendu", "Archivé"];
@@ -61,14 +63,20 @@ export default function Dossiers() {
   const [filterTypeActe, setFilterTypeActe] = useState<string>("all");
   const [filterDate, setFilterDate] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [selectedDossier, setSelectedDossier] = useState<Dossier | null>(null);
+  const { openTabs, activeTabId, setActiveTabId, openTab, closeTab, setTabDetailSubTab } = useDossierTabs();
+  const { getSteps } = useActeSteps();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
-  const [pageTab, setPageTab] = useState<"dossiers" | "details" | "workflow">("dossiers");
-  const [openSecondaryTab, setOpenSecondaryTab] = useState<"details" | "workflow" | null>(null);
-  const [detailTab, setDetailTab] = useState("details");
+
+  // Derived from active tab
+  const activeTab = openTabs.find(t => t.id === activeTabId);
+  const selectedDossier = activeTab ? dossiers.find(d => d.id === activeTab.dossierId) ?? null : null;
+  const detailTab = activeTab?.detailSubTab ?? "details";
+  const setDetailTab = (st: string) => { if (activeTab) setTabDetailSubTab(activeTab.id, st); };
+  const pageTab = activeTabId === "dossiers" ? "dossiers" : (activeTab?.type ?? "dossiers");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -97,22 +105,36 @@ export default function Dossiers() {
   const [dossierWorkflows, setDossierWorkflows] = useState<Record<string, WorkflowConfig>>({});
 
   const openDossierTab = (d: Dossier, tab: "details" | "workflow") => {
-    setSelectedDossier(d);
-    setPageTab(tab);
-    setOpenSecondaryTab(tab);
-    if (tab === "details") setDetailTab("details");
+    openTab({ id: d.id, code: d.code, objet: d.objet }, tab);
   };
 
   const getWorkflow = (dossier: Dossier): WorkflowConfig | null => {
-    if (dossierWorkflows[dossier.id]) return dossierWorkflows[dossier.id];
-    // Cherche un template correspondant au typeActe (correspondance exacte ou partielle)
-    const exact = workflowTemplates[dossier.typeActe];
-    if (exact) return exact;
-    // Recherche approximative (ex: "Vente immobilière" → template "Vente immobilière")
-    const key = Object.keys(workflowTemplates).find(k =>
-      dossier.typeActe.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(dossier.typeActe.toLowerCase())
-    );
-    return key ? workflowTemplates[key] : workflowTemplates["Vente immobilière"] ?? null;
+    const steps = getSteps(dossier.typeActe);
+    const savedWf = dossierWorkflows[dossier.id];
+    const templateWf = workflowTemplates[dossier.typeActe];
+
+    const configSteps: WorkflowStep[] = steps.map((label, i) => {
+      const key = label.toLowerCase().replace(/[\s/(),']+/g, "_").replace(/_+/g, "_");
+      const savedStep = savedWf?.steps.find(s => s.key === key) ?? savedWf?.steps[i];
+      const templateStep = templateWf?.steps[i] ?? templateWf?.steps.find(s => s.label === label);
+      return {
+        key,
+        label,
+        description: templateStep?.description ?? "",
+        icon: templateStep?.icon ?? "FileText",
+        time: templateStep?.time ?? "1 j",
+        status: savedStep?.status ?? "pending",
+        startedAt: savedStep?.startedAt,
+        completedAt: savedStep?.completedAt,
+        button: { actionId: `start_${key}` },
+      };
+    });
+
+    return {
+      layout: "horizontal",
+      palette: WORKFLOW_PALETTE,
+      steps: configSteps,
+    };
   };
 
   const handleWorkflowStart = (dossierId: string, stepKey: string) => {
@@ -276,7 +298,6 @@ export default function Dossiers() {
       clerc: form.clerc || undefined,
     } : d));
     setShowEditModal(false);
-    setSelectedDossier(null);
     toast.success(fr ? "Dossier modifié avec succès" : "Case updated successfully");
   }, [editingDossier, form, fr]);
 
@@ -285,7 +306,6 @@ export default function Dossiers() {
     try {
       setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
       setShowDeleteDialog(false);
-      setSelectedDossier(null);
       setEditingDossier(null);
       toast.success(fr ? "Dossier supprimé" : "Case deleted");
       announce(fr ? "Dossier supprimé" : "Case deleted");
@@ -361,7 +381,7 @@ export default function Dossiers() {
       clients: partiesList.map(p => p.nom),
     } : d));
     if (selectedDossier?.id === partiesDossier.id) {
-      setSelectedDossier(prev => prev ? { ...prev, parties: partiesList, clients: partiesList.map(p => p.nom) } : null);
+      // selectedDossier is derived from dossiers state; updating dossiers above is sufficient
     }
     setShowPartiesModal(false);
     toast.success(fr ? "Parties prenantes mises à jour" : "Stakeholders updated");
@@ -423,67 +443,47 @@ export default function Dossiers() {
       </div>
 
       {/* Page-level tabs */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border overflow-x-auto">
         <button
-          onClick={() => setPageTab("dossiers")}
+          onClick={() => setActiveTabId("dossiers")}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
-            pageTab === "dossiers" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap shrink-0",
+            activeTabId === "dossiers" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
           <FolderOpen className="h-4 w-4" />
           {fr ? "Dossiers" : "Cases"}
         </button>
-        {openSecondaryTab === "details" && selectedDossier && (
-          <div className={cn(
-            "flex items-center border-b-2 -mb-px transition-colors",
-            pageTab === "details" ? "border-primary" : "border-transparent"
-          )}>
-            <button
-              onClick={() => setPageTab("details")}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                pageTab === "details" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <FileText className="h-4 w-4" />
-              {fr ? "Voir détail" : "View detail"}
-              <span className="text-xs font-mono text-muted-foreground">{selectedDossier.code}</span>
-            </button>
-            <button
-              onClick={() => { setPageTab("dossiers"); setOpenSecondaryTab(null); setSelectedDossier(null); }}
-              className="pr-3 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={fr ? "Fermer" : "Close"}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-        {openSecondaryTab === "workflow" && selectedDossier && (
-          <div className={cn(
-            "flex items-center border-b-2 -mb-px transition-colors",
-            pageTab === "workflow" ? "border-primary" : "border-transparent"
-          )}>
-            <button
-              onClick={() => setPageTab("workflow")}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                pageTab === "workflow" ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <GitBranch className="h-4 w-4" />
-              {fr ? "Workflow" : "Workflow"}
-              <span className="text-xs font-mono text-muted-foreground">{selectedDossier.code}</span>
-            </button>
-            <button
-              onClick={() => { setPageTab("dossiers"); setOpenSecondaryTab(null); setSelectedDossier(null); }}
-              className="pr-3 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={fr ? "Fermer" : "Close"}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
+        {openTabs.map(tab => {
+          const isActive = activeTabId === tab.id;
+          const Icon = tab.type === "details" ? FileText : GitBranch;
+          const label = tab.type === "details" ? (fr ? "Détail" : "Detail") : "Workflow";
+          return (
+            <div key={tab.id} className={cn(
+              "flex items-center border-b-2 -mb-px transition-colors shrink-0",
+              isActive ? "border-primary" : "border-transparent"
+            )}>
+              <button
+                onClick={() => setActiveTabId(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 pl-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap",
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+                <span className="text-xs font-mono text-muted-foreground">{tab.dossierCode}</span>
+              </button>
+              <button
+                onClick={() => closeTab(tab.id)}
+                className="px-2 py-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={fr ? "Fermer" : "Close"}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Tab: Dossiers ──────────────────────────────────────── */}
@@ -605,7 +605,7 @@ export default function Dossiers() {
                           <DropdownMenuItem onClick={() => openPartiesModal(d)}><UserPlus className="mr-2 h-4 w-4" /> {fr ? "Associer parties" : "Link stakeholders"}</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => openFactureModal(d)}><Receipt className="mr-2 h-4 w-4" /> {fr ? "Générer facture" : "Generate invoice"}</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { openDossierTab(d, "details"); setDetailTab("actes"); }}><FileSignature className="mr-2 h-4 w-4" /> {fr ? "Signer" : "Sign"}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { openDossierTab(d, "details"); setTabDetailSubTab(`${d.id}-details`, "actes"); }}><FileSignature className="mr-2 h-4 w-4" /> {fr ? "Signer" : "Sign"}</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleArchive(d)}><Archive className="mr-2 h-4 w-4" /> {fr ? "Archiver" : "Archive"}</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-destructive" onClick={() => openDelete(d)}><Trash2 className="mr-2 h-4 w-4" /> {fr ? "Supprimer" : "Delete"}</DropdownMenuItem>
@@ -671,7 +671,7 @@ export default function Dossiers() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(d); }}><Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}</DropdownMenuItem>
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openPartiesModal(d); }}><UserPlus className="mr-2 h-4 w-4" /> {fr ? "Associer parties" : "Link stakeholders"}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={e => { e.stopPropagation(); openDossierTab(d, "details"); setDetailTab("actes"); }}><FileSignature className="mr-2 h-4 w-4" /> {fr ? "Signer" : "Sign"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={e => { e.stopPropagation(); openDossierTab(d, "details"); setTabDetailSubTab(`${d.id}-details`, "actes"); }}><FileSignature className="mr-2 h-4 w-4" /> {fr ? "Signer" : "Sign"}</DropdownMenuItem>
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openFactureModal(d); }}><Receipt className="mr-2 h-4 w-4" /> {fr ? "Générer facture" : "Generate invoice"}</DropdownMenuItem>
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); handleArchive(d); }}><Archive className="mr-2 h-4 w-4" /> {fr ? "Archiver" : "Archive"}</DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -996,7 +996,7 @@ export default function Dossiers() {
           <div className="text-center py-20 text-muted-foreground">
             <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
             <p className="text-sm font-medium">{fr ? "Sélectionnez un dossier dans la liste pour voir son détail" : "Select a case from the list to view its detail"}</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setPageTab("dossiers")}>{fr ? "Aller à la liste" : "Go to list"}</Button>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTabId("dossiers")}>{fr ? "Aller à la liste" : "Go to list"}</Button>
           </div>
         )
       )}
@@ -1035,7 +1035,7 @@ export default function Dossiers() {
           <div className="text-center py-20 text-muted-foreground">
             <GitBranch className="h-10 w-10 mx-auto mb-3 opacity-40" />
             <p className="text-sm font-medium">{fr ? "Sélectionnez un dossier dans la liste pour voir son workflow" : "Select a case from the list to view its workflow"}</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => setPageTab("dossiers")}>{fr ? "Aller à la liste" : "Go to list"}</Button>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTabId("dossiers")}>{fr ? "Aller à la liste" : "Go to list"}</Button>
           </div>
         )
       )}
