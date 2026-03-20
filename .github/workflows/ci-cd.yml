@@ -1,0 +1,68 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # CI : Lint + Tests + Build check
+  # ─────────────────────────────────────────────
+  ci:
+    name: CI — Lint, Tests & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Tests
+        run: bun run test --run
+
+      - name: Build (vérification production)
+        run: bun run build
+
+  # ─────────────────────────────────────────────
+  # CD Staging → branche develop
+  # ─────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: staging
+
+    steps:
+      - name: Trigger Railway deploy (Staging)
+        run: |
+          curl -s -X POST "${{ secrets.RAILWAY_DEPLOY_HOOK_FRONTEND_STAGING }}" \
+            -o /dev/null -w "HTTP Status: %{http_code}\n"
+
+  # ─────────────────────────────────────────────
+  # CD Production → branche main
+  # ─────────────────────────────────────────────
+  deploy-production:
+    name: Deploy → Production
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - name: Trigger Railway deploy (Production)
+        run: |
+          curl -s -X POST "${{ secrets.RAILWAY_DEPLOY_HOOK_FRONTEND_PROD }}" \
+            -o /dev/null -w "HTTP Status: %{http_code}\n"
