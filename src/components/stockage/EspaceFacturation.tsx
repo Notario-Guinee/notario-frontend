@@ -567,6 +567,10 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
                 : t("subs.card.save")
               }
             </Button>
+
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
+              Vous acceptez que Notario débite votre carte pour les services auxquels vous souscrirez et de manière récurrente mensuelle jusqu'à ce que vous annuliez conformément à nos conditions, notamment en exerçant votre droit d'annulation de votre abonnement dans les 14 jours suivant la date d'abonnement. Vous pouvez annuler à tout moment dans les paramètres de votre compte.
+            </p>
           </form>
         ) : null}
       </div>

@@ -92,7 +92,8 @@ export default function PortailClient() {
 
   // Send message modal
   const [showMsgModal, setShowMsgModal] = useState(false);
-  const [msgForm, setMsgForm] = useState({ clientId: "", message: "" });
+  const [msgForm, setMsgForm] = useState({ clientIds: [] as string[], message: "" });
+  const [msgClientSearch, setMsgClientSearch] = useState("");
 
   // Doc request modal
   const [showDocRequestModal, setShowDocRequestModal] = useState(false);
@@ -135,16 +136,17 @@ export default function PortailClient() {
   };
 
   const handleSendMessage = () => {
-    const client = mockClients.find(c => c.id === msgForm.clientId);
-    if (!client || !msgForm.message) return;
-    setMessages(prev => [...prev, {
-      id: String(Date.now()), clientId: msgForm.clientId,
-      clientName: `${client.nom} ${client.prenom}`, message: msgForm.message,
-      date: new Date().toISOString().slice(0, 10), direction: "sent",
-    }]);
+    if (!msgForm.clientIds.length || !msgForm.message) return;
+    const now = new Date().toISOString().slice(0, 10);
+    const newMsgs = msgForm.clientIds.map((cid, i) => {
+      const client = mockClients.find(c => c.id === cid)!;
+      return { id: String(Date.now() + i), clientId: cid, clientName: `${client.nom} ${client.prenom}`, message: msgForm.message, date: now, direction: "sent" as const };
+    });
+    setMessages(prev => [...prev, ...newMsgs]);
     setShowMsgModal(false);
-    setMsgForm({ clientId: "", message: "" });
-    toast.success(t("portail.sendMessage") + " ✓");
+    setMsgForm({ clientIds: [], message: "" });
+    setMsgClientSearch("");
+    toast.success(`Message envoyé à ${newMsgs.length} client${newMsgs.length > 1 ? "s" : ""}`);
   };
 
   const handleDocRequest = () => {
@@ -433,7 +435,7 @@ export default function PortailClient() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-sm font-semibold text-foreground">{t("portail.secureCommunication")}</h2>
-            <Button size="sm" onClick={() => { setMsgForm({ clientId: "", message: "" }); setShowMsgModal(true); }}>
+            <Button size="sm" onClick={() => { setMsgForm({ clientIds: [], message: "" }); setMsgClientSearch(""); setShowMsgModal(true); }}>
               <Send className="mr-1 h-4 w-4" /> {t("portail.sendMessage")}
             </Button>
           </div>
@@ -570,7 +572,7 @@ export default function PortailClient() {
       </Dialog>
 
       {/* Send Message Modal */}
-      <Dialog open={showMsgModal} onOpenChange={setShowMsgModal}>
+      <Dialog open={showMsgModal} onOpenChange={o => { if (!o) { setShowMsgModal(false); setMsgClientSearch(""); setMsgForm({ clientIds: [], message: "" }); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading">{t("portail.sendMessage")}</DialogTitle>
@@ -578,25 +580,96 @@ export default function PortailClient() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{t("label.client")} *</Label>
-              <Select value={msgForm.clientId} onValueChange={v => setMsgForm(f => ({ ...f, clientId: v }))}>
-                <SelectTrigger><SelectValue placeholder={t("factures.selectClient")} /></SelectTrigger>
-                <SelectContent>
-                  {mockClients.filter(c => portail.find(p => p.clientId === c.id)?.actif).map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nom} {c.prenom}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>
+                {t("label.client")} *
+                {msgForm.clientIds.length > 0 && (
+                  <span className="ml-2 text-[11px] font-normal text-primary">
+                    {msgForm.clientIds.length} sélectionné{msgForm.clientIds.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </Label>
+
+              {/* Tags des clients sélectionnés */}
+              {msgForm.clientIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-border bg-muted/30 min-h-[36px]">
+                  {msgForm.clientIds.map(cid => {
+                    const c = mockClients.find(x => x.id === cid);
+                    if (!c) return null;
+                    return (
+                      <span key={cid} className="inline-flex items-center gap-1 bg-primary/10 text-primary border border-primary/20 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs font-medium">
+                        {c.nom} {c.prenom}
+                        <span className="font-mono text-[10px] opacity-70">{c.code}</span>
+                        <button
+                          onClick={() => setMsgForm(f => ({ ...f, clientIds: f.clientIds.filter(id => id !== cid) }))}
+                          className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                          aria-label={`Retirer ${c.nom}`}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Champ de recherche — toujours visible */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={msgClientSearch}
+                  onChange={e => setMsgClientSearch(e.target.value)}
+                  placeholder="Nom, numéro client (C-XXXX) ou téléphone…"
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Liste déroulante de résultats */}
+              {msgClientSearch && (() => {
+                const results = mockClients
+                  .filter(c => portail.find(p => p.clientId === c.id)?.actif)
+                  .filter(c => !msgForm.clientIds.includes(c.id))
+                  .filter(c =>
+                    searchMatch(c.code, msgClientSearch) ||
+                    searchMatch(c.nom, msgClientSearch) ||
+                    searchMatch(c.prenom, msgClientSearch) ||
+                    searchMatch(c.telephone, msgClientSearch)
+                  );
+                return (
+                  <div className="border border-border rounded-lg bg-card shadow-lg max-h-44 overflow-y-auto">
+                    {results.length > 0 ? results.map(c => (
+                      <button key={c.id}
+                        onClick={() => {
+                          setMsgForm(f => ({ ...f, clientIds: [...f.clientIds, c.id] }));
+                          setMsgClientSearch("");
+                        }}
+                        className="w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors border-b border-border last:border-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-foreground">
+                            {c.nom} {c.prenom}
+                            <span className="text-xs font-mono text-primary ml-2">{c.code}</span>
+                          </span>
+                          <span className="text-xs text-muted-foreground">{c.telephone}</span>
+                        </div>
+                      </button>
+                    )) : (
+                      <p className="text-sm text-muted-foreground text-center py-3">Aucun client trouvé</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
+
             <div className="space-y-2">
               <Label>{t("portail.messageContent")} *</Label>
               <Textarea value={msgForm.message} onChange={e => setMsgForm(f => ({ ...f, message: e.target.value }))} placeholder="..." rows={4} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowMsgModal(false)}>{t("action.cancel")}</Button>
-            <Button onClick={handleSendMessage} disabled={!msgForm.clientId || !msgForm.message}>
+            <Button variant="outline" onClick={() => { setShowMsgModal(false); setMsgClientSearch(""); setMsgForm({ clientIds: [], message: "" }); }}>{t("action.cancel")}</Button>
+            <Button onClick={handleSendMessage} disabled={!msgForm.clientIds.length || !msgForm.message}>
               <Send className="mr-1 h-4 w-4" /> {t("action.send")}
+              {msgForm.clientIds.length > 1 && <span className="ml-1 text-[11px] opacity-80">({msgForm.clientIds.length})</span>}
             </Button>
           </DialogFooter>
         </DialogContent>

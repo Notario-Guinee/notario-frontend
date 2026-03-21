@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { cn, searchMatch } from "@/lib/utils";
-import { Plus, Search, Edit, Archive } from "lucide-react";
+import { Plus, Search, Edit, Archive, Trash2, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -49,6 +49,8 @@ export default function Utilisateurs() {
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [archiving, setArchiving] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState<User | null>(null);
+  const [unarchiving, setUnarchiving] = useState<User | null>(null);
   // Formulaire avec champs facultatifs
   const [form, setForm] = useState({
     nom: "", prenom: "", email: "", telephone: "", role: "Standard",
@@ -95,6 +97,22 @@ export default function Utilisateurs() {
     setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
     setArchiving(null);
     toast.success(t("users.toastArchived"));
+  };
+
+  // Désarchivage d'un utilisateur
+  const handleUnarchive = () => {
+    if (!unarchiving) return;
+    setUsers(prev => prev.map(u => u.id === unarchiving.id ? { ...u, statut: "Actif" } : u));
+    setUnarchiving(null);
+    toast.success(t("users.toastUnarchived") || `${unarchiving.prenom} ${unarchiving.nom} réactivé`);
+  };
+
+  // Suppression définitive d'un utilisateur
+  const handleDelete = () => {
+    if (!deleting) return;
+    setUsers(prev => prev.filter(u => u.id !== deleting.id));
+    setDeleting(null);
+    toast.success(t("users.toastDeleted") || `${deleting.prenom} ${deleting.nom} supprimé`);
   };
 
   return (
@@ -160,10 +178,21 @@ export default function Utilisateurs() {
                 <td className="px-4 py-3"><StatusBadge status={u.statut} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditing({ ...u })}><Edit className="h-4 w-4" /></Button>
-                    {u.statut !== "Archivé" && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning" onClick={() => setArchiving(u)}><Archive className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={t("users.edit") || "Modifier"} onClick={() => setEditing({ ...u })}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    {u.statut !== "Archivé" ? (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning" title={t("users.archive") || "Archiver"} onClick={() => setArchiving(u)}>
+                        <Archive className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-600" title={t("users.unarchive") || "Désarchiver"} onClick={() => setUnarchiving(u)}>
+                        <ArchiveRestore className="h-4 w-4" />
+                      </Button>
                     )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title={t("users.delete") || "Supprimer"} onClick={() => setDeleting(u)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </td>
               </motion.tr>
@@ -308,6 +337,42 @@ export default function Utilisateurs() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t("users.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleArchive} className="bg-warning text-warning-foreground hover:bg-warning/90">{t("users.archive")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ═══ Dialogue de confirmation de désarchivage ═══ */}
+      <AlertDialog open={!!unarchiving} onOpenChange={o => !o && setUnarchiving(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Désarchiver cet utilisateur ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unarchiving?.prenom} {unarchiving?.nom} sera réactivé et pourra à nouveau accéder à l'application.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("users.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnarchive} className="bg-emerald-600 text-white hover:bg-emerald-700">
+              Désarchiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ═══ Dialogue de confirmation de suppression ═══ */}
+      <AlertDialog open={!!deleting} onOpenChange={o => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Supprimer cet utilisateur ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleting?.prenom} {deleting?.nom}</strong> ({deleting?.code}) sera définitivement supprimé. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("users.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer définitivement
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

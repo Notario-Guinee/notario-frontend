@@ -130,9 +130,12 @@ export default function ActesSignatures() {
     setEditingStep(null);
   };
 
+  const [confirmDeleteStep, setConfirmDeleteStep] = useState<{ acteLabel: string; idx: number; label: string } | null>(null);
+
   const deleteStep = (acteLabel: string, idx: number) => {
     const steps = getSteps(acteLabel).filter((_, i) => i !== idx);
     setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
+    setConfirmDeleteStep(null);
   };
 
   const addStep = (acteLabel: string) => {
@@ -300,6 +303,8 @@ export default function ActesSignatures() {
     setEditingCat(null);
   };
 
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<{ idx: number; label: string; acteCount: number } | null>(null);
+
   const deleteCategory = (idx: number) => {
     setCatalogue(prev => prev.filter((_, i) => i !== idx));
     setExpandedCats(prev => {
@@ -307,6 +312,7 @@ export default function ActesSignatures() {
       next.delete(idx);
       return next;
     });
+    setConfirmDeleteCat(null);
   };
 
   const addCategory = () => {
@@ -327,10 +333,13 @@ export default function ActesSignatures() {
     setEditingActe(null);
   };
 
+  const [confirmDeleteActe, setConfirmDeleteActe] = useState<{ catIdx: number; acteIdx: number; label: string } | null>(null);
+
   const deleteActe = (catIdx: number, acteIdx: number) => {
     setCatalogue(prev => prev.map((c, i) =>
       i === catIdx ? { ...c, actes: c.actes.filter((_, j) => j !== acteIdx) } : c
     ));
+    setConfirmDeleteActe(null);
   };
 
   const addActe = (catIdx: number) => {
@@ -537,7 +546,7 @@ export default function ActesSignatures() {
                         <Edit2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteCategory(catIdx)}>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteCat({ idx: catIdx, label: cat.label, acteCount: cat.actes.length })}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -591,7 +600,7 @@ export default function ActesSignatures() {
                                   <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingActe({ catIdx, acteIdx, label: acte })}>
                                     <Edit2 className="h-3 w-3" />
                                   </Button>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => deleteActe(catIdx, acteIdx)}>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteActe({ catIdx, acteIdx, label: acte })}>
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </>
@@ -640,7 +649,7 @@ export default function ActesSignatures() {
                                       <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setEditingStep({ key: stepKey, idx: si, label: step })}>
                                         <Edit2 className="h-2.5 w-2.5" />
                                       </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => deleteStep(acte, si)}>
+                                      <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteStep({ acteLabel: acte, idx: si, label: step })}>
                                         <Trash2 className="h-2.5 w-2.5" />
                                       </Button>
                                     </>
@@ -880,6 +889,87 @@ export default function ActesSignatures() {
             <Button variant="outline" onClick={() => setShowCreate(false)}>{t("actes.create.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.type}>
               {t("actes.create.submit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmation suppression catégorie ─────────────────── */}
+      <Dialog open={!!confirmDeleteCat} onOpenChange={o => !o && setConfirmDeleteCat(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-destructive">
+              {fr ? "Supprimer cette catégorie ?" : "Delete this category?"}
+            </DialogTitle>
+            <DialogDescription>
+              {fr
+                ? `La catégorie « ${confirmDeleteCat?.label} » et ses ${confirmDeleteCat?.acteCount} acte(s) seront définitivement supprimés du catalogue. Cette action est irréversible.`
+                : `The category "${confirmDeleteCat?.label}" and its ${confirmDeleteCat?.acteCount} act(s) will be permanently removed from the catalogue. This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteCat(null)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDeleteCat && deleteCategory(confirmDeleteCat.idx)}
+            >
+              {fr ? "Supprimer" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmation suppression acte ──────────────────────── */}
+      <Dialog open={!!confirmDeleteActe} onOpenChange={o => !o && setConfirmDeleteActe(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-destructive">
+              {fr ? "Supprimer cet acte ?" : "Delete this act?"}
+            </DialogTitle>
+            <DialogDescription>
+              {fr
+                ? `L'acte « ${confirmDeleteActe?.label} » sera définitivement supprimé du catalogue. Cette action est irréversible.`
+                : `The act "${confirmDeleteActe?.label}" will be permanently removed from the catalogue. This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteActe(null)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDeleteActe && deleteActe(confirmDeleteActe.catIdx, confirmDeleteActe.acteIdx)}
+            >
+              {fr ? "Supprimer" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirmation suppression étape ─────────────────────── */}
+      <Dialog open={!!confirmDeleteStep} onOpenChange={o => !o && setConfirmDeleteStep(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-destructive">
+              {fr ? "Supprimer cette étape ?" : "Delete this step?"}
+            </DialogTitle>
+            <DialogDescription>
+              {fr
+                ? `L'étape « ${confirmDeleteStep?.label} » sera supprimée du workflow de cet acte. Cette action est irréversible.`
+                : `The step "${confirmDeleteStep?.label}" will be removed from this act's workflow. This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteStep(null)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmDeleteStep && deleteStep(confirmDeleteStep.acteLabel, confirmDeleteStep.idx)}
+            >
+              {fr ? "Supprimer" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

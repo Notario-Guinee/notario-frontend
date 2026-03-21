@@ -279,8 +279,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "agenda.cancel": "Annuler",
 
     // ActesSignatures page
-    "actes.pageTitle": "Actes & signatures",
-    "actes.subtitle": "Rédaction, workflow procédural et signature électronique",
+    "actes.pageTitle": "Actes notariés",
+    "actes.subtitle": "Rédaction et workflow procédural",
     "actes.newActe": "Nouvel acte",
     "actes.kpi.total": "Total actes",
     "actes.kpi.brouillons": "Brouillons",
@@ -1682,8 +1682,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "agenda.cancel": "Cancel",
 
     // ActesSignatures page
-    "actes.pageTitle": "Acts & Signatures",
-    "actes.subtitle": "Drafting, procedural workflow and electronic signature",
+    "actes.pageTitle": "Notarial Acts",
+    "actes.subtitle": "Drafting and procedural workflow",
     "actes.newActe": "New Act",
     "actes.kpi.total": "Total acts",
     "actes.kpi.brouillons": "Drafts",

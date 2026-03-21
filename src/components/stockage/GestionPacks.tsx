@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react';
-import { Package, RefreshCw, Clock, Star, Check, Loader2, PackageOpen } from 'lucide-react';
+import { Package, RefreshCw, Clock, Star, Check, Loader2, PackageOpen, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -63,6 +63,8 @@ export function GestionPacks({
   const [isLoading, setIsLoading] = useState(true);
   /** Pack en attente de confirmation de souscription */
   const [packASouscrire, setPackASouscrire] = useState<PackMensuel | null>(null);
+  /** Case à cocher consentement dans le dialogue de souscription */
+  const [consentementAccepte, setConsentementAccepte] = useState(false);
   /** Pack en attente de confirmation de résiliation */
   const [packAResilier, setPackAResilier] = useState<PackMensuel | null>(null);
 
@@ -239,7 +241,7 @@ export function GestionPacks({
               ) : (
                 <Button
                   className="w-full text-xs bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() => setPackASouscrire(pack)}
+                  onClick={() => { setPackASouscrire(pack); setConsentementAccepte(false); }}
                   disabled={isActionEnCours}
                 >
                   {t("subs.packs.subscribe")}
@@ -251,7 +253,7 @@ export function GestionPacks({
       </div>
 
       {/* ── Dialog confirmation souscription ── */}
-      <Dialog open={!!packASouscrire} onOpenChange={o => !o && setPackASouscrire(null)}>
+      <Dialog open={!!packASouscrire} onOpenChange={o => { if (!o) { setPackASouscrire(null); setConsentementAccepte(false); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-heading">
@@ -266,21 +268,45 @@ export function GestionPacks({
               <li className="flex items-center gap-2">✅ {t("subs.packs.dialogStorageLabel")} +{afficherCapacite(packASouscrire.stockage_gb)}</li>
               <li className="flex items-center gap-2">💳 {t("subs.packs.dialogPriceLabel")} {new Intl.NumberFormat('fr-FR').format(packASouscrire.prix_mois_gnf)} GNF</li>
               <li className="flex items-center gap-2">🔄 {t("subs.packs.dialogRenewalLabel")} {t("subs.packs.dialogRenewalValue")}</li>
-              {packsActifs.length > 0 && packASouscrire && packASouscrire.stockage_gb > stockagePackActif && (
+              {packsActifs.length > 0 && packASouscrire.stockage_gb > stockagePackActif && (
                 <li className="flex items-start gap-2 text-muted-foreground text-xs pt-1 border-t border-border">
                   ℹ️ {t("subs.packs.dialogReplaceNote")}
                 </li>
               )}
             </ul>
           )}
+
+          {/* Consentement */}
+          <div className="border-t border-border pt-4 space-y-3">
+            <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+              Vous acceptez que Notario débite votre carte du montant indiqué ci-dessus maintenant et de manière récurrente mensuelle jusqu'à ce que vous annuliez conformément à nos conditions, notamment en exerçant votre droit d'annulation de votre abonnement dans les 14 jours suivant la date d'abonnement. Vous pouvez annuler à tout moment dans les paramètres de votre compte.
+            </p>
+            <label className="flex items-start gap-2.5 cursor-pointer group">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={consentementAccepte}
+                  onChange={e => setConsentementAccepte(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${consentementAccepte ? 'bg-primary border-primary' : 'border-muted-foreground/40 group-hover:border-primary/60'}`}>
+                  {consentementAccepte && <ShieldCheck className="w-3 h-3 text-white" />}
+                </div>
+              </div>
+              <span className="text-[11px] text-foreground leading-relaxed select-none">
+                J'ai lu et j'accepte les conditions ci-dessus pour procéder à la souscription.
+              </span>
+            </label>
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPackASouscrire(null)}>
+            <Button variant="outline" onClick={() => { setPackASouscrire(null); setConsentementAccepte(false); }}>
               {t("subs.packs.dialogCancel")}
             </Button>
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={confirmerSouscription}
-              disabled={isActionEnCours}
+              disabled={isActionEnCours || !consentementAccepte}
             >
               {isActionEnCours
                 ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> {t("subs.packs.subscribing")}</>
