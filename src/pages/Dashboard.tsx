@@ -4,7 +4,7 @@
 // du jour, les dossiers récents, les tâches et l'activité
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Receipt, CheckCircle, AlertTriangle, FolderOpen, Clock, Users, FileText, Activity, Loader2, HardDrive, Send } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
@@ -14,6 +14,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { dashboardService } from "@/services/dashboardService";
+import type { DashboardStats, RevenueByMonth } from "@/types/api";
 
 // Animation d'apparition progressive
 const fadeUp = {
@@ -34,8 +36,45 @@ const activityIcons: Record<string, React.ElementType> = {
 export default function Dashboard() {
   const { t, lang } = useLanguage();
   const navigate = useNavigate();
-  const [loading] = useState(false); // État de chargement (prêt pour connexion API)
+  const [loading, setLoading] = useState(true);
+  const [apiStats, setApiStats] = useState<DashboardStats | null>(null);
+  const [apiRevenue, setApiRevenue] = useState<RevenueByMonth[] | null>(null);
   const storageUsed = 15.5;
+
+  // Load real data from API; fall back silently to mock data on error
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [stats, revenue] = await Promise.all([
+          dashboardService.getStats(),
+          dashboardService.getRevenueByMonth(),
+        ]);
+        if (!cancelled) {
+          setApiStats(stats);
+          setApiRevenue(revenue);
+        }
+      } catch {
+        // Backend not available – keep using mock data
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Derived KPI values: prefer API data, fall back to hardcoded mock values
+  const kpiTotalInvoices = apiStats?.chiffreAffaires ?? 15050000;
+  const kpiPaid = apiStats?.paiementsEnAttente !== undefined ? (kpiTotalInvoices - apiStats.paiementsEnAttente) : 9200000;
+  const kpiUnpaid = apiStats?.paiementsEnAttente ?? 950000;
+  const kpiActiveCases = apiStats?.dossiersEnCours ?? 3;
+
+  // Revenue chart data: prefer API, fall back to mock
+  const revenueChartData = apiRevenue && apiRevenue.length > 0
+    ? apiRevenue.map(r => ({ mois: r.mois, revenus: r.montant, depenses: 0 }))
+    : mockRevenueData;
+
   const storageTotal = 20;
 
   const storagePercent = useMemo(
@@ -87,10 +126,10 @@ export default function Dashboard() {
 
       {/* Cartes KPI — indicateurs financiers clés */}
       <motion.div {...fadeUp} transition={{ delay: 0.05 }} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard title={t("dashboard.totalInvoices")} value={formatGNF(15050000)} trend={12.5} subtitle={t("dashboard.thisMonth")} icon={Receipt} accentColor="blue" />
-        <KpiCard title={t("dashboard.paidInvoices")} value={formatGNF(9200000)} trend={8.3} subtitle={t("dashboard.thisMonth")} icon={CheckCircle} accentColor="green" />
-        <KpiCard title={t("dashboard.unpaidInvoices")} value={formatGNF(950000)} trend={-15} subtitle={t("dashboard.overdue")} icon={AlertTriangle} accentColor="red" />
-        <KpiCard title={t("dashboard.activeCases")} value="3" trend={5} subtitle={t("dashboard.activeCount")} icon={FolderOpen} accentColor="purple" />
+        <KpiCard title={t("dashboard.totalInvoices")} value={formatGNF(kpiTotalInvoices)} trend={12.5} subtitle={t("dashboard.thisMonth")} icon={Receipt} accentColor="blue" />
+        <KpiCard title={t("dashboard.paidInvoices")} value={formatGNF(kpiPaid)} trend={8.3} subtitle={t("dashboard.thisMonth")} icon={CheckCircle} accentColor="green" />
+        <KpiCard title={t("dashboard.unpaidInvoices")} value={formatGNF(kpiUnpaid)} trend={-15} subtitle={t("dashboard.overdue")} icon={AlertTriangle} accentColor="red" />
+        <KpiCard title={t("dashboard.activeCases")} value={String(kpiActiveCases)} trend={5} subtitle={t("dashboard.activeCount")} icon={FolderOpen} accentColor="purple" />
       </motion.div>
 
       {/* Graphique de revenus + Agenda du jour */}
@@ -99,7 +138,7 @@ export default function Dashboard() {
         <motion.div {...fadeUp} transition={{ delay: 0.1 }} className="xl:col-span-2 rounded-xl border border-border bg-card p-5 shadow-card">
           <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("dashboard.revenueChart")}</h2>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={mockRevenueData}>
+            <LineChart data={revenueChartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis dataKey="mois" className="fill-muted-foreground" fontSize={11} />
               <YAxis className="fill-muted-foreground" fontSize={11} tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`} />

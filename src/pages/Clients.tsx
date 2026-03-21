@@ -5,7 +5,7 @@
 // depuis un client, export CSV/PDF, recherche et filtres
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { searchMatch, cn } from "@/lib/utils";
 import { Plus, Download, X, User, Building2, Search, Users, CheckCircle2, Edit, Trash2, FileText, FolderPlus, Receipt, Calendar, BarChart3, MessageSquare, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { mockClients, mockDossiers, mockFactures, formatGNF, type Dossier } from "@/data/mockData";
+import { clientService } from "@/services/clientService";
+import type { Client as ApiClient } from "@/types/api";
 import { PROFESSIONS, TYPES_ACTE } from "@/data/constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -44,11 +46,41 @@ const mockDocumentsClient = [
   { id: "4", nom: "Procuration notariée", type: "Acte", dossier: "N-2025-101", date: "2024-04-02" },
 ];
 
+/** Map an API Client to the local ClientType used by the UI */
+function apiClientToClientType(c: ApiClient): ClientType {
+  return {
+    id: String(c.id),
+    code: `C-${c.id}`,
+    nom: c.typeClient === "MORALE" ? (c.raisonSociale ?? "") : (c.nom ?? ""),
+    prenom: c.typeClient === "MORALE" ? "" : (c.prenom ?? ""),
+    type: c.typeClient === "MORALE" ? "Morale" : "Physique",
+    telephone: c.telephone,
+    email: c.email ?? "",
+    profession: c.formeJuridique ?? "",
+    statut: c.actif ? "Actif" : "Inactif",
+    adresse: c.adresse,
+    dateInscription: c.createdAt ? c.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+  } as ClientType;
+}
+
 export default function Clients() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
   const [clients, setClients] = useState<ClientType[]>(mockClients);
+
+  // Load real clients from API; silently fall back to mock data on error
+  useEffect(() => {
+    let cancelled = false;
+    clientService.getAll(0, 100).then(page => {
+      if (!cancelled && page.content.length > 0) {
+        setClients(page.content.map(apiClientToClientType));
+      }
+    }).catch(() => {
+      // Backend not available – keep using mock data
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
