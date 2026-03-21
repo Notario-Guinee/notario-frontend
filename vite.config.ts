@@ -5,16 +5,16 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173,
     hmr: {
       overlay: false,
     },
     proxy: {
       "/api": {
-        target: "http://localhost:8081",
+        target: "http://localhost:8080",
         changeOrigin: true,
         headers: {
-          "X-Tenant-ID": "tenant-demo-1",
+          "X-Tenant-ID": "default",
         },
       },
     },
