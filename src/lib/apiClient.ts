@@ -78,11 +78,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const details = wrapped?.errorDetails;
     let errorMsg = wrapped?.message || `HTTP ${response.status}`;
-    if (details && typeof details === "object") {
-      const fieldErrors = Object.values(details).filter(Boolean).join(" · ");
+    if (details && typeof details === "object" && !Array.isArray(details)) {
+      const fieldErrors = Object.values(details as Record<string, string>).filter(Boolean).join(" · ");
       if (fieldErrors) errorMsg = fieldErrors;
+    } else if (typeof details === "string" && details) {
+      errorMsg = details;
     }
-    throw new ApiError(errorMsg, response.status, wrapped?.errorCode, details);
+    throw new ApiError(errorMsg, response.status, wrapped?.errorCode, details as Record<string, string> | undefined);
   }
 
   if (wrapped?.success === false) {
