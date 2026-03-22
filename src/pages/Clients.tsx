@@ -67,17 +67,28 @@ export default function Clients() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
-  const [clients, setClients] = useState<ClientType[]>(mockClients);
+  const [clients, setClients] = useState<ClientType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load real clients from API; silently fall back to mock data on error
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
     clientService.getAll(0, 100).then(page => {
-      if (!cancelled && page.content.length > 0) {
-        setClients(page.content.map(apiClientToClientType));
+      if (!cancelled) {
+        if (page.content.length > 0) {
+          setClients(page.content.map(apiClientToClientType));
+        } else {
+          setClients(mockClients);
+        }
+        setIsLoading(false);
       }
     }).catch(() => {
-      // Backend not available – keep using mock data
+      if (!cancelled) {
+        // Backend not available – keep using mock data
+        setClients(mockClients);
+        setIsLoading(false);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -370,6 +381,12 @@ export default function Clients() {
       </div>
 
       {/* Tableau des clients */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3" />
+          {fr ? "Chargement des clients..." : "Loading clients..."}
+        </div>
+      ) : (
       <ClientTable
         visibleClients={visibleClients}
         filtered={filtered}
@@ -385,6 +402,7 @@ export default function Clients() {
         onOpenCreateFacture={openCreateFacture}
         onOpenInvite={(client) => { setInviteClient(client); setShowInviteModal(true); }}
       />
+      )}
 
       {/* ═══ Tiroir de détail client ═══ */}
       <AnimatePresence>
