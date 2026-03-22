@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Récupère le profil utilisateur avec le token stocké
   const fetchMe = async (token: string): Promise<User> => {
     const res = await fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, "X-Tenant-ID": "default" },
     });
     if (!res.ok) throw new Error("Erreur serveur");
     const data: ApiResponse<User> = await res.json();
