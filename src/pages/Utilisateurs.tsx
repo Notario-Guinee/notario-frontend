@@ -4,7 +4,7 @@
 // filtrage, création, modification, archivage
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn, searchMatch } from "@/lib/utils";
 import { Plus, Search, Edit, Archive, Trash2, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { userService } from "@/services/userService";
+import type { User as ApiUser } from "@/types/api";
 
 // Interface utilisateur avec champs facultatifs
 interface User {
@@ -40,6 +42,24 @@ const initialUsers: User[] = [
 // Liste des modules disponibles pour les droits d'accès
 const allModules = ["Clients", "Dossiers", "Actes", "Factures", "Paiements", "Archives", "Messagerie", "Agenda", "Kanban"];
 
+// Helper: map API User to local User shape
+const mapApiUser = (u: ApiUser): User => {
+  const roleMap: Record<string, string> = {
+    GERANT: "Gérant", STANDARD: "Standard", LECTURE_SEULE: "Standard", ADMIN_GLOBAL: "Gérant",
+  };
+  return {
+    id: String(u.id),
+    code: `USR-${String(u.id).padStart(3, "0")}`,
+    nom: u.nom,
+    prenom: u.prenom,
+    telephone: u.telephone ?? "",
+    email: u.email,
+    role: roleMap[u.role] ?? u.role,
+    statut: u.actif ? "Actif" : "Archivé",
+    permissions: [],
+  };
+};
+
 export default function Utilisateurs() {
   const { t } = useLanguage();
   const [users, setUsers] = useState(initialUsers);
@@ -59,6 +79,15 @@ export default function Utilisateurs() {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
+  // Load users from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    userService.getAll(0, 100).then(pageData => {
+      if (!cancelled && pageData.content.length > 0) setUsers(pageData.content.map(mapApiUser));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // Filtrage des utilisateurs
   const filtered = users.filter(u => {
     const matchSearch = !search || [u.nom, u.prenom, u.email, u.telephone, u.code, u.role].some(f => searchMatch(f, search));
@@ -70,17 +99,30 @@ export default function Utilisateurs() {
   // Création d'un nouvel utilisateur
   const handleCreate = () => {
     const code = `USR-${String(users.length + 1).padStart(3, "0")}`;
-    setUsers(prev => [...prev, {
-      id: String(Date.now()), code, nom: form.nom, prenom: form.prenom,
+    const optimisticId = String(Date.now());
+    const newUser: User = {
+      id: optimisticId, code, nom: form.nom, prenom: form.prenom,
       telephone: form.telephone, email: form.email, role: form.role,
       statut: "Actif", permissions: [],
       dateNaissance: form.dateNaissance || undefined,
       lieuNaissance: form.lieuNaissance || undefined,
       adresse: form.adresse || undefined,
-    }]);
+    };
+    setUsers(prev => [...prev, newUser]);
     setShowNew(false);
     setForm({ nom: "", prenom: "", email: "", telephone: "", role: "Standard", dateNaissance: "", lieuNaissance: "", adresse: "" });
     toast.success(t("users.toastAdded"));
+    const roleApiMap: Record<string, string> = {
+      Gérant: "GERANT", Standard: "STANDARD", Notaire: "STANDARD", Comptable: "STANDARD",
+    };
+    userService.create({
+      nom: form.nom, prenom: form.prenom, email: form.email,
+      telephone: form.telephone || undefined,
+      role: roleApiMap[form.role] ?? "STANDARD",
+      password: "ChangeMe123!",
+    }).then(created => {
+      setUsers(prev => prev.map(u => u.id === optimisticId ? mapApiUser(created) : u));
+    }).catch(() => {});
   };
 
   // Mise à jour d'un utilisateur
@@ -89,6 +131,17 @@ export default function Utilisateurs() {
     setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
     setEditing(null);
     toast.success(t("users.toastUpdated"));
+    const userId = Number(editing.id);
+    if (!isNaN(userId)) {
+      const roleApiMap: Record<string, string> = {
+        Gérant: "GERANT", Standard: "STANDARD", Notaire: "STANDARD", Comptable: "STANDARD",
+      };
+      userService.update(userId, {
+        nom: editing.nom, prenom: editing.prenom, email: editing.email,
+        telephone: editing.telephone || undefined,
+        role: roleApiMap[editing.role] ?? "STANDARD",
+      }).catch(() => {});
+    }
   };
 
   // Archivage d'un utilisateur
@@ -97,6 +150,8 @@ export default function Utilisateurs() {
     setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
     setArchiving(null);
     toast.success(t("users.toastArchived"));
+    const userId = Number(archiving.id);
+    if (!isNaN(userId)) userService.deactivate(userId).catch(() => {});
   };
 
   // Désarchivage d'un utilisateur
@@ -105,6 +160,8 @@ export default function Utilisateurs() {
     setUsers(prev => prev.map(u => u.id === unarchiving.id ? { ...u, statut: "Actif" } : u));
     setUnarchiving(null);
     toast.success(t("users.toastUnarchived") || `${unarchiving.prenom} ${unarchiving.nom} réactivé`);
+    const userId = Number(unarchiving.id);
+    if (!isNaN(userId)) userService.activate(userId).catch(() => {});
   };
 
   // Suppression définitive d'un utilisateur
@@ -113,6 +170,8 @@ export default function Utilisateurs() {
     setUsers(prev => prev.filter(u => u.id !== deleting.id));
     setDeleting(null);
     toast.success(t("users.toastDeleted") || `${deleting.prenom} ${deleting.nom} supprimé`);
+    const userId = Number(deleting.id);
+    if (!isNaN(userId)) userService.delete(userId).catch(() => {});
   };
 
   return (

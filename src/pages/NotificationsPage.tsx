@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { notificationService } from "@/services/notificationService";
+import type { Notification as ApiNotification } from "@/types/api";
 
 type NotifType = "dossier" | "paiement" | "client" | "rdv" | "securite" | "document" | "action";
 
@@ -81,6 +83,39 @@ const eventLabels: Record<string, Record<string, string>> = {
   },
 };
 
+// Helper: map API Notification to local Notification shape
+const iconForType = (type: string): React.ElementType => {
+  const map: Record<string, React.ElementType> = {
+    dossier: FolderOpen, paiement: Receipt, client: User, rdv: Calendar,
+    securite: Shield, document: FileText, action: AlertTriangle,
+  };
+  return map[type.toLowerCase()] ?? Bell;
+};
+
+const colorForType = (type: string): string => {
+  const map: Record<string, string> = {
+    dossier: "text-secondary bg-secondary/15",
+    paiement: "text-success bg-success/15",
+    client: "text-primary bg-primary/15",
+    rdv: "text-warning bg-warning/15",
+    securite: "text-destructive bg-destructive/15",
+    document: "text-secondary bg-secondary/15",
+    action: "text-warning bg-warning/15",
+  };
+  return map[type.toLowerCase()] ?? "text-muted-foreground bg-muted";
+};
+
+const mapApiNotif = (n: ApiNotification): Notification => ({
+  id: String(n.id),
+  type: (n.type?.toLowerCase() as NotifType) ?? "dossier",
+  titre: n.titre,
+  message: n.message,
+  time: n.createdAt ? new Date(n.createdAt).toLocaleString("fr-FR") : "",
+  lu: n.lu,
+  icon: iconForType(n.type ?? ""),
+  color: colorForType(n.type ?? ""),
+});
+
 export default function NotificationsPage() {
   const { t, lang } = useLanguage();
   const [tab, setTab] = useState<"centre" | "config">("centre");
@@ -89,8 +124,20 @@ export default function NotificationsPage() {
   const [canaux, setCanaux] = useState(initialCanaux);
   const [filterType, setFilterType] = useState<string>("all");
 
+  // Load notifications from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    notificationService.getAll().then(data => {
+      if (!cancelled && data.length > 0) setNotifications(data.map(mapApiNotif));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const nonLues = notifications.filter(n => !n.lu).length;
-  const marquerToutLu = () => setNotifications(prev => prev.map(n => ({ ...n, lu: true })));
+  const marquerToutLu = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, lu: true })));
+    notificationService.markAllAsRead().catch(() => {});
+  };
 
   const toggleEvent = (key: string) => {
     setEventTypes(prev => prev.map(e => e.key === key ? { ...e, active: !e.active } : e));
@@ -185,7 +232,10 @@ export default function NotificationsPage() {
           <div className="space-y-2">
             {filteredNotifs.map((n, i) => (
               <motion.div key={n.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, lu: true } : x))}
+                onClick={() => {
+                  setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, lu: true } : x));
+                  if (!n.lu) notificationService.markAsRead(Number(n.id)).catch(() => {});
+                }}
                 className={`flex items-start gap-4 rounded-xl border p-4 cursor-pointer transition-colors ${!n.lu ? "border-primary/20 bg-primary/5" : "border-border bg-card hover:bg-muted/20"}`}>
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${n.color}`}>
                   <n.icon className="h-4 w-4" />

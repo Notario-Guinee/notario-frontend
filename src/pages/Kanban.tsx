@@ -4,7 +4,7 @@
 // déplacement entre colonnes (À faire / En cours / Terminée)
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Download, ListTodo, Clock, CheckCircle2, AlertTriangle, CalendarClock, X, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { mockKanbanTasks, type KanbanTask } from "@/data/mockData";
+import { kanbanService } from "@/services/kanbanService";
+import type { KanbanTask as ApiKanbanTask } from "@/types/api";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -59,7 +61,67 @@ export default function Kanban() {
     priorite: "Normale" as KanbanTask["priorite"], dossier: "", tags: "",
   });
 
+  // Maps API colonneId to local ColumnId (by position in sorted boards)
+  const [colonneMap, setColonneMap] = useState<Record<number, ColumnId>>({});
+
   const resetForm = () => setForm({ titre: "", description: "", assignee: "", deadline: "", priorite: "Normale", dossier: "", tags: "" });
+
+  // Helper: map API KanbanTask to local KanbanTask shape
+  const mapApiTask = (t: ApiKanbanTask, colMap: Record<number, ColumnId>): { task: KanbanTask; col: ColumnId } => {
+    const colIds: ColumnId[] = ["todo", "in_progress", "done"];
+    const col = colMap[t.colonneId] ?? colIds[0];
+    const prioriteMap: Record<string, KanbanTask["priorite"]> = {
+      BASSE: "Basse", NORMALE: "Normale", HAUTE: "Haute", URGENTE: "Urgente",
+    };
+    return {
+      col,
+      task: {
+        id: String(t.id),
+        titre: t.titre,
+        description: t.description ?? "",
+        assignee: String(t.assigneId ?? ""),
+        deadline: t.dateEcheance ?? "",
+        priorite: prioriteMap[t.priorite ?? ""] ?? "Normale",
+        dossier: t.dossierId ? String(t.dossierId) : undefined,
+        tags: [],
+      },
+    };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [boardsData, tasksData] = await Promise.all([
+          kanbanService.getBoards(),
+          kanbanService.getTasks(),
+        ]);
+        if (!cancelled) {
+          // Build colonneId → ColumnId map from first board's columns
+          const colIds: ColumnId[] = ["todo", "in_progress", "done"];
+          const newColMap: Record<number, ColumnId> = {};
+          const firstBoard = boardsData[0];
+          if (firstBoard?.colonnes) {
+            const sorted = [...firstBoard.colonnes].sort((a, b) => a.ordre - b.ordre);
+            sorted.forEach((col, idx) => {
+              if (idx < colIds.length) newColMap[col.id] = colIds[idx];
+            });
+          }
+          if (tasksData.length > 0) {
+            const newTasks: Record<ColumnId, KanbanTask[]> = { todo: [], in_progress: [], done: [] };
+            tasksData.forEach(t => {
+              const { task, col } = mapApiTask(t, newColMap);
+              newTasks[col].push(task);
+            });
+            setTasks(newTasks);
+            setColonneMap(newColMap);
+          }
+        }
+      } catch { /* silent fallback to mock */ }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const allTasks = [...tasks.todo, ...tasks.in_progress, ...tasks.done];
   const stats = {
@@ -128,6 +190,33 @@ export default function Kanban() {
     setShowCreateModal(false);
     resetForm();
     toast.success(t("kanban.taskCreated"));
+    // Persist to backend
+    const colIds: ColumnId[] = ["todo", "in_progress", "done"];
+    const colIdx = colIds.indexOf(createForColumn);
+    const reverseMap = Object.entries(colonneMap).find(([, v]) => v === createForColumn);
+    const colonneId = reverseMap ? Number(reverseMap[0]) : colIdx + 1;
+    const prioriteApiMap: Record<KanbanTask["priorite"], string> = {
+      Basse: "BASSE", Normale: "NORMALE", Haute: "HAUTE", Urgente: "URGENTE",
+    };
+    kanbanService.createTask({
+      boardId: colonneId > 0 ? 1 : 1, // default board
+      colonneId,
+      titre: form.titre,
+      description: form.description || undefined,
+      priorite: prioriteApiMap[form.priorite] as "BASSE" | "NORMALE" | "HAUTE" | "URGENTE",
+      dateEcheance: form.deadline || undefined,
+    }).then(created => {
+      // Replace optimistic entry with server id
+      setTasks(prev => {
+        const newState = { ...prev };
+        for (const col of Object.keys(newState) as ColumnId[]) {
+          newState[col] = newState[col].map(task =>
+            task.id === newTask.id ? { ...task, id: String(created.id) } : task
+          );
+        }
+        return newState;
+      });
+    }).catch(() => {});
   };
 
   const handleEdit = () => {
@@ -152,6 +241,19 @@ export default function Kanban() {
     setShowEditModal(false);
     setShowDetailDrawer(false);
     toast.success(t("kanban.taskEdited"));
+    // Persist to backend
+    const taskId = Number(selectedTask.id);
+    if (!isNaN(taskId)) {
+      const prioriteApiMap: Record<KanbanTask["priorite"], string> = {
+        Basse: "BASSE", Normale: "NORMALE", Haute: "HAUTE", Urgente: "URGENTE",
+      };
+      kanbanService.updateTask(taskId, {
+        titre: updated.titre,
+        description: updated.description || undefined,
+        priorite: prioriteApiMap[updated.priorite] as "BASSE" | "NORMALE" | "HAUTE" | "URGENTE",
+        dateEcheance: updated.deadline || undefined,
+      }).catch(() => {});
+    }
   };
 
   const handleDelete = () => {
@@ -167,6 +269,11 @@ export default function Kanban() {
     setShowDetailDrawer(false);
     setSelectedTask(null);
     toast.success(t("kanban.taskDeleted"));
+    // Persist to backend
+    const taskId = Number(selectedTask.id);
+    if (!isNaN(taskId)) {
+      kanbanService.deleteTask(taskId).catch(() => {});
+    }
   };
 
   const openTaskDetail = (task: KanbanTask, colId: ColumnId) => {

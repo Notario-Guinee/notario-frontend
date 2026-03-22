@@ -4,7 +4,7 @@
 // rappels de notification, détail modal par rendez-vous
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, X, Bell, CalendarOff, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
+import { agendaService } from "@/services/agendaService";
+import type { RendezVous } from "@/types/api";
 
 type ViewMode = "mois" | "semaine" | "jour" | "liste";
 
@@ -96,6 +98,36 @@ export default function Agenda() {
     { value: "1 jour avant", label: t("agenda.rappel.1j") },
   ];
 
+  // Helper: map API RendezVous to local RDV shape
+  const mapRdv = (r: RendezVous): RDV => {
+    const dt = new Date(r.dateDebut);
+    const heure = dt.toTimeString().slice(0, 5);
+    const date = r.dateDebut.slice(0, 10);
+    const statutMap: Record<string, string> = {
+      CONFIRME: "Confirmé", PLANIFIE: "En attente", ANNULE: "Annulé",
+      EN_COURS: "Confirmé", TERMINE: "Confirmé",
+    };
+    return {
+      id: String(r.id),
+      heure,
+      titre: r.titre,
+      client: String(r.clientId ?? ""),
+      lieu: r.lieu ?? "",
+      duree: "1h",
+      statut: statutMap[r.statut] ?? r.statut,
+      date,
+      description: r.description,
+    };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    agendaService.getAll().then(data => {
+      if (!cancelled && data.length > 0) setRdvData(data.map(mapRdv));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -105,7 +137,7 @@ export default function Agenda() {
 
   const resetForm = () => setForm({ titre: "", client: "", lieu: "Bureau 1", date: "", heure: "09:00", duree: "1h", description: "", rappel: "30 minutes avant" });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
     if (!form.date?.trim()) { toast.error("La date est obligatoire."); return; }
     if (!form.heure?.trim()) { toast.error("L'heure est obligatoire."); return; }
@@ -117,7 +149,20 @@ export default function Agenda() {
         client: form.client, lieu: form.lieu, duree: form.duree,
         statut: "Confirmé", date: form.date, description: form.description, rappel: form.rappel,
       };
+      // Optimistic update
       setRdvData(prev => [...prev, newRdv]);
+      // Persist to backend
+      agendaService.create({
+        titre: newRdv.titre,
+        description: form.description || undefined,
+        dateDebut: `${form.date}T${form.heure}:00`,
+        dateFin: `${form.date}T${form.heure}:00`,
+        lieu: form.lieu || undefined,
+        statut: "CONFIRME",
+      }).then(created => {
+        // Replace optimistic entry with server-assigned id
+        setRdvData(prev => prev.map(r => r.id === newRdv.id ? mapRdv(created) : r));
+      }).catch(() => {});
       setShowCreateModal(false);
       resetForm();
       toast.success(t("agenda.toast.created"));
