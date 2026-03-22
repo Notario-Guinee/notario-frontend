@@ -14,6 +14,7 @@ export interface GlobalApiResponse<T> {
   data: T;
   message: string;
   errorCode?: string;
+  errorDetails?: Record<string, string>;
   timestamp: string;
   tenantId: string;
 }
@@ -22,7 +23,8 @@ class ApiError extends Error {
   constructor(
     message: string,
     public statusCode?: number,
-    public errorCode?: string
+    public errorCode?: string,
+    public errorDetails?: Record<string, string>
   ) {
     super(message);
     this.name = "ApiError";
@@ -74,11 +76,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const wrapped = body as GlobalApiResponse<T>;
 
   if (!response.ok) {
-    throw new ApiError(
-      wrapped?.message || `HTTP ${response.status}`,
-      response.status,
-      wrapped?.errorCode
-    );
+    const details = wrapped?.errorDetails;
+    let errorMsg = wrapped?.message || `HTTP ${response.status}`;
+    if (details && typeof details === "object") {
+      const fieldErrors = Object.values(details).filter(Boolean).join(" · ");
+      if (fieldErrors) errorMsg = fieldErrors;
+    }
+    throw new ApiError(errorMsg, response.status, wrapped?.errorCode, details);
   }
 
   if (wrapped?.success === false) {

@@ -163,8 +163,8 @@ export function ClientModals({
               </div>
               {form.type === "Physique" && (
                 <div className="space-y-2">
-                  <Label>{fr ? "Prénom" : "First name"}</Label>
-                  <Input value={form.prenom} onChange={e => setForm(f => ({ ...f, prenom: e.target.value }))} placeholder={fr ? "Prénom" : "First name"} />
+                  <Label>{fr ? "Prénom *" : "First name *"}</Label>
+                  <Input value={form.prenom} onChange={e => setForm(f => ({ ...f, prenom: e.target.value }))} placeholder={fr ? "Prénom" : "First name"} required />
                 </div>
               )}
             </div>

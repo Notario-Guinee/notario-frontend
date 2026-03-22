@@ -171,10 +171,25 @@ export default function Clients() {
     actifs: clients.filter(c => c.statut === "Actif").length,
   }), [clients]);
 
+  // Normalise un numéro de téléphone guinéen vers le format +224XXXXXXXXX
+  const normalizePhone = (phone: string): string => {
+    const cleaned = phone.replace(/[\s\-().]/g, "");
+    if (/^\+224\d{9}$/.test(cleaned)) return cleaned;
+    if (/^00224\d{9}$/.test(cleaned)) return "+" + cleaned.slice(2);
+    if (/^224\d{9}$/.test(cleaned)) return "+" + cleaned;
+    if (/^0\d{9}$/.test(cleaned)) return "+224" + cleaned.slice(1);
+    if (/^\d{9}$/.test(cleaned)) return "+224" + cleaned;
+    return cleaned;
+  };
+
   // Création d'un nouveau client
   const handleCreate = useCallback(async () => {
     if (!form.nom?.trim()) {
       toast.error(fr ? "Le nom est obligatoire." : "Last name is required.");
+      return;
+    }
+    if (form.type === "Physique" && !form.prenom?.trim()) {
+      toast.error(fr ? "Le prénom est obligatoire pour une personne physique." : "First name is required for an individual.");
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -186,12 +201,17 @@ export default function Clients() {
       toast.error(fr ? "Le téléphone est obligatoire." : "Phone is required.");
       return;
     }
+    const phone = normalizePhone(form.telephone);
+    if (!/^\+224\d{9}$/.test(phone)) {
+      toast.error(fr ? "Téléphone invalide. Format attendu : +224XXXXXXXXX" : "Invalid phone. Expected format: +224XXXXXXXXX");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload = form.type === "Morale" ? {
         typeClient: "MORALE" as const,
         raisonSociale: form.nom,
-        telephone: form.telephone,
+        telephone: phone,
         email: form.email || undefined,
         adresse: form.adresse || undefined,
         secteurActivite: form.profession || undefined,
@@ -200,8 +220,8 @@ export default function Clients() {
       } : {
         typeClient: "PHYSIQUE" as const,
         nom: form.nom,
-        prenom: form.prenom || undefined,
-        telephone: form.telephone,
+        prenom: form.prenom,
+        telephone: phone,
         email: form.email || undefined,
         profession: form.profession || undefined,
         adresse: form.adresse || undefined,
@@ -229,9 +249,10 @@ export default function Clients() {
     setIsSubmitting(true);
     try {
       const clientId = parseInt(editingClient.id);
+      const phone = form.telephone ? normalizePhone(form.telephone) : undefined;
       const payload = editingClient.type === "Morale" ? {
         raisonSociale: form.nom || undefined,
-        telephone: form.telephone || undefined,
+        telephone: phone || undefined,
         email: form.email || undefined,
         secteurActivite: form.profession || undefined,
         adresse: form.adresse || undefined,
@@ -240,7 +261,7 @@ export default function Clients() {
       } : {
         nom: form.nom || undefined,
         prenom: form.prenom || undefined,
-        telephone: form.telephone || undefined,
+        telephone: phone || undefined,
         email: form.email || undefined,
         profession: form.profession || undefined,
         adresse: form.adresse || undefined,
