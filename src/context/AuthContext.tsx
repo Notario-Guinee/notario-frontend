@@ -63,12 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      headers: { "Content-Type": "application/json", "X-Tenant-ID": "default" },
+      body: JSON.stringify({ email, password, tenantId: "default" }),
     });
     const data: ApiResponse<{ accessToken: string }> & { errors?: Record<string, string> } = await res.json();
     if (!res.ok || !data.success) {
-      // Priorité : message du backend, puis champs de validation, puis fallback
+      // Log complet pour diagnostic
+      console.error("[Auth] Échec login", res.status, JSON.stringify(data));
       const errorMsg =
         data.message ||
         (data.errors ? Object.values(data.errors).join(", ") : null) ||
