@@ -4,7 +4,7 @@
 // filtrage par mode de paiement, enregistrement de paiement
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Download, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { StatusBadge } from "@/components/ui/status-badge";
 import { mockClients, mockFactures, formatGNF } from "@/data/mockData";
 import { searchMatch } from "@/lib/utils";
+import { paiementService } from "@/services/paiementService";
+import { getModePaiementLabel, getPaiementStatutLabel } from "@/lib/dataUtils";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
@@ -41,9 +43,32 @@ const modeIcons: Record<string, string> = { "Orange Money": "🟠", "Virement": 
 export default function Paiements() {
   const { t } = useLanguage();
   const [paiements, setPaiements] = useState(initialPaiements);
+
+  useEffect(() => {
+    let cancelled = false;
+    paiementService.getAll(0, 100).then(page => {
+      if (!cancelled && page.content.length > 0) {
+        const mapped: Paiement[] = page.content.map(p => ({
+          id: String(p.id),
+          reference: p.reference,
+          client: p.client ? `${p.client.nom ?? ""} ${p.client.prenom ?? ""}`.trim() || p.client.raisonSociale || String(p.clientId) : String(p.clientId),
+          facture: p.factureId ? `FAC-${p.factureId}` : "",
+          montant: p.montant,
+          mode: getModePaiementLabel(p.modePaiement),
+          statut: getPaiementStatutLabel(p.statut),
+          date: p.dateTransaction?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+          transaction: p.numerTransaction ?? "",
+        }));
+        setPaiements(mapped);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState("Tous");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [form, setForm] = useState({ client: "", facture: "", montant: "", mode: "Espèces", notes: "" });
 
@@ -65,17 +90,46 @@ export default function Paiements() {
     : mockClients;
 
   // Création d'un nouveau paiement
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (!form.client || !form.montant) return;
+    setIsSubmitting(true);
     const ref = `PAI-2026-${String(paiements.length + 1).padStart(3, "0")}`;
+    const now = new Date().toISOString().slice(0, 10);
     const newPaiement: Paiement = {
       id: String(Date.now()), reference: ref, client: form.client, facture: form.facture,
       montant: Number(form.montant) || 0, mode: form.mode, statut: "Encaissé",
-      date: new Date().toISOString().slice(0, 10), transaction: `${form.mode.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+      date: now, transaction: `${form.mode.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-6)}`,
     };
     setPaiements(prev => [newPaiement, ...prev]);
     setShowCreateModal(false);
     resetForm();
     toast.success(`${ref} — ${t("caisse.toastSaved")}`);
+    // Sync with backend (fire-and-forget, UI already updated)
+    const modeMap: Record<string, string> = {
+      "Espèces": "ESPECES", "Virement": "VIREMENT", "Chèque": "CHEQUE",
+      "Orange Money": "ORANGE_MONEY", "PayCard": "PAYCARD",
+    };
+    paiementService.create({
+      clientId: 0, // clientId unknown from name search; best-effort
+      montant: Number(form.montant) || 0,
+      modePaiement: (modeMap[form.mode] ?? "ESPECES") as import("@/types/api").ModePaiement,
+      dateTransaction: now,
+      notes: form.notes || undefined,
+    }).then(created => {
+      // Replace the optimistic entry with the real one from the server
+      setPaiements(prev => prev.map((p, i) => i === 0 ? {
+        id: String(created.id),
+        reference: created.reference,
+        client: p.client,
+        facture: p.facture,
+        montant: created.montant,
+        mode: getModePaiementLabel(created.modePaiement),
+        statut: getPaiementStatutLabel(created.statut),
+        date: created.dateTransaction?.slice(0, 10) ?? now,
+        transaction: created.numerTransaction ?? p.transaction,
+      } : p));
+    }).catch(() => {/* keep optimistic entry */});
+    setIsSubmitting(false);
   };
 
   return (
@@ -242,8 +296,8 @@ export default function Paiements() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("paiements.cancel")}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.montant}>
-              {t("paiements.record")}
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.client || !form.montant}>
+              {isSubmitting ? (t("paiements.record") + "...") : t("paiements.record")}
             </Button>
           </DialogFooter>
         </DialogContent>

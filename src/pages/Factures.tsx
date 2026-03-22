@@ -4,7 +4,7 @@
 // création de facture, vue modèle de facture
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { mockFactures, mockClients, mockDossiers, formatGNF, currentUser } from "@/data/mockData";
 import { searchMatch } from "@/lib/utils";
+import { factureService } from "@/services/factureService";
+import { normalizeFacture } from "@/lib/dataUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -30,6 +32,18 @@ export default function Factures() {
   const { announce } = useAnnouncer();
   const fr = lang === "FR";
   const [factures, setFactures] = useState(mockFactures);
+
+  useEffect(() => {
+    let cancelled = false;
+    factureService.getAll(0, 100).then(page => {
+      if (!cancelled && page.content.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setFactures(page.content.map(normalizeFacture) as any);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const [search, setSearch] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,6 +64,11 @@ export default function Factures() {
     setFactures(prev => prev.filter(f => f.id !== id));
     toast.success(t("factures.toastDeleted") || "Facture supprimée définitivement.");
     announce(fr ? "Facture supprimée" : "Invoice deleted");
+    // Sync with backend (fire-and-forget, UI already updated)
+    const numericId = Number(id);
+    if (!isNaN(numericId)) {
+      factureService.delete(numericId).catch(() => {/* silent */});
+    }
   }, [t, announce, fr]);
 
   // Réinitialisation du formulaire
@@ -59,7 +78,7 @@ export default function Factures() {
   };
 
   // Création d'une nouvelle facture
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
     const montant = Number(form.montant);
     if (!montant || montant <= 0) { toast.error("Le montant doit être supérieur à 0."); return; }
@@ -77,6 +96,16 @@ export default function Factures() {
       resetForm();
       toast.success(`${num} ${t("factures.toastCreated")}`);
       announce(fr ? "Facture créée" : "Invoice created");
+      // Sync with backend (fire-and-forget, UI already updated)
+      factureService.create({
+        clientId: 0, // clientId unknown from name search; best-effort
+        montantHT: montant,
+        montantTTC: montant,
+      }).then(created => {
+        // Replace the optimistic entry with the real one from the server
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setFactures(prev => [normalizeFacture(created) as any, ...prev.slice(1)]);
+      }).catch(() => {/* keep optimistic entry */});
     } catch (err) {
       toast.error(fr ? "Erreur lors de la création" : "Error creating invoice");
       console.error(err);

@@ -4,10 +4,12 @@
 // gestion des parties prenantes, filtres, export CSV/PDF
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
+import { dossierService } from "@/services/dossierService";
+import { normalizeDossier } from "@/lib/dataUtils";
 import { Plus, Download, Search, FolderOpen, Clock, PenLine, CheckCircle2, DollarSign, MoreHorizontal, X, Trash2, Edit, FileText, List, LayoutGrid, Archive, Receipt, UserPlus, Users, FileDown, CalendarDays, Upload, GitBranch, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -57,6 +59,18 @@ export default function Dossiers() {
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
   const [dossiers, setDossiers] = useState<Dossier[]>(mockDossiers);
+
+  useEffect(() => {
+    let cancelled = false;
+    dossierService.getAll(0, 100).then(page => {
+      if (!cancelled && page.content.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDossiers(page.content.map(normalizeDossier) as any);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState<string>("all");
   const [filterPriorite, setFilterPriorite] = useState<string>("all");
@@ -261,7 +275,7 @@ export default function Dossiers() {
     totalMontant: dossiers.reduce((s, d) => s + d.montant, 0),
   }), [dossiers]);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!form.typeActe?.trim()) {
       toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
       return;
@@ -296,6 +310,16 @@ export default function Dossiers() {
       resetForm();
       toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
       announce(fr ? "Dossier créé" : "Case created");
+      // Sync with backend (fire-and-forget, UI already updated)
+      dossierService.create({
+        typeActe: form.typeActe,
+        objet: form.objet || form.typeActe,
+        montant: Number(form.montant) || 0,
+      }).then(created => {
+        // Replace the optimistic entry with the real one from the server
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDossiers(prev => [normalizeDossier(created) as any, ...prev.slice(1)]);
+      }).catch(() => {/* keep optimistic entry */});
     } catch (err) {
       toast.error(fr ? "Erreur lors de la création" : "Error creating case");
       console.error(err);
@@ -326,9 +350,15 @@ export default function Dossiers() {
     try {
       setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
       setShowDeleteDialog(false);
+      const deletedId = editingDossier.id;
       setEditingDossier(null);
       toast.success(fr ? "Dossier supprimé" : "Case deleted");
       announce(fr ? "Dossier supprimé" : "Case deleted");
+      // Sync with backend (fire-and-forget, UI already updated)
+      const numericId = Number(deletedId);
+      if (!isNaN(numericId)) {
+        dossierService.delete(numericId).catch(() => {/* silent */});
+      }
     } catch (err) {
       toast.error(fr ? "Erreur lors de la suppression" : "Error deleting case");
       console.error(err);
@@ -339,6 +369,11 @@ export default function Dossiers() {
     setDossiers(prev => prev.map(dos => dos.id === d.id ? { ...dos, statut: "Archivé" as Dossier["statut"] } : dos));
     toast.success(fr ? `Dossier ${d.code} archivé` : `Case ${d.code} archived`);
     announce(fr ? "Dossier archivé" : "Case archived");
+    // Sync with backend (fire-and-forget, UI already updated)
+    const numericId = Number(d.id);
+    if (!isNaN(numericId)) {
+      dossierService.changeStatut(numericId, "ARCHIVE").catch(() => {/* silent */});
+    }
   }, [fr, announce]);
 
   const openEdit = useCallback((d: Dossier) => {
