@@ -66,9 +66,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) throw new Error("Erreur serveur");
-    const data: ApiResponse<{ accessToken: string }> = await res.json();
-    if (!data.success) throw new Error(data.message || "Erreur de connexion");
+    const data: ApiResponse<{ accessToken: string }> & { errors?: Record<string, string> } = await res.json();
+    if (!res.ok || !data.success) {
+      // Priorité : message du backend, puis champs de validation, puis fallback
+      const errorMsg =
+        data.message ||
+        (data.errors ? Object.values(data.errors).join(", ") : null) ||
+        "Identifiants incorrects";
+      throw new Error(errorMsg);
+    }
 
     const token = data.data.accessToken;
     localStorage.setItem("accessToken", token);
