@@ -34,8 +34,8 @@ export default function LoginTenant() {
     try {
       await login(email, password);
       navigate("/dashboard");
-    } catch (err: any) {
-      setError(err.message || "Erreur de connexion");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
       setLoading(false);
     }
@@ -116,11 +116,8 @@ export default function LoginTenant() {
             </div>
             <Button
               className="w-full bg-[#1a2e42] hover:bg-[#243d56] text-white font-medium h-11"
-              onClick={() => {
-                // Marque la session comme authentifiée pour PrivateRoute
-                localStorage.setItem("notario_auth", "true");
-                navigate("/dashboard");
-              }}
+              onClick={handleLogin}
+              disabled={loading}
             >
               {t("login.tenantSubmit")}
             </Button>

@@ -12,14 +12,35 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginAdmin() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleAdminLogin = async () => {
+    if (!email || !password) {
+      setError("Veuillez remplir tous les champs");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password);
+      navigate("/admin/dashboard");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Accès refusé");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative">
@@ -123,7 +144,12 @@ export default function LoginAdmin() {
               <Input type="text" placeholder="000 000" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="font-mono text-lg text-center tracking-[0.2em]" />
               <p className="text-[11px] text-muted-foreground">{t("login.admin2FADesc")}</p>
             </div>
-            <Button className="w-full bg-[#0C1F35] hover:bg-[#162d47] text-white font-medium h-11" onClick={() => navigate("/admin/dashboard")}>
+            {error && (
+              <div className="text-red-500 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+            <Button className="w-full bg-[#0C1F35] hover:bg-[#162d47] text-white font-medium h-11" onClick={handleAdminLogin} disabled={loading}>
               {t("login.adminAccess")}
             </Button>
           </div>

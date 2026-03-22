@@ -83,16 +83,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 // Instance unique du client React Query
 const queryClient = new QueryClient();
 
-// ─── Protection des routes privées ───
-// Pour la démo : vérifie localStorage.getItem("notario_auth")
-// En production : remplacer par vérification JWT/session réelle
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const isAuth = localStorage.getItem("notario_auth") === "true";
-  if (!isAuth) {
-    return <Navigate to="/login" replace />;
-  }
-  return <>{children}</>;
-}
 
 /**
  * Garde de route — redirige vers /login si l'utilisateur n'est pas connecté
@@ -101,7 +91,6 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 /**
@@ -137,7 +126,7 @@ const App = () => (
               <Route path="/inscription-client" element={<InscriptionClient />} />
 
               {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-              <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+              <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
                 {/* Routes du gérant */}
                 <Route index                      element={<Dashboard />} />
                 <Route path="/dashboard"          element={<Dashboard />} />
