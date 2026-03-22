@@ -6,14 +6,19 @@ const BASE = "/api/clients";
 
 export const clientService = {
   /**
-   * Fetch a paginated list of clients, with optional search filter.
+   * Fetch a paginated list of clients.
+   * If search is provided, delegates to the search endpoint (searchTerm param).
    */
   async getAll(
     page = 0,
     size = 20,
     search?: string
   ): Promise<Page<Client>> {
-    const result = await apiClient.get<Page<Client>>(BASE, { page, size, search });
+    if (search) {
+      const result = await apiClient.get<Page<Client>>(`${BASE}/search`, { searchTerm: search, page, size });
+      return { ...result, content: result.content.map(normalizeClient) };
+    }
+    const result = await apiClient.get<Page<Client>>(BASE, { page, size });
     return { ...result, content: result.content.map(normalizeClient) };
   },
 
@@ -52,7 +57,7 @@ export const clientService = {
    * Search clients by query string.
    */
   async search(query: string): Promise<Client[]> {
-    const results = await apiClient.get<Client[]>(`${BASE}/search`, { q: query });
+    const results = await apiClient.get<Client[]>(`${BASE}/search`, { searchTerm: query });
     return results.map(normalizeClient);
   },
 };
