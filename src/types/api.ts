@@ -49,6 +49,7 @@ export type TypeClient = "PHYSIQUE" | "MORALE";
 export interface Client {
   id: number;
   tenantId: string;
+  codeClient?: string;
   typeClient: TypeClient;
   // Natural person (PHYSIQUE)
   nom?: string;
@@ -57,12 +58,15 @@ export interface Client {
   lieuNaissance?: string;
   numeroCni?: string;    // frontend expected
   numeroPiece?: string;  // backend may return this
+  profession?: string;
   // Legal entity (MORALE)
   raisonSociale?: string;        // frontend expected
   denominationSociale?: string;  // backend may return this
+  sigle?: string;
+  formeJuridique?: string;
+  secteurActivite?: string;
   numeroRccm?: string;
   nif?: string;
-  formeJuridique?: string;
   // Common
   email?: string;
   telephone: string;
@@ -72,6 +76,7 @@ export interface Client {
   actif: boolean;
   vip?: boolean;
   notes?: string;
+  noteDescriptive?: string;
   createdAt?: string;
 }
 

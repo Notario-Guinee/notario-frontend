@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { mockClients, mockDossiers, mockFactures, formatGNF, type Dossier } from "@/data/mockData";
+import { mockDossiers, mockFactures, formatGNF, type Dossier } from "@/data/mockData";
 import { clientService } from "@/services/clientService";
 import type { Client as ApiClient } from "@/types/api";
 import { PROFESSIONS, TYPES_ACTE } from "@/data/constants";
@@ -50,15 +50,16 @@ const mockDocumentsClient = [
 function apiClientToClientType(c: ApiClient): ClientType {
   return {
     id: String(c.id),
-    code: `C-${c.id}`,
-    nom: c.typeClient === "MORALE" ? (c.raisonSociale ?? "") : (c.nom ?? ""),
+    code: c.codeClient ?? `C-${c.id}`,
+    nom: c.typeClient === "MORALE" ? (c.raisonSociale ?? c.denominationSociale ?? "") : (c.nom ?? ""),
     prenom: c.typeClient === "MORALE" ? "" : (c.prenom ?? ""),
     type: c.typeClient === "MORALE" ? "Morale" : "Physique",
     telephone: c.telephone,
     email: c.email ?? "",
-    profession: c.formeJuridique ?? "",
+    profession: c.profession ?? c.secteurActivite ?? c.formeJuridique ?? "",
     statut: c.actif ? "Actif" : "Inactif",
     adresse: c.adresse,
+    description: c.noteDescriptive ?? c.notes,
     dateInscription: c.createdAt ? c.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
   } as ClientType;
 }
@@ -70,23 +71,18 @@ export default function Clients() {
   const [clients, setClients] = useState<ClientType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load real clients from API; silently fall back to mock data on error
+  // Load real clients from API
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     clientService.getAll(0, 100).then(page => {
       if (!cancelled) {
-        if (page.content.length > 0) {
-          setClients(page.content.map(apiClientToClientType));
-        } else {
-          setClients(mockClients);
-        }
+        setClients(page.content.map(apiClientToClientType));
         setIsLoading(false);
       }
     }).catch(() => {
       if (!cancelled) {
-        // Backend not available – keep using mock data
-        setClients(mockClients);
+        setClients([]);
         setIsLoading(false);
       }
     });
@@ -176,7 +172,7 @@ export default function Clients() {
   }), [clients]);
 
   // Création d'un nouveau client
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!form.nom?.trim()) {
       toast.error(fr ? "Le nom est obligatoire." : "Last name is required.");
       return;
@@ -186,70 +182,106 @@ export default function Clients() {
       toast.error(fr ? "Adresse email invalide." : "Invalid email address.");
       return;
     }
-    if (form.telephone && form.telephone.replace(/\D/g, "").length < 8) {
-      toast.error(fr ? "Numéro de téléphone invalide." : "Invalid phone number.");
+    if (!form.telephone?.trim()) {
+      toast.error(fr ? "Le téléphone est obligatoire." : "Phone is required.");
       return;
     }
     setIsSubmitting(true);
     try {
-      const newClient: ClientType = {
-        id: String(Date.now()),
-        code: `C-${1209 + clients.length - mockClients.length}`,
-        nom: form.nom, prenom: form.prenom, type: form.type,
-        telephone: form.telephone, email: form.email,
-        profession: form.profession, statut: form.statut as ClientType["statut"],
-        adresse: form.adresse,
-        description: form.description,
-        dateInscription: new Date().toISOString().slice(0, 10),
+      const payload = form.type === "Morale" ? {
+        typeClient: "MORALE" as const,
+        raisonSociale: form.nom,
+        telephone: form.telephone,
+        email: form.email || undefined,
+        adresse: form.adresse || undefined,
+        secteurActivite: form.profession || undefined,
+        noteDescriptive: form.description || undefined,
+        actif: true,
+      } : {
+        typeClient: "PHYSIQUE" as const,
+        nom: form.nom,
+        prenom: form.prenom || undefined,
+        telephone: form.telephone,
+        email: form.email || undefined,
+        profession: form.profession || undefined,
+        adresse: form.adresse || undefined,
+        noteDescriptive: form.description || undefined,
+        actif: true,
       };
-      setClients(prev => [newClient, ...prev]);
+      const created = await clientService.create(payload);
+      setClients(prev => [apiClientToClientType(created), ...prev]);
       setShowCreateModal(false);
       resetForm();
-      toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
+      toast.success(fr ? "Client créé avec succès" : "Client added successfully");
       announce(fr ? "Client créé avec succès" : "Client created successfully");
-    } catch (err) {
-      toast.error(fr ? "Erreur lors de la création" : "Error creating client");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg || (fr ? "Erreur lors de la création" : "Error creating client"));
       console.error(err);
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, fr, clients.length, announce, resetForm]);
+  }, [form, fr, announce, resetForm]);
 
   // Modification d'un client existant
-  const handleEdit = useCallback(() => {
+  const handleEdit = useCallback(async () => {
     if (!editingClient) return;
+    setIsSubmitting(true);
     try {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? {
-        ...editingClient,
-        nom: form.nom || editingClient.nom,
-        prenom: form.prenom ?? editingClient.prenom,
-        type: form.type,
-        telephone: form.telephone || editingClient.telephone,
-        email: form.email || editingClient.email,
-        profession: form.profession || editingClient.profession,
-        statut: form.statut as ClientType["statut"],
-        adresse: form.adresse,
-        description: form.description,
-      } : c));
+      const clientId = parseInt(editingClient.id);
+      const payload = editingClient.type === "Morale" ? {
+        raisonSociale: form.nom || undefined,
+        telephone: form.telephone || undefined,
+        email: form.email || undefined,
+        secteurActivite: form.profession || undefined,
+        adresse: form.adresse || undefined,
+        noteDescriptive: form.description || undefined,
+        actif: form.statut === "Actif",
+      } : {
+        nom: form.nom || undefined,
+        prenom: form.prenom || undefined,
+        telephone: form.telephone || undefined,
+        email: form.email || undefined,
+        profession: form.profession || undefined,
+        adresse: form.adresse || undefined,
+        noteDescriptive: form.description || undefined,
+        actif: form.statut === "Actif",
+      };
+      const updated = await clientService.update(clientId, payload);
+      const updatedType = apiClientToClientType(updated);
+      setClients(prev => prev.map(c => c.id === editingClient.id ? updatedType : c));
+      if (selectedClient?.id === editingClient.id) setSelectedClient(updatedType);
       setShowEditModal(false);
-      setSelectedClient(null);
       toast.success(fr ? "Client modifié" : "Client updated");
       announce(fr ? "Client mis à jour" : "Client updated");
-    } catch (err) {
-      toast.error(fr ? "Erreur lors de la modification" : "Error updating client");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg || (fr ? "Erreur lors de la modification" : "Error updating client"));
       console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [editingClient, form, fr, announce]);
+  }, [editingClient, form, fr, selectedClient, announce]);
 
   // Suppression d'un client
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!editingClient) return;
-    setClients(prev => prev.filter(c => c.id !== editingClient.id));
-    setShowDeleteDialog(false);
-    setSelectedClient(null);
-    setEditingClient(null);
-    toast.success(fr ? "Client supprimé" : "Client deleted");
-    announce(fr ? "Client supprimé" : "Client deleted");
+    setIsSubmitting(true);
+    try {
+      await clientService.delete(parseInt(editingClient.id));
+      setClients(prev => prev.filter(c => c.id !== editingClient.id));
+      setShowDeleteDialog(false);
+      setSelectedClient(null);
+      setEditingClient(null);
+      toast.success(fr ? "Client supprimé" : "Client deleted");
+      announce(fr ? "Client supprimé" : "Client deleted");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(msg || (fr ? "Erreur lors de la suppression" : "Error deleting client"));
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [editingClient, fr, announce]);
 
   const openEdit = useCallback((c: ClientType) => {
