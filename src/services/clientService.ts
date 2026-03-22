@@ -1,5 +1,6 @@
 import apiClient from "../lib/apiClient";
 import type { Client, CreateClientPayload, UpdateClientPayload, Page } from "../types/api";
+import { normalizeClient } from "../lib/dataUtils";
 
 const BASE = "/api/clients";
 
@@ -12,28 +13,32 @@ export const clientService = {
     size = 20,
     search?: string
   ): Promise<Page<Client>> {
-    return apiClient.get<Page<Client>>(BASE, { page, size, search });
+    const result = await apiClient.get<Page<Client>>(BASE, { page, size, search });
+    return { ...result, content: result.content.map(normalizeClient) };
   },
 
   /**
    * Fetch a single client by ID.
    */
   async getById(id: number): Promise<Client> {
-    return apiClient.get<Client>(`${BASE}/${id}`);
+    const result = await apiClient.get<Client>(`${BASE}/${id}`);
+    return normalizeClient(result);
   },
 
   /**
    * Create a new client.
    */
   async create(data: CreateClientPayload): Promise<Client> {
-    return apiClient.post<Client>(BASE, data);
+    const result = await apiClient.post<Client>(BASE, data);
+    return normalizeClient(result);
   },
 
   /**
    * Update an existing client.
    */
   async update(id: number, data: UpdateClientPayload): Promise<Client> {
-    return apiClient.put<Client>(`${BASE}/${id}`, data);
+    const result = await apiClient.put<Client>(`${BASE}/${id}`, data);
+    return normalizeClient(result);
   },
 
   /**
@@ -47,7 +52,8 @@ export const clientService = {
    * Search clients by query string.
    */
   async search(query: string): Promise<Client[]> {
-    return apiClient.get<Client[]>(`${BASE}/search`, { q: query });
+    const results = await apiClient.get<Client[]>(`${BASE}/search`, { q: query });
+    return results.map(normalizeClient);
   },
 };
 

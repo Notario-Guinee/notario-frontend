@@ -55,9 +55,11 @@ export interface Client {
   prenom?: string;
   dateNaissance?: string;
   lieuNaissance?: string;
-  numeroCni?: string;
+  numeroCni?: string;    // frontend expected
+  numeroPiece?: string;  // backend may return this
   // Legal entity (MORALE)
-  raisonSociale?: string;
+  raisonSociale?: string;        // frontend expected
+  denominationSociale?: string;  // backend may return this
   numeroRccm?: string;
   nif?: string;
   formeJuridique?: string;
@@ -84,24 +86,38 @@ export type DossierStatut =
   | "EN_ATTENTE_PIECES"
   | "TERMINE"
   | "SUSPENDU"
-  | "ARCHIVE";
+  | "ARCHIVE"
+  | "BROUILLON"            // backend value
+  | "EN_ATTENTE"           // backend value
+  | "EN_ATTENTE_SIGNATURE" // backend value
+  | "EN_ATTENTE_VALIDATION" // backend value
+  | "PRET_SIGNATURE"       // backend value
+  | "SIGNE"                // backend value
+  | "ENREGISTRE"           // backend value
+  | "CLOTURE"              // backend value
+  | "ANNULE";              // backend value
 
 export type DossierPriorite = "BASSE" | "NORMALE" | "HAUTE" | "URGENTE";
 
 export interface Dossier {
   id: number;
   tenantId: string;
-  code: string;
+  code?: string;          // frontend expected
+  numeroDossier?: string; // backend may return this
   typeActe: string;
   objet: string;
   statut: DossierStatut;
   priorite: DossierPriorite;
-  montant?: number;
+  montant?: number;       // frontend expected
+  montantTotal?: number;  // backend may return this
   avancement?: number;
-  dateCreation: string;
+  dateCreation?: string;  // frontend expected
+  dateOuverture?: string; // backend may return this
   dateEcheance?: string;
-  notaireId?: number;
-  assistantId?: number;
+  notaireId?: number;       // frontend expected
+  notaireChargeId?: number; // backend may return this
+  assistantId?: number;       // frontend expected
+  assistantChargeId?: number; // backend may return this
   clientIds?: number[];
   clients?: Client[];
   createdAt?: string;
@@ -137,7 +153,8 @@ export type FactureStatut =
 export interface Facture {
   id: number;
   tenantId: string;
-  numero: string;
+  numero?: string;           // frontend expected
+  numeroFacture?: string;    // backend returns this
   dossierId?: number;
   clientId: number;
   client?: Client;
@@ -147,7 +164,8 @@ export interface Facture {
   statut: FactureStatut;
   dateEmission?: string;
   dateEcheance?: string;
-  dateCreation: string;
+  dateCreation?: string;    // frontend expected
+  createdAt?: string;       // backend returns this
 }
 
 export interface CreateFacturePayload {
@@ -168,13 +186,22 @@ export type ModePaiement =
   | "VIREMENT"
   | "CHEQUE"
   | "MOBILE_MONEY"
-  | "CARTE";
+  | "CARTE"
+  | "ORANGE_MONEY"   // backend value
+  | "PAYCARD"        // backend value
+  | "CARTE_BANCAIRE" // backend value
+  | "MTN_MONEY"      // backend value
+  | "MOOV_MONEY";    // backend value
 
 export type PaiementStatut =
   | "EN_ATTENTE"
   | "VALIDE"
   | "REJETE"
-  | "REMBOURSE";
+  | "REMBOURSE"
+  | "CONFIRME"   // backend value
+  | "ENCAISSE"   // backend value
+  | "EN_COURS"   // backend value
+  | "PARTIEL";   // backend value
 
 export interface Paiement {
   id: number;
