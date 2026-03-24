@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn, searchMatch } from "@/lib/utils";
-import { Building2, Users, Receipt, Activity, Search, Plus, Eye, Edit, Trash2, Package, HardDrive } from "lucide-react";
+import { Building2, Users, Receipt, Activity, Search, Plus, Eye, Edit, Trash2, Package, HardDrive, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -9,12 +9,19 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatGNF } from "@/data/mockData";
+import { cabinetService, type CabinetResume } from "@/services/cabinetService";
 
 interface Tenant {
   id: string; nom: string; gerant: string; sousDomaine: string; users: number; maxUsers: number;
   plan: string; statut: string; date: string; modules: string[];
   storageUsed: number; storageTotal: number;
+  // Champs issus de l'API
+  logoUrl?: string | null;
+  email?: string | null;
+  ville?: string | null;
+  devise?: string | null;
+  pourcentageCompletion?: number;
+  configurationComplete?: boolean;
 }
 
 const allModules = ["Clients", "Dossiers", "Factures", "Paiements", "Archives OCR", "Messagerie", "Portail Client", "Kanban", "Formation", "Agenda"];
@@ -36,6 +43,36 @@ export default function AdminTenantsPage() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const [tenants, setTenants] = useState(initialTenants);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    cabinetService.getAllConfigs()
+      .then((configs: CabinetResume[]) => {
+        const mapped: Tenant[] = configs.map(c => ({
+          id: String(c.id),
+          nom: c.nomCabinet,
+          gerant: "—",
+          sousDomaine: "—",
+          users: 0,
+          maxUsers: 0,
+          plan: "—",
+          statut: c.configurationComplete ? "Actif" : "Incomplet",
+          date: c.derniereMiseAJour ?? new Date().toISOString().slice(0, 10),
+          modules: [],
+          storageUsed: 0,
+          storageTotal: 0,
+          logoUrl: c.logoUrl,
+          email: c.email,
+          ville: c.ville,
+          devise: c.devise,
+          pourcentageCompletion: c.pourcentageCompletion,
+          configurationComplete: c.configurationComplete,
+        }));
+        setTenants(mapped);
+      })
+      .catch(() => toast.error("Impossible de charger la liste des cabinets"))
+      .finally(() => setLoading(false));
+  }, []);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("Tous");
   const [showNew, setShowNew] = useState(false);
@@ -84,6 +121,12 @@ export default function AdminTenantsPage() {
       return { ...t, modules };
     }));
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -228,78 +271,112 @@ export default function AdminTenantsPage() {
 
       {/* View Tenant */}
       <Dialog open={!!viewing} onOpenChange={o => !o && setViewing(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl">
+          <DialogHeader className="sr-only">
             <DialogTitle>{viewing?.nom}</DialogTitle>
             <DialogDescription>{fr ? "Détails du cabinet" : "Office details"}</DialogDescription>
           </DialogHeader>
           {viewing && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { l: fr ? "Gérant" : "Manager", v: viewing.gerant },
-                  { l: fr ? "Sous-domaine" : "Subdomain", v: `${viewing.sousDomaine}.notario.gn` },
-                  { l: "Plan", v: viewing.plan },
-                  { l: fr ? "Statut" : "Status", v: viewing.statut },
-                  { l: fr ? "Utilisateurs" : "Users", v: String(viewing.users) },
-                  { l: fr ? "Date de création" : "Created", v: new Date(viewing.date).toLocaleDateString("fr-FR") },
-                ].map(f => (
-                  <div key={f.l}>
-                    <label className="text-xs font-medium text-muted-foreground">{f.l}</label>
-                    <p className="text-sm font-medium text-foreground mt-0.5">{f.v}</p>
+            <div>
+              {/* Bannière header avec dégradé */}
+              <div className="relative bg-gradient-to-br from-[#1a2e42] to-[#2a4a6b] px-6 pt-8 pb-6">
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                <div className="relative flex items-center gap-5">
+                  {viewing.logoUrl ? (
+                    <img src={viewing.logoUrl} alt="Logo" className="h-20 w-20 rounded-2xl object-cover border-2 border-white/20 shadow-xl" />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 border-2 border-white/20 backdrop-blur-sm">
+                      <Building2 className="h-9 w-9 text-white/70" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading text-xl font-bold text-white truncate">{viewing.nom}</p>
+                    <p className="text-sm text-white/60 mt-0.5">{viewing.email ?? "—"}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", statutColors[viewing.statut] || "bg-white/20 text-white")}>
+                        {viewing.statut}
+                      </span>
+                      {viewing.devise && (
+                        <span className="rounded-full bg-white/10 text-white/80 px-2.5 py-0.5 text-[11px] font-medium">
+                          {viewing.devise}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-              {/* Storage management */}
-              <div className="rounded-lg border border-border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-2"><HardDrive className="h-4 w-4" /> {fr ? "Stockage" : "Storage"}</label>
-                  <span className={cn("text-sm font-bold", (viewing.storageTotal - viewing.storageUsed) <= 1 ? "text-destructive" : "text-foreground")}>{viewing.storageUsed} / {viewing.storageTotal} Go</span>
                 </div>
-                <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                  <div className={cn("h-full rounded-full transition-all", (viewing.storageTotal - viewing.storageUsed) <= 1 ? "bg-destructive" : "bg-primary")} style={{ width: `${Math.min(100, (viewing.storageUsed / viewing.storageTotal) * 100)}%` }} />
-                </div>
-                {(viewing.storageTotal - viewing.storageUsed) <= 1 && (
-                  <p className="text-xs text-destructive font-medium">⚠️ {fr ? "Stockage presque plein ! Le gérant sera notifié." : "Storage almost full! Manager will be notified."}</p>
-                )}
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">{fr ? "Étendre à" : "Extend to"}</label>
-                  <select
-                    value={viewing.storageTotal}
-                    onChange={e => {
-                      const newTotal = Number(e.target.value);
-                      const updated = { ...viewing, storageTotal: newTotal };
-                      setViewing(updated);
-                      setTenants(prev => prev.map(t => t.id === updated.id ? updated : t));
-                      toast.success(fr ? `Stockage étendu à ${newTotal} Go` : `Storage extended to ${newTotal} GB`);
-                    }}
-                    className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
-                  >
-                    {[5, 10, 20, 50, 100, 200].map(v => <option key={v} value={v}>{v} Go</option>)}
-                  </select>
+
+                {/* Barre de complétion */}
+                <div className="relative mt-5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] text-white/60">{fr ? "Complétion du profil" : "Profile completion"}</span>
+                    <span className="text-[11px] font-bold text-white">{viewing.pourcentageCompletion ?? 0}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+                      style={{ width: `${viewing.pourcentageCompletion ?? 0}%` }} />
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">{fr ? "Modules activés" : "Enabled modules"}</label>
-                <div className="flex flex-wrap gap-2">
-                  {allModules.map(m => (
-                    <label key={m} className="flex items-center gap-2 rounded-lg border border-border p-2 cursor-pointer hover:bg-muted/30">
-                      <Switch checked={viewing.modules.includes(m)} onCheckedChange={() => {
-                        const updated = { ...viewing, modules: viewing.modules.includes(m) ? viewing.modules.filter(x => x !== m) : [...viewing.modules, m] };
-                        setViewing(updated);
-                        setTenants(prev => prev.map(t => t.id === updated.id ? updated : t));
-                        toast.success(`${m} ${viewing.modules.includes(m) ? (fr ? "désactivé" : "disabled") : (fr ? "activé" : "enabled")}`);
-                      }} />
-                      <span className="text-xs text-foreground">{m}</span>
-                    </label>
+
+              {/* Corps du modal */}
+              <div className="p-6 space-y-5 bg-card">
+                {/* Champs en grille */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { l: fr ? "Ville" : "City", v: viewing.ville ?? "—", icon: "📍" },
+                    { l: fr ? "Devise" : "Currency", v: viewing.devise ?? "—", icon: "💱" },
+                    { l: fr ? "Gérant" : "Manager", v: viewing.gerant, icon: "👤" },
+                    { l: "Plan", v: viewing.plan, icon: "📦" },
+                    { l: fr ? "Utilisateurs" : "Users", v: `${viewing.users} / ${viewing.maxUsers || "—"}`, icon: "👥" },
+                    { l: fr ? "Dernière MAJ" : "Last update", v: viewing.date ? new Date(viewing.date).toLocaleDateString("fr-FR") : "—", icon: "🕐" },
+                  ].map(f => (
+                    <div key={f.l} className="rounded-xl bg-muted/40 border border-border px-4 py-3">
+                      <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                        <span>{f.icon}</span> {f.l}
+                      </p>
+                      <p className="text-sm font-semibold text-foreground mt-1 truncate">{f.v}</p>
+                    </div>
                   ))}
+                </div>
+
+                {/* Statut configuration */}
+                <div className={cn("rounded-xl border px-4 py-3 flex items-center gap-3",
+                  viewing.configurationComplete
+                    ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/40"
+                    : "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/40"
+                )}>
+                  <span className="text-lg">{viewing.configurationComplete ? "✅" : "⚠️"}</span>
+                  <div>
+                    <p className={cn("text-xs font-semibold", viewing.configurationComplete ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300")}>
+                      {fr ? "Configuration" : "Configuration"}
+                    </p>
+                    <p className={cn("text-[11px]", viewing.configurationComplete ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                      {viewing.configurationComplete ? (fr ? "Profil complet" : "Complete profile") : (fr ? "Profil incomplet" : "Incomplete profile")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Modules activés */}
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">{fr ? "Modules activés" : "Enabled modules"}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {viewing.modules.length > 0 ? viewing.modules.map(m => (
+                      <span key={m} className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-[11px] font-medium">{m}</span>
+                    )) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex justify-end pt-1">
+                  <Button variant="outline" className="rounded-xl" onClick={() => setViewing(null)}>
+                    {fr ? "Fermer" : "Close"}
+                  </Button>
                 </div>
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewing(null)}>{fr ? "Fermer" : "Close"}</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

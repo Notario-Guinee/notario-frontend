@@ -89,7 +89,23 @@ export interface ChangePasswordDto {
 
 // ── Appels API ────────────────────────────────────────────────────────────────
 
+export interface CabinetResume {
+  id: number;
+  nomCabinet: string;
+  logoUrl: string | null;
+  devise: string;
+  ville: string | null;
+  email: string | null;
+  configurationComplete: boolean;
+  pourcentageCompletion: number;
+  derniereMiseAJour: string | null;
+}
+
 export const cabinetService = {
+  // Récupère la liste de tous les cabinets (admin uniquement)
+  getAllConfigs: () =>
+    apiClient.get<CabinetResume[]>("/api/cabinet/configs"),
+
   // Récupère la configuration complète du cabinet
   getConfig: () =>
     apiClient.get<CabinetConfig>("/api/cabinet/config"),
