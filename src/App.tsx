@@ -77,7 +77,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 /**
  * Composant racine — enveloppe l'arbre avec tous les providers

@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         headers: {
           "X-Tenant-ID": "tenant-demo-1",
+          "Origin": "http://localhost:8081",
         },
       },
     },

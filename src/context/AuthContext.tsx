@@ -36,9 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await fetch("/api/auth/me", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error("Erreur serveur");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Erreur /auth/me (${res.status})`);
+    }
     const data: ApiResponse<User> = await res.json();
-    if (!data.success) throw new Error("Non authentifié");
+    if (!data.success) throw new Error(data.message || "Non authentifié");
     return data.data;
   };
 
@@ -66,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) throw new Error("Erreur serveur");
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Erreur /auth/login (${res.status})`);
+    }
     const data: ApiResponse<{ accessToken: string }> = await res.json();
     if (!data.success) throw new Error(data.message || "Erreur de connexion");
 
