@@ -13,8 +13,14 @@ type PortalType = "admin" | "tenant" | "client";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const portal = (searchParams.get("portal") as PortalType) || "tenant";
-  const { t } = useLanguage();
+  const searchPortal = searchParams.get("portal");
+  const tenant = searchParams.get("tenant");
+  
+  // Si portal est absent, on déduit du tenant (envoyé par le backend)
+  const portal: PortalType = (searchPortal as PortalType) || 
+                             (tenant === "global-admin" ? "admin" : "tenant");
+  const { t, lang } = useLanguage();
+  const fr = lang === "FR";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -51,8 +57,9 @@ export default function ResetPassword() {
   ];
 
   const allValid = passwordChecks.every((c) => c.valid);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!allValid) {
       toast.error(t("reset.requirementsNotMet"));
@@ -62,9 +69,42 @@ export default function ResetPassword() {
       toast.error(t("reset.mismatch"));
       return;
     }
-    // TODO: call supabase.auth.updateUser({ password })
-    setSubmitted(true);
-    toast.success(t("reset.success"));
+
+    const token = searchParams.get("token");
+    if (!token) {
+      toast.error("Token de réinitialisation manquant");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Déterminer le chemin de base selon le portail (pour le proxy Vite)
+      const basePath = portal === "admin" ? "/api-admin" : "/api";
+
+      const response = await fetch(`${basePath}/auth/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          token, 
+          newPassword: password 
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Erreur lors de la réinitialisation");
+      }
+
+      setSubmitted(true);
+      toast.success(t("reset.success"));
+    } catch (error: any) {
+      toast.error(error.message || "Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -151,8 +191,8 @@ export default function ResetPassword() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={!allValid || !confirmPassword}>
-                  {t("reset.submit")}
+                <Button type="submit" className="w-full" disabled={loading || !allValid || !confirmPassword}>
+                  {loading ? (fr ? "Réinitialisation..." : "Resetting...") : t("reset.submit")}
                 </Button>
               </form>
             ) : (

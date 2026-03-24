@@ -44,12 +44,38 @@ export default function ForgotPassword() {
   const config = configs[portal] || configs.tenant;
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) { toast.error(t("forgot.errorEmpty")); return; }
-    setSubmitted(true);
-    toast.success(t("forgot.successToast"));
+    
+    setLoading(true);
+    try {
+      // Déterminer le chemin de base selon le portail (pour le proxy Vite)
+      const basePath = portal === "admin" ? "/api-admin" : "/api";
+
+      const response = await fetch(`${basePath}/auth/forgot-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email })
+      });
+
+      // Le backend retourne toujours un succès pour la sécurité (même si l'email n'existe pas)
+      // On vérifie quand même si la requête a abouti
+      if (!response.ok) {
+        throw new Error("Erreur lors de la demande de réinitialisation");
+      }
+
+      setSubmitted(true);
+      toast.success(t("forgot.successToast"));
+    } catch (error: any) {
+      toast.error(error.message || "Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const Icon = config.icon;

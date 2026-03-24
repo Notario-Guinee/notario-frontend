@@ -1,15 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
 // Sidebar principale — Menu de navigation latéral
-// Affiche les groupes de navigation selon le rôle actif (gérant
-// ou admin global), avec logo, switcher de rôle et profil
+// Affiche les groupes de navigation selon le rôle du user connecté
+// Le role est déterminé automatiquement au login — pas de switcher manuel
 // ═══════════════════════════════════════════════════════════════
-
+import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { currentUser } from "@/data/mockData";
 import { useSidebarState } from "@/context/SidebarContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useRole } from "@/context/RoleContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, Users, FolderOpen, Calendar, CheckSquare,
   Receipt, CreditCard, Landmark, Wallet, BarChart3, Settings,
@@ -27,7 +27,19 @@ export function AppSidebar() {
   const { collapsed, toggle } = useSidebarState();
   const location = useLocation();
   const { t, lang } = useLanguage();
-  const { isAdminGlobal, role, setRole } = useRole();
+  const { isAdminGlobal, setRole } = useRole();
+  const { user } = useAuth();
+
+  // Détermine le role automatiquement selon le tenant stocké au login
+  // global-admin → menus admin | tout autre tenant → menus gérant
+  useEffect(() => {
+    const basePath = localStorage.getItem("authBasePath") || "/api";
+    if (basePath === "/api-admin") {
+      setRole("admin_global");
+    } else {
+      setRole("gerant");
+    }
+  }, []);
 
   // ─── Navigation du gérant ───
   const gerantGroups: NavGroup[] = [
@@ -118,7 +130,7 @@ export function AppSidebar() {
     },
   ];
 
-  // Sélectionner les groupes selon le rôle actif
+  // Sélectionne les groupes selon le role déterminé au login
   const navGroups = isAdminGlobal ? adminGroups : gerantGroups;
 
   return (
@@ -134,35 +146,11 @@ export function AppSidebar() {
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="font-heading text-sm font-bold text-foreground truncate">Notario</h1>
-            <p className="text-[10px] text-muted-foreground truncate">{isAdminGlobal ? (lang === "FR" ? "Admin Global" : "Global Admin") : currentUser.cabinet}</p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {isAdminGlobal ? (lang === "FR" ? "Admin Global" : "Global Admin") : (user?.nomComplet ?? "Cabinet")}
+            </p>
           </div>
         )}
-      </div>
-
-      {/* ═══ Sélecteur de rôle (Gérant / Admin) ═══ */}
-      <div className="shrink-0 border-b border-border p-2">
-        <div className={cn("flex rounded-lg bg-muted p-0.5", collapsed && "flex-col")}>
-          <button
-            onClick={() => setRole("gerant")}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold transition-colors",
-              !isAdminGlobal ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Gérant"
-          >
-            {collapsed ? "G" : (lang === "FR" ? "Gérant" : "Manager")}
-          </button>
-          <button
-            onClick={() => setRole("admin_global")}
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold transition-colors",
-              isAdminGlobal ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            )}
-            title="Admin Global"
-          >
-            {collapsed ? "A" : "Admin"}
-          </button>
-        </div>
       </div>
 
       {/* ═══ Groupes de navigation ═══ */}
@@ -221,12 +209,12 @@ export function AppSidebar() {
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-heading text-xs font-bold",
             isAdminGlobal ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"
           )}>
-            {isAdminGlobal ? "A" : currentUser.firstName.charAt(0)}
+            {user?.initiales ?? "U"}
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{isAdminGlobal ? "Super Admin" : currentUser.name}</p>
-              <p className="text-[10px] text-muted-foreground">{isAdminGlobal ? "Admin Global" : currentUser.role}</p>
+              <p className="text-sm font-medium text-foreground truncate">{user?.nomComplet ?? "Utilisateur"}</p>
+              <p className="text-[10px] text-muted-foreground">{user?.role ?? ""}</p>
             </div>
           )}
         </div>

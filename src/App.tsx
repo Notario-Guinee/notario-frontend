@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -65,6 +65,7 @@ import ResetPassword from "./pages/ResetPassword";
 // ─── Espace client (portail externe) ───
 import EspaceClient from "./pages/EspaceClient";
 import InscriptionClient from "./pages/InscriptionClient";
+import RegisterTenant from "./pages/RegisterTenant";
 
 // Instance unique du client React Query
 const queryClient = new QueryClient();
@@ -73,12 +74,106 @@ const queryClient = new QueryClient();
  * Garde de route — redirige vers /login si l'utilisateur n'est pas connecté
  * Utilisé pour protéger toutes les routes du dashboard
  */
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
 }
+const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <LoginTenant />,
+  },
+  {
+    path: "/admin/login",
+    element: <LoginAdmin />,
+  },
+  {
+    path: "/client/login",
+    element: <LoginPortailClient />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
+  },
+  {
+    path: "/espace-client",
+    element: <EspaceClient />,
+  },
+  {
+    path: "/inscription-client",
+    element: <InscriptionClient />,
+    },
+    {
+      path: "/register",
+      element: <RegisterTenant />,
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: "dashboard", element: <Dashboard /> },
+          { path: "clients", element: <Clients /> },
+          { path: "dossiers", element: <Dossiers /> },
+          { path: "types-actions", element: <TypesActions /> },
+          { path: "actes", element: <ActesSignatures /> },
+          { path: "factures", element: <Factures /> },
+          { path: "kanban", element: <Kanban /> },
+          { path: "synthese", element: <SyntheseFinanciere /> },
+          { path: "agenda", element: <Agenda /> },
+          { path: "paiements", element: <Paiements /> },
+          { path: "comptes", element: <ComptesBancaires /> },
+          { path: "caisse", element: <Caisse /> },
+          { path: "tarifs", element: <Tarifs /> },
+          { path: "archives-numeriques", element: <ArchivesNumeriques /> },
+          { path: "archives-physiques", element: <ArchivesPhysiques /> },
+          { path: "modeles", element: <ModelesDocuments /> },
+          { path: "messagerie", element: <Messagerie /> },
+          { path: "notifications", element: <NotificationsPage /> },
+          { path: "formation", element: <Formation /> },
+          { path: "portail", element: <PortailClient /> },
+          { path: "administration", element: <Administration /> },
+          { path: "utilisateurs", element: <Utilisateurs /> },
+          { path: "cabinet", element: <MonCabinet /> },
+          { path: "admin/dashboard", element: <AdminDashboard /> },
+          { path: "admin/tenants", element: <AdminTenantsPage /> },
+          { path: "admin/modules", element: <AdminModulesOffres /> },
+          { path: "admin/leads", element: <AdminLeadsPage /> },
+          { path: "admin/licenses", element: <AdminLicenses /> },
+          { path: "admin/users", element: <AdminUsersGlobal /> },
+          { path: "admin/roles", element: <AdminRoles /> },
+          { path: "admin/audit", element: <AdminAudit /> },
+          { path: "admin/billing", element: <AdminBilling /> },
+          { path: "admin/monitoring", element: <AdminMonitoring /> },
+          { path: "admin/security", element: <AdminSecurityPolicies /> },
+        ]
+      }
+    ]
+  },
+  {
+    path: "*",
+    element: <NotFound />,
+  }
+// @ts-ignore
+], {
+  future: {
+    // @ts-ignore
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+    v7_fetcherPersist: true,
+    v7_normalizeFormMethod: true,
+    v7_partialHydration: true,
+    v7_skipActionErrorRevalidation: true,
+  }
+});
+
 /**
  * Composant racine — enveloppe l'arbre avec tous les providers
  * et définit la structure de routage de l'application
@@ -95,69 +190,8 @@ const App = () => (
         {/* Systèmes de notifications toast */}
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
-            <Route path="/login" element={<LoginTenant />} />
-            <Route path="/admin/login" element={<LoginAdmin />} />
-            <Route path="/client/login" element={<LoginPortailClient />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-
-            {/* ═══ Portail client (hors layout dashboard) ═══ */}
-            <Route path="/espace-client" element={<EspaceClient />} />
-            <Route path="/inscription-client" element={<InscriptionClient />} />
-
-            {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-            <Route element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }>
-              {/* Routes du gérant */}
-              <Route index element={<Dashboard />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/clients" element={<Clients />} />
-              <Route path="/dossiers" element={<Dossiers />} />
-              <Route path="/types-actions" element={<TypesActions />} />
-              <Route path="/actes" element={<ActesSignatures />} />
-              <Route path="/factures" element={<Factures />} />
-              <Route path="/kanban" element={<Kanban />} />
-              <Route path="/synthese" element={<SyntheseFinanciere />} />
-              <Route path="/agenda" element={<Agenda />} />
-              <Route path="/paiements" element={<Paiements />} />
-              <Route path="/comptes" element={<ComptesBancaires />} />
-              <Route path="/caisse" element={<Caisse />} />
-              <Route path="/tarifs" element={<Tarifs />} />
-              <Route path="/archives-numeriques" element={<ArchivesNumeriques />} />
-              <Route path="/archives-physiques" element={<ArchivesPhysiques />} />
-              <Route path="/modeles" element={<ModelesDocuments />} />
-              <Route path="/messagerie" element={<Messagerie />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/formation" element={<Formation />} />
-              <Route path="/portail" element={<PortailClient />} />
-              <Route path="/administration" element={<Administration />} />
-              <Route path="/utilisateurs" element={<Utilisateurs />} />
-              <Route path="/cabinet" element={<MonCabinet />} />
-
-              {/* Routes d'administration globale */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/admin/tenants" element={<AdminTenantsPage />} />
-              <Route path="/admin/modules" element={<AdminModulesOffres />} />
-              <Route path="/admin/leads" element={<AdminLeadsPage />} />
-              <Route path="/admin/licenses" element={<AdminLicenses />} />
-              <Route path="/admin/users" element={<AdminUsersGlobal />} />
-              <Route path="/admin/roles" element={<AdminRoles />} />
-              <Route path="/admin/audit" element={<AdminAudit />} />
-              <Route path="/admin/billing" element={<AdminBilling />} />
-              <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-              <Route path="/admin/security" element={<AdminSecurityPolicies />} />
-            </Route>
-
-            {/* Page 404 — route de secours */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        {/* @ts-ignore */}
+        <RouterProvider router={router} future={{ v7_startTransition: true }} />
       </TooltipProvider>
     </QueryClientProvider>
     </SidebarProvider>

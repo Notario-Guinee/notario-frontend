@@ -28,6 +28,7 @@ export default function InscriptionClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const passwordChecks = [
     { label: fr ? "8 caractères minimum" : "8 characters minimum", valid: form.password.length >= 8 },
@@ -38,7 +39,7 @@ export default function InscriptionClient() {
   ];
   const allValid = passwordChecks.every(c => c.valid);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.prenom || !form.nom || !form.email || !form.telephone || !form.password) {
       toast.error(fr ? "Veuillez remplir tous les champs obligatoires" : "Please fill in all required fields");
@@ -52,9 +53,39 @@ export default function InscriptionClient() {
       toast.error(fr ? "Les mots de passe ne correspondent pas" : "Passwords do not match");
       return;
     }
-    // TODO: appel API réel
-    setSubmitted(true);
-    toast.success(fr ? "Compte créé avec succès !" : "Account created successfully!");
+    
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nom: form.nom,
+          prenom: form.prenom,
+          email: form.email,
+          telephone: form.telephone,
+          adresse: form.adresse,
+          password: form.password,
+          confirmPassword: form.confirmPassword,
+          role: "CLIENT"
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || (fr ? "Erreur lors de l'inscription" : "Registration failed"));
+      }
+
+      setSubmitted(true);
+      toast.success(fr ? "Compte créé avec succès !" : "Account created successfully!");
+    } catch (error: any) {
+      toast.error(error.message || (fr ? "Une erreur est survenue" : "An error occurred"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const features = [
@@ -167,8 +198,8 @@ export default function InscriptionClient() {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-[#1B6B93] hover:bg-[#155A7A]" disabled={!allValid || form.password !== form.confirmPassword || !form.prenom || !form.nom || !form.email}>
-              <UserPlus className="h-4 w-4 mr-2" /> {fr ? "Créer mon compte" : "Create my account"}
+            <Button type="submit" className="w-full bg-[#1B6B93] hover:bg-[#155A7A]" disabled={loading || !allValid || form.password !== form.confirmPassword || !form.prenom || !form.nom || !form.email}>
+              <UserPlus className="h-4 w-4 mr-2" /> {loading ? (fr ? "Création en cours..." : "Creating account...") : (fr ? "Créer mon compte" : "Create my account")}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">

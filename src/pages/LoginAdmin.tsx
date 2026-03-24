@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +10,32 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export default function LoginAdmin() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Appel réel au backend avec le tenant global-admin
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Veuillez remplir tous les champs");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await login(email, password, "global-admin");
+      navigate("/admin/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Échec de l'authentification admin");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 relative">
@@ -100,7 +122,14 @@ export default function LoginAdmin() {
               <label className="text-xs font-medium text-muted-foreground">{t("login.password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type={showPassword ? "text" : "password"} placeholder="••••••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-10" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
                 <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -109,6 +138,14 @@ export default function LoginAdmin() {
                 <button onClick={() => navigate("/forgot-password?portal=admin")} className="text-xs text-primary hover:underline">{t("login.forgotPassword")}</button>
               </div>
             </div>
+
+            {/* Message d'erreur affiché si le login échoue */}
+            {error && (
+              <div className="text-red-500 text-xs bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+
             <div className="rounded-lg bg-muted/50 border border-border p-3.5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-foreground">{t("login.admin2FA")}</span>
@@ -117,8 +154,13 @@ export default function LoginAdmin() {
               <Input type="text" placeholder="000 000" value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="font-mono text-lg text-center tracking-[0.2em]" />
               <p className="text-[11px] text-muted-foreground">{t("login.admin2FADesc")}</p>
             </div>
-            <Button className="w-full bg-[#0C1F35] hover:bg-[#162d47] text-white font-medium h-11" onClick={() => navigate("/admin/dashboard")}>
-              {t("login.adminAccess")}
+
+            <Button
+              className="w-full bg-[#0C1F35] hover:bg-[#162d47] text-white font-medium h-11"
+              onClick={handleLogin}
+              disabled={loading}
+            >
+              {loading ? "Connexion..." : t("login.adminAccess")}
             </Button>
           </div>
 

@@ -1,20 +1,22 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { Building2, Upload, User, Shield, Mail, Phone, MapPin, Camera, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { currentUser } from "@/data/mockData";
+
 import { toast } from "sonner";
 
 export default function MonCabinet() {
+  const { changePassword, updateProfile, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"cabinet" | "profil" | "securite">("cabinet");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [cabinetForm, setCabinetForm] = useState({
-    nom: currentUser.cabinet,
+    nom: user?.nomComplet || "",
     email: "contact@diallo-notaires.gn",
     telephone: "+224 622 00 11 22",
     adresse: "Quartier Almamya, Commune de Kaloum, Conakry",
@@ -23,11 +25,11 @@ export default function MonCabinet() {
   });
 
   const [profilForm, setProfilForm] = useState({
-    nom: "Diallo",
-    prenom: currentUser.firstName,
-    email: currentUser.email,
-    telephone: "+224 622 00 11 22",
-    role: currentUser.role,
+    nom: user?.nom || "",
+    prenom: user?.prenom || "",
+    email: user?.email || "",
+    telephone: user?.telephone || "",
+    role: user?.role || "",
   });
 
   const [securiteForm, setSecuriteForm] = useState({
@@ -37,6 +39,19 @@ export default function MonCabinet() {
     mfaEnabled: false,
     sessionTimeout: "30",
   });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  // Resynchronise le form profil quand le user est chargé depuis le backend
+  useEffect(() => {
+    if (user) {
+      setProfilForm({
+        nom: user.nom || "",
+        prenom: user.prenom || "",
+        email: user.email || "",
+        telephone: user.telephone || "",
+        role: user.role || "",
+      });
+    }
+  }, [user]);
 
   const tabs = [
     { id: "cabinet" as const, label: "Mon Cabinet", icon: Building2 },
@@ -177,7 +192,7 @@ export default function MonCabinet() {
               </div>
               <div>
                 <p className="font-heading text-lg font-bold text-foreground">{profilForm.prenom} {profilForm.nom}</p>
-                <p className="text-sm text-muted-foreground">{profilForm.role} · {currentUser.cabinet}</p>
+                <p className="text-sm text-muted-foreground">{profilForm.role} · {user?.nomComplet}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -204,7 +219,7 @@ export default function MonCabinet() {
               <Label>Rôle</Label>
               <Input value={profilForm.role} disabled className="opacity-60" />
             </div>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => toast.success("Profil mis à jour")}>
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={async () => { try { await updateProfile({ nom: profilForm.nom, prenom: profilForm.prenom, email: profilForm.email, telephone: profilForm.telephone }); toast.success("Profil mis à jour avec succès"); } catch (err: any) { toast.error(err.message || "Erreur lors de la mise à jour"); } }}>
               Enregistrer le profil
             </Button>
           </div>
@@ -230,12 +245,27 @@ export default function MonCabinet() {
                 <Input type="password" value={securiteForm.confirmPassword} onChange={e => setSecuriteForm(f => ({ ...f, confirmPassword: e.target.value }))} placeholder="••••••••" />
               </div>
             </div>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => {
-              if (securiteForm.newPassword !== securiteForm.confirmPassword) { toast.error("Les mots de passe ne correspondent pas"); return; }
-              toast.success("Mot de passe modifié");
-              setSecuriteForm(f => ({ ...f, oldPassword: "", newPassword: "", confirmPassword: "" }));
-            }}>
-              Modifier le mot de passe
+            <Button 
+              className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" 
+              disabled={passwordLoading}
+              onClick={async () => {
+                if (!securiteForm.oldPassword) { toast.error("Veuillez saisir votre mot de passe actuel"); return; }
+                if (securiteForm.newPassword !== securiteForm.confirmPassword) { toast.error("Les mots de passe ne correspondent pas"); return; }
+                if (securiteForm.newPassword.length < 8) { toast.error("Le nouveau mot de passe doit faire au moins 8 caractères"); return; }
+                
+                setPasswordLoading(true);
+                try {
+                  await changePassword(securiteForm.oldPassword, securiteForm.newPassword);
+                  toast.success("Mot de passe modifié avec succès");
+                  setSecuriteForm(f => ({ ...f, oldPassword: "", newPassword: "", confirmPassword: "" }));
+                } catch (error: any) {
+                  toast.error(error.message || "Erreur lors du changement de mot de passe");
+                } finally {
+                  setPasswordLoading(false);
+                }
+              }}
+            >
+              {passwordLoading ? "Chargement..." : "Modifier le mot de passe"}
             </Button>
           </div>
           <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-4">

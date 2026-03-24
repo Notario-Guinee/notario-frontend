@@ -128,6 +128,10 @@ export default function LoginTenant() {
           <p className="text-center text-xs text-muted-foreground">
             {t("login.tenantClientLink")}{" "}
             <button onClick={() => navigate("/client/login")} className="text-primary hover:underline font-medium">{t("login.tenantClientAccess")}</button>
+          <p className="text-center text-xs text-muted-foreground mt-2">
+            Pas encore de compte ?{" "}
+            <button onClick={() => navigate("/register")} className="text-primary hover:underline font-medium">Créer un compte</button>
+          </p>
           </p>
           <div className="mt-6 rounded-lg bg-muted/50 px-3.5 py-2.5 flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
