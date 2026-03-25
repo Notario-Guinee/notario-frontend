@@ -1,3 +1,8 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Connexion Gérant — Authentification du gérant de cabinet
+// Formulaire email/mot de passe avec affichage/masquage du mdp
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
@@ -17,9 +22,6 @@ export default function LoginTenant() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const cabinetName = "Cabinet Maître Sylla";
-  const subdomain = "sylla.notariale.com";
 
   // Appel réel au backend — remplace l'ancien navigate("/dashboard") direct
   const handleLogin = async () => {
@@ -57,8 +59,8 @@ export default function LoginTenant() {
             <div className="flex items-center gap-3 mb-10">
               <div className="w-10 h-10 rounded-xl bg-[#2AA3D6] flex items-center justify-center text-white font-bold text-lg shadow-lg">N</div>
               <div>
-                <p className="text-white font-medium text-[15px]">{cabinetName}</p>
-                <p className="text-[#8ba5be] text-[11px]">{subdomain}</p>
+                <p className="text-white font-medium text-[15px]">Notario</p>
+                <p className="text-[#8ba5be] text-[11px]">{t("login.tenantPlatform")}</p>
               </div>
             </div>
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">{t("login.tenantWelcome")}</h2>
@@ -132,7 +134,7 @@ export default function LoginTenant() {
           <div className="mt-6 rounded-lg bg-muted/50 px-3.5 py-2.5 flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-[11px] text-muted-foreground">
-              {t("login.tenantSpace")} : <strong className="text-foreground">{subdomain}</strong>
+              {t("login.tenantSecureAccess")}
             </span>
           </div>
         </div>

@@ -108,4 +108,3 @@ Ce projet est sous licence privée — tous droits réservés © Notario Guinée
 ## 📬 Contact
 
 Pour toute question ou demande, contactez l'équipe via le dépôt GitHub : [Notario-Guinee](https://github.com/Notario-Guinee)
-

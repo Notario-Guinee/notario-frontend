@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Facturation — Gestion de la facturation SaaS
+// Suivi des abonnements, génération des factures mensuelles aux
+// tenants et envoi par email ou messagerie
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Receipt, Mail, MessageSquare, Send } from "lucide-react";

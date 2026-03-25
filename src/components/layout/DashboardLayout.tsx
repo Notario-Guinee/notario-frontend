@@ -18,21 +18,21 @@ export function DashboardLayout() {
   const { collapsed } = useSidebarState();
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       {/* Barre latérale de navigation (masquée sur mobile) */}
       <div className="hidden md:block">
         <AppSidebar />
       </div>
       {/* Zone de contenu principal — marge ajustée selon la sidebar */}
       <div className={cn(
-        "flex flex-1 flex-col transition-all duration-300",
+        "flex flex-1 min-w-0 flex-col transition-all duration-300",
         "md:ml-[72px]",
         !collapsed && "md:ml-[260px]"
       )}>
         {/* Barre supérieure avec fil d'Ariane, thème, langue */}
         <TopBar />
         {/* Contenu de la page active */}
-        <main className="flex-1 overflow-y-auto scrollbar-thin p-6">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden scrollbar-thin p-6">
           <Outlet />
         </main>
       </div>

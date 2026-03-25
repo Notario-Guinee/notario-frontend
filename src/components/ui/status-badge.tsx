@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant StatusBadge — Badge coloré d'état/statut
+// Affiche le statut d'un dossier, d'une facture ou d'une tâche
+// sous forme d'un badge arrondi avec couleur sémantique
+// ═══════════════════════════════════════════════════════════════
+
 import { cn } from "@/lib/utils";
 
 type StatusType = "En cours" | "Signé" | "Archivé" | "Annulé" | "Actif" | "Inactif" |

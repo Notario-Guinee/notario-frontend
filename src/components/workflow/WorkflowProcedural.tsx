@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+// ═══════════════════════════════════════════════════════════════
+// Composant WorkflowProcedural — Visualisation des étapes d'un
+// dossier notarial sous forme de pipeline interactif animé
+// Supporte les dispositions horizontale (≥900px) et verticale
+// Actions disponibles : Démarrer, Terminer, Revenir en arrière
+// ═══════════════════════════════════════════════════════════════
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,
-  Stamp, Newspaper, CheckCircle2, Clock, Play, RotateCcw, Timer
+  Stamp, Newspaper, CheckCircle2, Clock, Play, RotateCcw, Timer, MessageSquare, Send as SendIcon, X as XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkflowConfig, WorkflowStep } from "./workflow-types";
@@ -13,23 +20,50 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Stamp, Newspaper, CheckCircle2, Clock, Play,
 };
 
+interface StepComment {
+  user: string;
+  text: string;
+  date: string;
+}
+
 interface WorkflowProceduralProps {
   config: WorkflowConfig;
   onStart?: (actionId: string, stepKey: string) => void;
   onRevert?: (stepKey: string) => void;
   onComplete?: (stepKey: string) => void;
+  stepComments?: Record<string, StepComment[]>;
+  onAddComment?: (stepKey: string, text: string) => void;
   className?: string;
 }
 
-export default function WorkflowProcedural({ config, onStart, onRevert, onComplete, className }: WorkflowProceduralProps) {
+export default function WorkflowProcedural({ config, onStart, onRevert, onComplete, stepComments = {}, onAddComment, className }: WorkflowProceduralProps) {
   const { steps } = config;
   const palette = config.palette?.length ? config.palette : WORKFLOW_PALETTE;
   const [now, setNow] = useState(Date.now());
+  const [openCommentKey, setOpenCommentKey] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const toggleComment = (stepKey: string) => {
+    setOpenCommentKey(prev => {
+      const next = prev === stepKey ? null : stepKey;
+      if (next) setTimeout(() => commentInputRef.current?.focus(), 50);
+      return next;
+    });
+    setCommentText("");
+  };
+
+  const submitComment = (stepKey: string) => {
+    if (!commentText.trim()) return;
+    onAddComment?.(stepKey, commentText);
+    setCommentText("");
+    setOpenCommentKey(null);
+  };
 
   const getColor = useCallback((index: number) => palette[index % palette.length], [palette]);
 
@@ -220,9 +254,26 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
               </p>
 
               {/* Description */}
-              <p className={cn("mt-1 text-[10px] text-center leading-tight max-w-[120px]", isPending && "opacity-40")} style={{ color: "#6B7280" }}>
+              <p className={cn("mt-1 text-[10px] text-center leading-tight max-w-[120px] text-muted-foreground", isPending && "opacity-40")}>
                 {step.description}
               </p>
+
+              {/* Comment toggle button */}
+              <button
+                onClick={() => toggleComment(step.key)}
+                className={cn(
+                  "mt-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                  openCommentKey === step.key
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+                title="Commenter cette étape"
+              >
+                <MessageSquare className="h-3 w-3" />
+                {(stepComments[step.key]?.length ?? 0) > 0
+                  ? `${stepComments[step.key].length} commentaire${stepComments[step.key].length > 1 ? "s" : ""}`
+                  : "Commenter"}
+              </button>
 
               {/* Arrow connector */}
               {!isLast && (
@@ -247,6 +298,74 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
           );
         })}
       </div>
+
+      {/* Comment panel — horizontal layout */}
+      {openCommentKey && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          className="hidden min-[900px]:block mt-4 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-4"
+        >
+          {(() => {
+            const step = steps.find(s => s.key === openCommentKey);
+            const comments = stepComments[openCommentKey] ?? [];
+            const color = step ? getColor(steps.indexOf(step)) : "#1B6B93";
+            return (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-sm font-semibold text-foreground">
+                      Commentaires — <span style={{ color }}>{step?.label}</span>
+                    </span>
+                  </div>
+                  <button onClick={() => { setOpenCommentKey(null); setCommentText(""); }} className="text-muted-foreground hover:text-foreground">
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {comments.length > 0 && (
+                  <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                    {comments.map((c, ci) => (
+                      <div key={ci} className="rounded-lg bg-white dark:bg-muted/30 border border-border px-3 py-2">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[11px] font-semibold text-foreground">{c.user}</span>
+                          <span className="text-[10px] text-muted-foreground">{c.date}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{c.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {comments.length === 0 && (
+                  <p className="text-xs text-muted-foreground mb-3 italic">Aucun commentaire pour cette étape.</p>
+                )}
+
+                <div className="flex gap-2">
+                  <textarea
+                    ref={commentInputRef}
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(openCommentKey); } }}
+                    placeholder="Expliquer pourquoi cette étape est bloquée, en attente… (Entrée pour envoyer)"
+                    className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/50 min-h-[60px]"
+                    rows={2}
+                  />
+                  <button
+                    onClick={() => submitComment(openCommentKey)}
+                    disabled={!commentText.trim()}
+                    className="self-end px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  >
+                    <SendIcon className="h-3.5 w-3.5" />
+                    Envoyer
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+        </motion.div>
+      )}
 
       {/* Vertical layout for < 900px */}
       <div className="min-[900px]:hidden flex flex-col gap-0 relative">
@@ -329,7 +448,7 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">TERMINÉ</span>
                   )}
                 </div>
-                <p className="text-xs mt-1" style={{ color: "#6B7280" }}>{step.description}</p>
+                <p className="text-xs mt-1 text-muted-foreground">{step.description}</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {canStart && (
                     <button
@@ -357,7 +476,62 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
                       <RotateCcw className="h-3 w-3" /> REVENIR
                     </button>
                   )}
+                  <button
+                    onClick={() => toggleComment(step.key)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 flex items-center gap-1",
+                      openCommentKey === step.key
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "border border-muted-foreground/30 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    {(stepComments[step.key]?.length ?? 0) > 0
+                      ? `${stepComments[step.key].length} COMM.`
+                      : "COMMENTER"}
+                  </button>
                 </div>
+
+                {/* Inline comment panel — vertical layout */}
+                {openCommentKey === step.key && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="mt-3 rounded-lg border border-amber-200 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 p-3 overflow-hidden"
+                  >
+                    {(stepComments[step.key] ?? []).length > 0 && (
+                      <div className="space-y-2 mb-3 max-h-32 overflow-y-auto">
+                        {(stepComments[step.key] ?? []).map((c, ci) => (
+                          <div key={ci} className="rounded bg-white dark:bg-muted/30 border border-border px-2.5 py-1.5">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-[11px] font-semibold text-foreground">{c.user}</span>
+                              <span className="text-[10px] text-muted-foreground">{c.date}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{c.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <textarea
+                        ref={openCommentKey === step.key ? commentInputRef : undefined}
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(step.key); } }}
+                        placeholder="Expliquer le blocage ou l'attente… (Entrée pour envoyer)"
+                        className="flex-1 resize-none rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-400/50 min-h-[48px]"
+                        rows={2}
+                      />
+                      <button
+                        onClick={() => submitComment(step.key)}
+                        disabled={!commentText.trim()}
+                        className="self-end px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <SendIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
           );

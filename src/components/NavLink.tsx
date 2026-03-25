@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Composant NavLink — Wrapper de NavLink de react-router-dom
+// Ajoute le support des classes activeClassName et pendingClassName
+// pour faciliter la mise en forme des liens actifs/en attente
+// ═══════════════════════════════════════════════════════════════
+
 import { NavLink as RouterNavLink, NavLinkProps } from "react-router-dom";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";

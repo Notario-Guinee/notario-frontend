@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Monitoring — Surveillance des ressources de la plateforme
+// Affiche les métriques système : CPU, RAM, base de données,
+// stockage, utilisateurs connectés et état du réseau
+// ═══════════════════════════════════════════════════════════════
+
 import { Activity, Cpu, Database, HardDrive, Users, Wifi } from "lucide-react";
 
 const metrics = [

@@ -15,7 +15,7 @@ import {
   Receipt, CreditCard, Landmark, Wallet, BarChart3, Settings,
   Search, Package, FileText, MessageSquare, Bell,
   GraduationCap, Globe, Building2, UserCog, Shield,
-  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor,
+  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive,
 } from "lucide-react";
 
 /** Structure d'un élément de navigation */
@@ -37,7 +37,6 @@ export function AppSidebar() {
       items: [
         { title: t("nav.clients"), path: "/clients", icon: Users },
         { title: t("nav.dossiers"), path: "/dossiers", icon: FolderOpen },
-        { title: t("nav.typesActions"), path: "/types-actions", icon: Scale },
         { title: t("nav.actesSignatures"), path: "/actes", icon: FileText },
         { title: t("nav.agenda"), path: "/agenda", icon: Calendar },
         { title: t("nav.kanban"), path: "/kanban", icon: CheckSquare },
@@ -72,48 +71,49 @@ export function AppSidebar() {
     },
     { label: t("navGroup.portal"), items: [{ title: t("nav.portail"), path: "/portail", icon: Globe }] },
     {
-      label: lang === "FR" ? "Mon Cabinet" : "My Office",
+      label: t("navGroup.cabinet"),
       items: [
-        { title: lang === "FR" ? "Profil cabinet" : "Office Profile", path: "/administration?tab=cabinet", icon: Building2 },
-        { title: lang === "FR" ? "Utilisateurs" : "Users", path: "/utilisateurs", icon: Users },
-        { title: lang === "FR" ? "Journal d'audit" : "Audit Log", path: "/administration?tab=audit", icon: Shield },
-        { title: lang === "FR" ? "Sécurité & Accès" : "Security", path: "/administration?tab=securite", icon: UserCog },
-        { title: lang === "FR" ? "Paramètres" : "Settings", path: "/administration?tab=parametres", icon: Settings },
+        { title: t("sidebar.cabinetProfile"), path: "/administration?tab=cabinet", icon: Building2 },
+        { title: t("sidebar.users"), path: "/utilisateurs", icon: Users },
+        { title: t("sidebar.storageplan"), path: "/stockage", icon: HardDrive },
+        { title: t("sidebar.auditLog"), path: "/administration?tab=audit", icon: Shield },
+        { title: t("sidebar.securityAccess"), path: "/administration?tab=securite", icon: UserCog },
+        { title: t("sidebar.settings"), path: "/administration?tab=parametres", icon: Settings },
       ],
     },
   ];
 
   // ─── Navigation de l'administrateur global ───
   const adminGroups: NavGroup[] = [
-    { label: lang === "FR" ? "Tableau de bord" : "Dashboard", items: [{ title: lang === "FR" ? "Vue d'ensemble" : "Overview", path: "/admin/dashboard", icon: LayoutDashboard }] },
+    { label: t("navGroup.adminDashboard"), items: [{ title: t("sidebar.adminOverview"), path: "/admin/dashboard", icon: LayoutDashboard }] },
     {
-      label: lang === "FR" ? "Gestion Plateforme" : "Platform Management",
+      label: t("navGroup.adminPlatform"),
       items: [
-        { title: lang === "FR" ? "Tenants (Cabinets)" : "Tenants (Offices)", path: "/admin/tenants", icon: Building2 },
-        { title: lang === "FR" ? "Modules & Offres" : "Modules & Plans", path: "/admin/modules", icon: Package },
-        { title: lang === "FR" ? "Facturation" : "Billing", path: "/admin/billing", icon: Receipt },
-        { title: lang === "FR" ? "Licences" : "Licenses", path: "/admin/licenses", icon: Key },
-        { title: lang === "FR" ? "Monitoring" : "Monitoring", path: "/admin/monitoring", icon: Monitor },
+        { title: t("sidebar.adminTenants"), path: "/admin/tenants", icon: Building2 },
+        { title: t("sidebar.adminModulesPlans"), path: "/admin/modules", icon: Package },
+        { title: t("sidebar.adminBilling"), path: "/admin/billing", icon: Receipt },
+        { title: t("sidebar.adminLicenses"), path: "/admin/licenses", icon: Key },
+        { title: t("sidebar.adminMonitoring"), path: "/admin/monitoring", icon: Monitor },
       ],
     },
     {
-      label: lang === "FR" ? "Utilisateurs & Accès" : "Users & Access",
+      label: t("navGroup.adminUsersAccess"),
       items: [
-        { title: lang === "FR" ? "Utilisateurs globaux" : "Global Users", path: "/admin/users", icon: Users },
-        { title: lang === "FR" ? "Rôles & Permissions" : "Roles & Permissions", path: "/admin/roles", icon: UserCog },
+        { title: t("sidebar.adminGlobalUsers"), path: "/admin/users", icon: Users },
+        { title: t("sidebar.adminRoles"), path: "/admin/roles", icon: UserCog },
       ],
     },
     {
-      label: lang === "FR" ? "Commercial" : "Sales",
+      label: t("navGroup.adminSales"),
       items: [
-        { title: lang === "FR" ? "Leads & Démos" : "Leads & Demos", path: "/admin/leads", icon: Megaphone },
+        { title: t("sidebar.adminLeadsDemons"), path: "/admin/leads", icon: Megaphone },
       ],
     },
     {
-      label: lang === "FR" ? "Sécurité" : "Security",
+      label: t("navGroup.adminSecurity"),
       items: [
-        { title: lang === "FR" ? "Politiques de sécurité" : "Security Policies", path: "/admin/security", icon: Shield },
-        { title: lang === "FR" ? "Journal d'audit" : "Audit Log", path: "/admin/audit", icon: Shield },
+        { title: t("sidebar.adminSecurityPolicies"), path: "/admin/security", icon: Shield },
+        { title: t("sidebar.adminAuditLog"), path: "/admin/audit", icon: Shield },
       ],
     },
   ];
@@ -134,7 +134,7 @@ export function AppSidebar() {
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="font-heading text-sm font-bold text-foreground truncate">Notario</h1>
-            <p className="text-[10px] text-muted-foreground truncate">{isAdminGlobal ? (lang === "FR" ? "Admin Global" : "Global Admin") : currentUser.cabinet}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{isAdminGlobal ? t("sidebar.adminGlobal") : currentUser.cabinet}</p>
           </div>
         )}
       </div>
@@ -149,8 +149,9 @@ export function AppSidebar() {
               !isAdminGlobal ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             )}
             title="Gérant"
+            aria-pressed={!isAdminGlobal}
           >
-            {collapsed ? "G" : (lang === "FR" ? "Gérant" : "Manager")}
+            {collapsed ? "G" : t("sidebar.adminGerant")}
           </button>
           <button
             onClick={() => setRole("admin_global")}
@@ -159,6 +160,7 @@ export function AppSidebar() {
               isAdminGlobal ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             )}
             title="Admin Global"
+            aria-pressed={isAdminGlobal}
           >
             {collapsed ? "A" : "Admin"}
           </button>
@@ -166,7 +168,7 @@ export function AppSidebar() {
       </div>
 
       {/* ═══ Groupes de navigation ═══ */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin py-3 px-2">
+      <nav id="sidebar-nav" className="flex-1 overflow-y-auto scrollbar-thin py-3 px-2">
         {navGroups.map((group) => (
           <div key={group.label} className="mb-3">
             {/* Label du groupe (masqué en mode réduit) */}
@@ -236,7 +238,9 @@ export function AppSidebar() {
       <button
         onClick={toggle}
         className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground shadow-sm transition-colors z-50"
-        aria-label={collapsed ? (lang === "FR" ? "Étendre" : "Expand") : (lang === "FR" ? "Réduire" : "Collapse")}
+        aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+        aria-expanded={!collapsed}
+        aria-controls="sidebar-nav"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
       </button>

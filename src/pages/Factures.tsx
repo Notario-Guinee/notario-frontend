@@ -4,14 +4,16 @@
 // création de facture, vue modèle de facture
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
-import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Plus, Download, MoreHorizontal, Eye, Edit, Trash2, Search, X, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { mockFactures, mockClients, mockDossiers, formatGNF, currentUser } from "@/data/mockData";
 import { searchMatch } from "@/lib/utils";
@@ -19,15 +21,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAnnouncer } from "@/hooks/useAnnouncer";
 
 type Facture = typeof mockFactures[0];
 
 export default function Factures() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
+  const { announce } = useAnnouncer();
   const fr = lang === "FR";
   const [factures, setFactures] = useState(mockFactures);
   const [search, setSearch] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Recherche avancée dans le modal de création
   const [clientSearch, setClientSearch] = useState("");
   const [form, setForm] = useState({
@@ -37,6 +42,16 @@ export default function Factures() {
   // Modal de visualisation d'une facture
   const [viewFacture, setViewFacture] = useState<Facture | null>(null);
 
+  // Confirmation de suppression
+  const [deleteFactureId, setDeleteFactureId] = useState<string | null>(null);
+
+  // Suppression d'une facture
+  const handleDelete = useCallback((id: string) => {
+    setFactures(prev => prev.filter(f => f.id !== id));
+    toast.success(t("factures.toastDeleted") || "Facture supprimée définitivement.");
+    announce(fr ? "Facture supprimée" : "Invoice deleted");
+  }, [t, announce, fr]);
+
   // Réinitialisation du formulaire
   const resetForm = () => {
     setForm({ client: "", dossier: "", montant: "", description: "", echeance: "", statut: "Brouillon" });
@@ -44,23 +59,35 @@ export default function Factures() {
   };
 
   // Création d'une nouvelle facture
-  const handleCreate = () => {
-    const num = `FAC-2026-${String(factures.length + 1).padStart(3, "0")}`;
-    const newFacture: Facture = {
-      id: String(Date.now()), numero: num, client: form.client,
-      montant: Number(form.montant) || 0, statut: form.statut as any,
-      dateEmission: new Date().toISOString().slice(0, 10), dossier: form.dossier,
-    };
-    setFactures(prev => [newFacture, ...prev]);
-    setShowCreateModal(false);
-    resetForm();
-    toast.success(fr ? `Facture ${num} créée avec succès` : `Invoice ${num} created successfully`);
-  };
+  const handleCreate = useCallback(() => {
+    if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
+    const montant = Number(form.montant);
+    if (!montant || montant <= 0) { toast.error("Le montant doit être supérieur à 0."); return; }
+
+    setIsSubmitting(true);
+    try {
+      const num = `FAC-2026-${String(factures.length + 1).padStart(3, "0")}`;
+      const newFacture: Facture = {
+        id: String(Date.now()), numero: num, client: form.client,
+        montant: montant, statut: form.statut as Facture["statut"],
+        dateEmission: new Date().toISOString().slice(0, 10), dossier: form.dossier,
+      };
+      setFactures(prev => [newFacture, ...prev]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(`${num} ${t("factures.toastCreated")}`);
+      announce(fr ? "Facture créée" : "Invoice created");
+    } catch (err) {
+      toast.error(fr ? "Erreur lors de la création" : "Error creating invoice");
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [form, factures.length, t, announce, fr, resetForm]);
 
   // Filtrer les clients par recherche (code, nom, téléphone, dossier)
-  const filteredClients = clientSearch.length >= 1
+  const filteredClients = useMemo(() => clientSearch.length >= 1
     ? mockClients.filter(c => {
-        const searchStr = clientSearch.toLowerCase();
         // Recherche par code client, nom, prénom, téléphone
         if (searchMatch(c.code, clientSearch)) return true;
         if (searchMatch(c.nom, clientSearch)) return true;
@@ -73,49 +100,56 @@ export default function Factures() {
         if (clientDossiers.some(d => searchMatch(d.code, clientSearch))) return true;
         return false;
       })
-    : mockClients;
+    : mockClients,
+  [clientSearch]);
 
   // Dossiers associés au client sélectionné
-  const clientDossiers = form.client
+  const clientDossiers = useMemo(() => form.client
     ? mockDossiers.filter(d => d.clients.some(c => c.toLowerCase().includes(form.client.split(" ")[0]?.toLowerCase() || "")))
-    : mockDossiers;
+    : mockDossiers,
+  [form.client]);
 
   // Filtrage global dans la liste
-  const filtered = factures.filter(f => {
+  const filtered = useMemo(() => factures.filter(f => {
     if (!search) return true;
     return [f.numero, f.client, f.dossier, String(f.montant), f.statut, f.dateEmission].some(field => searchMatch(field, search));
-  });
+  }), [factures, search]);
 
   return (
     <div className="space-y-6">
       {/* En-tête */}
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">{fr ? "Factures" : "Invoices"}</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("factures.title")}</h1>
         <div className="ml-auto flex gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={fr ? "Rechercher..." : "Search..."} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
+            <Input aria-label="Rechercher une facture" placeholder={t("factures.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
           </div>
-          <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Export</Button>
+          <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> {t("factures.export")}</Button>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowCreateModal(true); }}>
-            <Plus className="mr-2 h-4 w-4" /> {fr ? "Nouvelle facture" : "New invoice"}
+            <Plus className="mr-2 h-4 w-4" /> {t("factures.newFacture")}
           </Button>
         </div>
       </div>
+
+      {/* Compteur de résultats pour lecteurs d'écran */}
+      <p aria-live="polite" className="sr-only">
+        {search ? (fr ? `${filtered.length} facture${filtered.length > 1 ? "s" : ""} trouvée${filtered.length > 1 ? "s" : ""}` : `${filtered.length} invoice${filtered.length > 1 ? "s" : ""} found`) : ""}
+      </p>
 
       {/* Tableau des factures */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fr ? "Numéro" : "Number"}</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fr ? "Client" : "Client"}</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{fr ? "Dossier" : "Case"}</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fr ? "Montant" : "Amount"}</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fr ? "Statut" : "Status"}</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Date</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("factures.colNumber")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("factures.colClient")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t("factures.colCase")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("factures.colAmount")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("factures.colStatus")}</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t("factures.colDate")}</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t("factures.colActions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -126,16 +160,16 @@ export default function Factures() {
                 <td className="px-4 py-3 text-sm text-muted-foreground font-mono hidden md:table-cell">{f.dossier}</td>
                 <td className="px-4 py-3 text-sm font-medium text-foreground">{formatGNF(f.montant)}</td>
                 <td className="px-4 py-3"><StatusBadge status={f.statut} /></td>
-                <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{new Date(f.dateEmission).toLocaleDateString('fr-FR')}</td>
+                <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{new Date(f.dateEmission).toLocaleDateString(lang === "FR" ? "fr-FR" : "en-GB")}</td>
                 <td className="px-4 py-3 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setViewFacture(f)}><Eye className="mr-2 h-4 w-4" /> {fr ? "Voir" : "View"}</DropdownMenuItem>
-                      <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> {fr ? "Supprimer" : "Delete"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setViewFacture(f)}><Eye className="mr-2 h-4 w-4" /> {t("factures.actionView")}</DropdownMenuItem>
+                      <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> {t("factures.actionEdit")}</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => setDeleteFactureId(f.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("factures.actionDelete")}</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>
@@ -143,14 +177,42 @@ export default function Factures() {
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && (
+          <EmptyState
+            icon={Receipt}
+            title={t("factures.emptyTitle") || "Aucune facture trouvée"}
+            description={search ? "Aucune facture ne correspond à votre recherche." : "Commencez par créer votre première facture."}
+          />
+        )}
       </div>
+
+      {/* ═══ Confirmation de suppression de facture ═══ */}
+      <AlertDialog open={!!deleteFactureId} onOpenChange={(open) => !open && setDeleteFactureId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement la facture et ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { handleDelete(deleteFactureId!); setDeleteFactureId(null); }}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ═══ Modal de visualisation de facture (modèle) ═══ */}
       <Dialog open={!!viewFacture} onOpenChange={o => !o && setViewFacture(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-heading">{fr ? "Facture" : "Invoice"} {viewFacture?.numero}</DialogTitle>
-            <DialogDescription>{fr ? "Modèle de facture" : "Invoice template"}</DialogDescription>
+            <DialogTitle className="font-heading">{t("factures.viewTitle")} {viewFacture?.numero}</DialogTitle>
+            <DialogDescription>{t("factures.viewDesc")}</DialogDescription>
           </DialogHeader>
           {viewFacture && (
             <div className="space-y-6 py-2">
@@ -166,9 +228,9 @@ export default function Factures() {
                     <p className="text-xs text-muted-foreground">NIF: NIF-2020-001234</p>
                   </div>
                   <div className="text-right">
-                    <h3 className="font-heading text-2xl font-bold text-foreground">{fr ? "FACTURE" : "INVOICE"}</h3>
+                    <h3 className="font-heading text-2xl font-bold text-foreground">{t("factures.invoiceLabel")}</h3>
                     <p className="text-sm font-mono font-bold text-primary mt-1">{viewFacture.numero}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{fr ? "Date d'émission" : "Issue date"}: {new Date(viewFacture.dateEmission).toLocaleDateString("fr-FR")}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("factures.issueDate")}: {new Date(viewFacture.dateEmission).toLocaleDateString(lang === "FR" ? "fr-FR" : "en-GB")}</p>
                   </div>
                 </div>
 
@@ -177,12 +239,12 @@ export default function Factures() {
                 {/* Infos client */}
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{fr ? "Facturé à" : "Bill to"}</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("factures.billTo")}</p>
                     <p className="text-sm font-bold text-foreground">{viewFacture.client}</p>
-                    <p className="text-xs text-muted-foreground">{fr ? "Dossier" : "Case"}: {viewFacture.dossier}</p>
+                    <p className="text-xs text-muted-foreground">{t("factures.caseLabel")}: {viewFacture.dossier}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{fr ? "Statut" : "Status"}</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("factures.statusLabel")}</p>
                     <StatusBadge status={viewFacture.statut} />
                   </div>
                 </div>
@@ -192,23 +254,23 @@ export default function Factures() {
                   <table className="w-full">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{fr ? "Description" : "Description"}</th>
-                        <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">{fr ? "Montant" : "Amount"}</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">{t("factures.colDesc")}</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground">{t("factures.colAmountHeader")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr className="border-t border-border">
                         <td className="px-4 py-3 text-sm text-foreground">
-                          {fr ? "Honoraires notariaux — Dossier" : "Notarial fees — Case"} {viewFacture.dossier}
+                          {t("factures.notarialFees")} {viewFacture.dossier}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-mono font-medium text-foreground">{formatGNF(viewFacture.montant)}</td>
                       </tr>
                       <tr className="border-t border-border bg-muted/30">
-                        <td className="px-4 py-2 text-sm font-semibold text-foreground">{fr ? "TVA (18%)" : "VAT (18%)"}</td>
+                        <td className="px-4 py-2 text-sm font-semibold text-foreground">{t("factures.vat")}</td>
                         <td className="px-4 py-2 text-sm text-right font-mono text-foreground">{formatGNF(Math.round(viewFacture.montant * 0.18))}</td>
                       </tr>
                       <tr className="border-t-2 border-primary/30">
-                        <td className="px-4 py-3 text-base font-bold text-foreground">{fr ? "Total TTC" : "Total (incl. tax)"}</td>
+                        <td className="px-4 py-3 text-base font-bold text-foreground">{t("factures.totalInclTax")}</td>
                         <td className="px-4 py-3 text-base text-right font-mono font-bold text-primary">{formatGNF(Math.round(viewFacture.montant * 1.18))}</td>
                       </tr>
                     </tbody>
@@ -217,17 +279,17 @@ export default function Factures() {
 
                 {/* Mentions légales */}
                 <div className="text-[11px] text-muted-foreground space-y-1 border-t border-border pt-4">
-                  <p>{fr ? "Conditions de paiement : Payable à réception" : "Payment terms: Payable upon receipt"}</p>
-                  <p>{fr ? "Mode de paiement : Virement bancaire, Espèces, Orange Money" : "Payment methods: Bank transfer, Cash, Orange Money"}</p>
-                  <p className="italic">{fr ? "En cas de retard de paiement, des pénalités de 2% par mois seront appliquées." : "Late payment will incur a 2% monthly penalty."}</p>
+                  <p>{t("factures.paymentTerms")}</p>
+                  <p>{t("factures.paymentMethods")}</p>
+                  <p className="italic">{t("factures.latePayment")}</p>
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setViewFacture(null)}>{fr ? "Fermer" : "Close"}</Button>
-            <Button className="bg-primary text-primary-foreground gap-2" onClick={() => { toast.success(fr ? "Impression en cours..." : "Printing..."); window.print(); }}>
-              <Printer className="h-4 w-4" /> {fr ? "Imprimer" : "Print"}
+            <Button variant="outline" onClick={() => setViewFacture(null)}>{t("factures.btnClose")}</Button>
+            <Button className="bg-primary text-primary-foreground gap-2" onClick={() => { toast.success(t("factures.printing")); window.print(); }}>
+              <Printer className="h-4 w-4" /> {t("factures.btnPrint")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -237,23 +299,24 @@ export default function Factures() {
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{fr ? "Nouvelle facture" : "New invoice"}</DialogTitle>
-            <DialogDescription>{fr ? "Créez et générez une nouvelle facture" : "Create and generate a new invoice"}</DialogDescription>
+            <DialogTitle className="font-heading">{t("factures.modalNewTitle")}</DialogTitle>
+            <DialogDescription>{t("factures.modalNewDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Champ de recherche avancée client */}
             <div className="space-y-2">
-              <Label>{fr ? "Client" : "Client"} *</Label>
+              <Label>{t("factures.clientLabel")} *</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
+                  aria-label="Rechercher un client"
                   value={clientSearch}
                   onChange={e => { setClientSearch(e.target.value); if (!e.target.value) setForm(f => ({ ...f, client: "" })); }}
-                  placeholder={fr ? "Rechercher par nom, code client, téléphone ou n° dossier..." : "Search by name, client code, phone or case number..."}
+                  placeholder={t("factures.searchClientPlaceholder")}
                   className="pl-9"
                 />
                 {clientSearch && (
-                  <button onClick={() => { setClientSearch(""); setForm(f => ({ ...f, client: "" })); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <button aria-label="Effacer la recherche client" onClick={() => { setClientSearch(""); setForm(f => ({ ...f, client: "" })); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     <X className="h-4 w-4" />
                   </button>
                 )}
@@ -286,7 +349,7 @@ export default function Factures() {
                       </button>
                     );
                   }) : (
-                    <p className="text-xs text-muted-foreground p-3 text-center">{fr ? "Aucun client trouvé" : "No client found"}</p>
+                    <p className="text-xs text-muted-foreground p-3 text-center">{t("factures.noClientFound")}</p>
                   )}
                 </div>
               )}
@@ -303,9 +366,9 @@ export default function Factures() {
 
             {/* Sélection du dossier */}
             <div className="space-y-2">
-              <Label>{fr ? "Dossier associé" : "Associated case"}</Label>
+              <Label>{t("factures.dossierLabel")}</Label>
               <Select value={form.dossier} onValueChange={v => setForm(f => ({ ...f, dossier: v }))}>
-                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un dossier..." : "Select a case..."} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("factures.selectDossier")} /></SelectTrigger>
                 <SelectContent>
                   {clientDossiers.map(d => <SelectItem key={d.id} value={d.code}>{d.code} — {d.objet}</SelectItem>)}
                 </SelectContent>
@@ -315,37 +378,37 @@ export default function Factures() {
             {/* Montant et date d'échéance */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{fr ? "Montant (GNF)" : "Amount (GNF)"} *</Label>
+                <Label>{t("factures.montantLabel")} *</Label>
                 <Input type="number" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} placeholder="0" />
               </div>
               <div className="space-y-2">
-                <Label>{fr ? "Date d'échéance" : "Due date"}</Label>
+                <Label>{t("factures.echeanceLabel")}</Label>
                 <Input type="date" value={form.echeance} onChange={e => setForm(f => ({ ...f, echeance: e.target.value }))} />
               </div>
             </div>
 
             {/* Statut */}
             <div className="space-y-2">
-              <Label>{fr ? "Statut" : "Status"}</Label>
+              <Label>{t("factures.statutLabel")}</Label>
               <Select value={form.statut} onValueChange={v => setForm(f => ({ ...f, statut: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Brouillon">{fr ? "Brouillon" : "Draft"}</SelectItem>
-                  <SelectItem value="Émise">{fr ? "Émise" : "Issued"}</SelectItem>
+                  <SelectItem value="Brouillon">{t("factures.statutDraft")}</SelectItem>
+                  <SelectItem value="Émise">{t("factures.statutIssued")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <Label>{fr ? "Description / Détails" : "Description / Details"}</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={fr ? "Détails de la prestation facturée..." : "Billing details..."} rows={3} />
+              <Label>{t("factures.descLabel")}</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t("factures.descPlaceholder")} rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.client || !form.montant}>
-              {fr ? "Générer la facture" : "Generate invoice"}
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("factures.btnCancel")}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.client?.trim() || !form.montant || Number(form.montant) <= 0}>
+              {isSubmitting ? "Création..." : t("factures.btnGenerate")}
             </Button>
           </DialogFooter>
         </DialogContent>

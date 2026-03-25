@@ -108,8 +108,6 @@ const FUSEAUX = ["Africa/Conakry", "Africa/Dakar", "Africa/Abidjan", "Europe/Par
 const LANGUES = [{ v: "fr", l: "Français" }, { v: "en", l: "English" }];
 
 // ── Logo picker helper ─────────────────────────────────────────────────────────
-// value  = URL HTTP/HTTPS envoyée à l'API (seule valeur acceptée par le backend)
-// preview = base64 local uniquement pour affichage avant upload réel
 function LogoPicker({
   value,
   onChange,
@@ -122,7 +120,6 @@ function LogoPicker({
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string>("");
 
-  // Sélection d'un fichier → preview locale uniquement, NE change PAS value
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -131,13 +128,11 @@ function LogoPicker({
     reader.readAsDataURL(file);
   };
 
-  // L'image affichée : URL saisie en priorité, sinon preview locale
   const displaySrc = value || preview;
 
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center gap-3">
-        {/* Preview */}
         <div className="h-16 w-16 rounded-xl border-2 border-dashed border-border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
           {displaySrc ? (
             <img src={displaySrc} alt="Logo" className="h-full w-full object-cover rounded-xl" />
@@ -496,8 +491,8 @@ export default function AdminTenantsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">
-            {fr ? "🏢 Gestion des Cabinets (Tenants)" : "🏢 Office Management (Tenants)"}
+          <h1 className="text-3xl font-bold text-foreground">
+            {fr ? "Gestion des Cabinets" : "Office Management"}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {fr ? "Ajouter, modifier, activer/désactiver des cabinets et leurs modules" : "Add, edit, enable/disable offices and their modules"}
@@ -517,7 +512,7 @@ export default function AdminTenantsPage() {
           { label: fr ? "Utilisateurs totaux" : "Total users", value: String(tenants.reduce((a, t) => a + t.users, 0)), icon: Users, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
           { label: fr ? "Modules activés" : "Active modules", value: String(tenants.reduce((a, t) => a + t.modules.length, 0)), icon: Package, bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
         ].map(kpi => (
-          <div key={kpi.label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4", kpi.bg)}>
+          <div key={kpi.label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-default", kpi.bg)}>
             <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white", kpi.iconBg)}>
               <kpi.icon className="h-6 w-6" />
             </div>
@@ -530,7 +525,7 @@ export default function AdminTenantsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="bg-card/50 rounded-xl p-4 border border-border flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder={fr ? "Rechercher un cabinet..." : "Search office..."} value={search}

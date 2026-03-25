@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════
-// Barre supérieure (TopBar) — Affiche le fil d'Ariane, le statut
-// en ligne, le sélecteur de langue, le thème, les manuels,
-// les notifications et le menu utilisateur
-// ═══════════════════════════════════════════════════════════════
-
 import { Bell, Wifi, WifiOff, Sun, Moon, User, Settings, LogOut, HelpCircle, Shield, Globe, BookDown } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,7 +22,6 @@ export function TopBar() {
   const { lang, setLang, t } = useLanguage();
   const { user, logout } = useAuth();
 
-  // Correspondance chemin → nom de page traduit
   const pathNames: Record<string, string> = {
     "/dashboard": t("nav.dashboard"),
     "/clients": t("nav.clients"),
@@ -56,10 +49,9 @@ export function TopBar() {
 
   const pageName = pathNames[location.pathname] || "Notario";
 
-  /** Simuler le téléchargement d'un manuel utilisateur */
   const handleDownloadManual = (language: string) => {
     toast.info(`📖 ${t("action.download")}...`);
-    setTimeout(() => toast.success(`${language === "FR" ? "Manuel" : "Manual"} (${language}) ✓`), 1500);
+    setTimeout(() => toast.success(`${t("topbar.manualLabel")} (${language}) ✓`), 1500);
   };
 
   return (
@@ -92,21 +84,17 @@ export function TopBar() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36">
-          <DropdownMenuItem onClick={() => { setLang("FR"); toast.info("Langue : Français"); }}>
+          <DropdownMenuItem onClick={() => { setLang("FR"); toast.info(t("topbar.langSwitchFR")); }}>
             <span className="mr-2">🇫🇷</span> Français
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { setLang("EN"); toast.info("Language: English"); }}>
+          <DropdownMenuItem onClick={() => { setLang("EN"); toast.info(t("topbar.langSwitchEN")); }}>
             <span className="mr-2">🇬🇧</span> English
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Bascule de thème clair/sombre */}
-      <button
-        onClick={toggleTheme}
-        className="rounded-lg p-2 hover:bg-muted transition-colors"
-        aria-label={t("topbar.theme")}
-      >
+      {/* Thème */}
+      <button onClick={toggleTheme} className="rounded-lg p-2 hover:bg-muted transition-colors" aria-label={t("topbar.theme")}>
         {theme === "dark" ? (
           <Sun className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
         ) : (
@@ -114,7 +102,7 @@ export function TopBar() {
         )}
       </button>
 
-      {/* Téléchargement des manuels utilisateur */}
+      {/* Manuels */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="rounded-lg p-2 hover:bg-muted transition-colors" aria-label={t("topbar.manuals")}>
@@ -133,7 +121,7 @@ export function TopBar() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Bouton de notifications avec badge */}
+      {/* Notifications */}
       <button className="relative rounded-lg p-2 hover:bg-muted transition-colors" aria-label="Notifications" onClick={() => navigate("/notifications")}>
         <Bell className="h-5 w-5 text-muted-foreground" />
         <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
@@ -141,7 +129,7 @@ export function TopBar() {
         </span>
       </button>
 
-      {/* Menu déroulant du profil utilisateur */}
+      {/* Profil utilisateur */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 font-heading text-xs font-bold text-primary cursor-pointer hover:bg-primary/30 transition-colors shrink-0 outline-none">
@@ -169,7 +157,13 @@ export function TopBar() {
             <HelpCircle className="mr-2 h-4 w-4" /> {t("topbar.help")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive" onClick={() => { logout(); navigate("/login"); }}>
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => {
+              logout(); // supprime la session côté backend et context
+              navigate("/login");
+            }}
+          >
             <LogOut className="mr-2 h-4 w-4" /> {t("topbar.logout")}
           </DropdownMenuItem>
         </DropdownMenuContent>

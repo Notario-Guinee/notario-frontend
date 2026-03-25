@@ -1,4 +1,9 @@
-// Mock data with realistic Guinean names and notarial context
+// ═══════════════════════════════════════════════════════════════
+// Données fictives (mock) — Simule le backend de l'application
+// Contient : utilisateur courant, clients, dossiers, tâches,
+// factures, paiements, agenda, activités et données financières
+// Noms basés sur le contexte notarial guinéen (Conakry)
+// ═══════════════════════════════════════════════════════════════
 
 export const currentUser = {
   id: "1",
@@ -42,18 +47,32 @@ export interface Dossier {
   nbPieces: number;
   date: string;
   notaire: string;
+  clerc?: string;
   parties?: PartiePrenanteEntry[];
 }
+
+/** Liste des notaires du cabinet */
+export const mockNotaires = [
+  "Maître Mamadou Diallo",
+  "Maître Aissata Keita",
+];
+
+/** Liste des clercs du cabinet */
+export const mockClercs = [
+  "Aïssatou Conté",
+  "Boubacar Diallo",
+  "Fatoumata Bah",
+];
 
 export const rolesParties = ["Acheteur", "Vendeur", "Bénéficiaire", "Mandant", "Mandataire", "Preneur", "Bailleur", "Donateur", "Donataire", "Héritier", "Autre"] as const;
 
 export const mockDossiers: Dossier[] = [
-  { id: "1", code: "N-2025-101", typeActe: "Vente immobilière", objet: "Vente – Villa", clients: ["Bah Oumar", "Fam. Diallo"], clientDate: "15/03/2024", montant: 3200000, statut: "En cours", priorite: "Normale", avancement: 65, nbActes: 2, nbPieces: 8, date: "2024-03-15", notaire: "Maître Notario", parties: [{ clientCode: "C-1201", nom: "Bah Oumar", role: "Acheteur" }, { clientCode: "C-1203", nom: "Fam. Diallo", role: "Vendeur" }] },
-  { id: "2", code: "N-2025-102", typeActe: "Succession", objet: "Succession", clients: ["Sylla F."], clientDate: "22/01/2024", montant: 1500000, statut: "En attente pièces", priorite: "Haute", avancement: 35, nbActes: 1, nbPieces: 3, date: "2024-01-22", notaire: "Maître Notario", parties: [{ clientCode: "C-1208", nom: "Sylla Mohamed", role: "Héritier" }] },
-  { id: "3", code: "N-2025-103", typeActe: "Constitution société", objet: "Constitution", clients: ["SARL Nimba"], clientDate: "08/04/2024", montant: 200000, statut: "En signature", priorite: "Normale", avancement: 90, nbActes: 3, nbPieces: 12, date: "2024-04-08", notaire: "Maître Notario", parties: [{ clientCode: "C-1202", nom: "SARL Nimba", role: "Bénéficiaire" }] },
-  { id: "4", code: "N-2025-104", typeActe: "Vente immobilière", objet: "Vente immobilière", clients: ["Fam. Diallo"], clientDate: "12/08/2024", montant: 4500000, statut: "En cours", priorite: "Urgente", avancement: 45, nbActes: 1, nbPieces: 6, date: "2024-08-12", notaire: "Maître Notario", parties: [{ clientCode: "C-1203", nom: "Fam. Diallo", role: "Vendeur" }] },
-  { id: "5", code: "N-2025-105", typeActe: "Donation", objet: "Donation", clients: ["Camara A."], clientDate: "03/06/2024", montant: 800000, statut: "En signature", priorite: "Normale", avancement: 80, nbActes: 2, nbPieces: 5, date: "2024-06-03", notaire: "Maître Notario", parties: [{ clientCode: "C-1204", nom: "Camara Aïssatou", role: "Donateur" }] },
-  { id: "6", code: "N-2025-106", typeActe: "Constitution société", objet: "Statuts SARL", clients: ["Société KankanCorp"], clientDate: "20/07/2024", montant: 200000, statut: "En attente pièces", priorite: "Basse", avancement: 25, nbActes: 0, nbPieces: 2, date: "2024-07-20", notaire: "Maître Notario", parties: [{ clientCode: "C-1205", nom: "Société KankanCorp", role: "Bénéficiaire" }] },
+  { id: "1", code: "N-2025-101", typeActe: "Vente immobilière", objet: "Vente – Villa", clients: ["Bah Oumar", "Fam. Diallo"], clientDate: "15/03/2024", montant: 3200000, statut: "En cours", priorite: "Normale", avancement: 65, nbActes: 2, nbPieces: 8, date: "2024-03-15", notaire: "Maître Mamadou Diallo", clerc: "Aïssatou Conté", parties: [{ clientCode: "C-1201", nom: "Bah Oumar", role: "Acheteur" }, { clientCode: "C-1203", nom: "Fam. Diallo", role: "Vendeur" }] },
+  { id: "2", code: "N-2025-102", typeActe: "Succession", objet: "Succession", clients: ["Sylla F."], clientDate: "22/01/2024", montant: 1500000, statut: "En attente pièces", priorite: "Haute", avancement: 35, nbActes: 1, nbPieces: 3, date: "2024-01-22", notaire: "Maître Mamadou Diallo", clerc: "Boubacar Diallo", parties: [{ clientCode: "C-1208", nom: "Sylla Mohamed", role: "Héritier" }] },
+  { id: "3", code: "N-2025-103", typeActe: "Constitution société", objet: "Constitution", clients: ["SARL Nimba"], clientDate: "08/04/2024", montant: 200000, statut: "En signature", priorite: "Normale", avancement: 90, nbActes: 3, nbPieces: 12, date: "2024-04-08", notaire: "Maître Aissata Keita", clerc: "Aïssatou Conté", parties: [{ clientCode: "C-1202", nom: "SARL Nimba", role: "Bénéficiaire" }] },
+  { id: "4", code: "N-2025-104", typeActe: "Vente immobilière", objet: "Vente immobilière", clients: ["Fam. Diallo"], clientDate: "12/08/2024", montant: 4500000, statut: "En cours", priorite: "Urgente", avancement: 45, nbActes: 1, nbPieces: 6, date: "2024-08-12", notaire: "Maître Mamadou Diallo", clerc: "Fatoumata Bah", parties: [{ clientCode: "C-1203", nom: "Fam. Diallo", role: "Vendeur" }] },
+  { id: "5", code: "N-2025-105", typeActe: "Donation", objet: "Donation", clients: ["Camara A."], clientDate: "03/06/2024", montant: 800000, statut: "En signature", priorite: "Normale", avancement: 80, nbActes: 2, nbPieces: 5, date: "2024-06-03", notaire: "Maître Aissata Keita", clerc: "Boubacar Diallo", parties: [{ clientCode: "C-1204", nom: "Camara Aïssatou", role: "Donateur" }] },
+  { id: "6", code: "N-2025-106", typeActe: "Constitution société", objet: "Statuts SARL", clients: ["Société KankanCorp"], clientDate: "20/07/2024", montant: 200000, statut: "En attente pièces", priorite: "Basse", avancement: 25, nbActes: 0, nbPieces: 2, date: "2024-07-20", notaire: "Maître Aissata Keita", clerc: "Fatoumata Bah", parties: [{ clientCode: "C-1205", nom: "Société KankanCorp", role: "Bénéficiaire" }] },
 ];
 
 export interface KanbanTask {
@@ -124,6 +143,4 @@ export const mockAgendaToday = [
   { id: "4", heure: "16:00", titre: "Réunion équipe", lieu: "Salle de conférence", duree: "1h" },
 ];
 
-export const formatGNF = (amount: number): string => {
-  return new Intl.NumberFormat('fr-GN', { style: 'decimal' }).format(amount) + ' GNF';
-};
+export { formatGNF } from '@/lib/formatters';

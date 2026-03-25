@@ -10,15 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Eye, EyeOff, UserPlus, CheckCircle, Shield, FileText, MessageSquare } from "lucide-react";
+import { Eye, EyeOff, UserPlus, CheckCircle, Shield, FileText, MessageSquare, Sun, Moon } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function InscriptionClient() {
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const [searchParams] = useSearchParams();
-  const cabinetName = searchParams.get("cabinet") || "Cabinet Maître Sylla";
+  const cabinetName = searchParams.get("cabinet") || "Notario";
   const fr = lang === "FR";
 
   const [form, setForm] = useState({
@@ -84,7 +86,16 @@ export default function InscriptionClient() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1B6B93]/10 via-background to-[#1B6B93]/5 p-4">
-      <div className="absolute top-4 right-4"><LanguageSwitcher /></div>
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <LanguageSwitcher />
+        <button
+          onClick={toggleTheme}
+          className="rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          aria-label="Changer de thème"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+      </div>
 
       <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-card border border-border rounded-2xl shadow-xl max-w-4xl w-full overflow-hidden grid grid-cols-1 md:grid-cols-5">
         {/* Left panel */}

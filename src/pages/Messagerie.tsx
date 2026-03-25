@@ -4,13 +4,16 @@
 // ajout d'employés, messages avec priorités et dossiers liés
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
-import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, Smile, Users, UserPlus, X } from "lucide-react";
+import { useState, useRef } from "react";
+import { sanitizeInput } from "@/lib/sanitize";
+import { Phone, Video, Paperclip, Send, Search, Plus, MessageCircle, MessageSquare, Smile, Users, UserPlus, X, Trash2, MoreVertical } from "lucide-react";
 import { currentUser } from "@/data/mockData";
 import { motion } from "framer-motion";
 import { searchMatch, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +88,9 @@ const messagesData: Record<string, ChatMessage[]> = {
   ],
 };
 
+// Emojis fréquents pour le picker
+const EMOJI_LIST = ["😀","😂","😊","😍","🥰","😎","🤔","😅","👍","👎","❤️","🎉","🙏","👋","✅","⚠️","🔥","💡","📎","📄","📅","🗂️","⚖️","🏛️","✍️","📝","💬","📞","📧","🕐"];
+
 // Styles pour les priorités des messages
 const priorityStyles: Record<string, string> = {
   urgente: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -102,14 +108,46 @@ const cabinetEmployees = [
 ];
 
 export default function Messagerie() {
-  const { lang } = useLanguage();
-  const fr = lang === "FR";
+  const { t } = useLanguage();
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConv, setSelectedConv] = useState(conversations[0]);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(messagesData);
   const [searchQuery, setSearchQuery] = useState("");
   const [newConvOpen, setNewConvOpen] = useState(false);
+
+  // ═══ Emoji picker + pièce jointe ═══
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<string[]>([]);
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const names = files.map(f => f.name);
+    setAttachments(prev => [...prev, ...names]);
+    toast.success(files.length === 1 ? `Fichier joint : ${files[0].name}` : `${files.length} fichiers joints`);
+    e.target.value = "";
+  };
+
+  // ═══ Suppression de conversation ═══
+  const [deleteConvId, setDeleteConvId] = useState<string | null>(null);
+
+  const handleDeleteConversation = (id: string) => {
+    const conv = conversations.find(c => c.id === id);
+    setConversations(prev => prev.filter(c => c.id !== id));
+    // Si la conversation supprimée était sélectionnée, basculer sur la première restante
+    if (selectedConv.id === id) {
+      const remaining = conversations.filter(c => c.id !== id);
+      if (remaining.length > 0) setSelectedConv(remaining[0]);
+    }
+    toast.success(`Conversation « ${conv?.nom} » supprimée.`);
+  };
 
   // ═══ Création de groupe ═══
   const [showGroupModal, setShowGroupModal] = useState(false);
@@ -118,12 +156,13 @@ export default function Messagerie() {
 
   // Envoyer un message dans la conversation sélectionnée
   const envoyer = () => {
-    if (!message.trim()) return;
+    if (!message.trim() && attachments.length === 0) return;
+    const text = [sanitizeInput(message), ...attachments.map(a => `📎 ${sanitizeInput(a)}`)].filter(Boolean).join("\n");
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
       from: currentUser.firstName,
-      text: message,
-      time: "À l'instant",
+      text,
+      time: t("msg.justNow"),
       mine: true,
     };
     setMessages((prev) => ({
@@ -131,6 +170,8 @@ export default function Messagerie() {
       [selectedConv.id]: [...(prev[selectedConv.id] || []), newMsg],
     }));
     setMessage("");
+    setAttachments([]);
+    setShowEmojiPicker(false);
   };
 
   // Créer un nouveau groupe
@@ -141,8 +182,8 @@ export default function Messagerie() {
       nom: groupName,
       avatar: "👥",
       presence: "online",
-      lastMsg: fr ? `Groupe créé avec ${selectedMembers.length} membres` : `Group created with ${selectedMembers.length} members`,
-      time: "À l'instant",
+      lastMsg: `${t("msg.groupCreatedSuccess")} — ${selectedMembers.length} ${t("msg.members")}`,
+      time: t("msg.justNow"),
       unread: 0,
       dossier: null,
       isGroup: true,
@@ -154,10 +195,8 @@ export default function Messagerie() {
       [newGroup.id]: [{
         id: "1",
         from: "Système",
-        text: fr
-          ? `Groupe « ${groupName} » créé par ${currentUser.name}. Membres : ${selectedMembers.join(", ")}`
-          : `Group "${groupName}" created by ${currentUser.name}. Members: ${selectedMembers.join(", ")}`,
-        time: "À l'instant",
+        text: `« ${groupName} » ${t("msg.groupCreatedSuccess")} — ${currentUser.name}. ${t("msg.membersLabel")}: ${selectedMembers.join(", ")}`,
+        time: t("msg.justNow"),
         mine: false,
       }],
     }));
@@ -165,7 +204,7 @@ export default function Messagerie() {
     setShowGroupModal(false);
     setGroupName("");
     setSelectedMembers([]);
-    toast.success(fr ? `Groupe « ${groupName} » créé avec succès` : `Group "${groupName}" created successfully`);
+    toast.success(`« ${groupName} » ${t("msg.groupCreatedSuccess")}`);
   };
 
   // Basculer la sélection d'un membre
@@ -188,30 +227,30 @@ export default function Messagerie() {
         <div className="flex items-center gap-3">
           <MessageCircle className="h-6 w-6 text-primary" />
           <div>
-            <h1 className="text-xl font-heading font-bold text-foreground">{fr ? "Messagerie" : "Messaging"}</h1>
-            <p className="text-sm text-muted-foreground">{fr ? "Communication interne du cabinet" : "Internal office communication"}</p>
+            <h1 className="text-xl font-heading font-bold text-foreground">{t("msg.title")}</h1>
+            <p className="text-sm text-muted-foreground">{t("msg.subtitle")}</p>
           </div>
         </div>
         <div className="flex gap-2">
           {/* Bouton de création de groupe */}
           <Button variant="outline" className="gap-2" onClick={() => { setGroupName(""); setSelectedMembers([]); setShowGroupModal(true); }}>
             <Users className="h-4 w-4" />
-            {fr ? "Créer un groupe" : "Create group"}
+            {t("msg.createGroup")}
           </Button>
           {/* Bouton de nouvelle conversation */}
           <Dialog open={newConvOpen} onOpenChange={setNewConvOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                {fr ? "Nouvelle conversation" : "New conversation"}
+                {t("msg.newConversation")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{fr ? "Nouvelle conversation" : "New conversation"}</DialogTitle>
+                <DialogTitle>{t("msg.newConversation")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder={fr ? "Rechercher un collaborateur..." : "Search a colleague..."} />
+                <Input placeholder={t("msg.searchCollaborator")} />
                 <div className="space-y-2">
                   {cabinetEmployees.map((emp) => (
                     <button
@@ -225,7 +264,7 @@ export default function Messagerie() {
                           avatar: emp.avatar,
                           presence: "online",
                           lastMsg: "",
-                          time: "À l'instant",
+                          time: t("msg.justNow"),
                           unread: 0,
                           dossier: null,
                         };
@@ -252,57 +291,85 @@ export default function Messagerie() {
         {/* Panneau gauche — Liste des conversations */}
         <div className="w-80 border-r border-border bg-card flex flex-col shrink-0">
           <div className="p-4 border-b border-border">
-            <h3 className="font-heading text-sm font-semibold text-foreground mb-3">{fr ? "Conversations" : "Conversations"}</h3>
+            <h3 className="font-heading text-sm font-semibold text-foreground mb-3">{t("msg.conversations")}</h3>
             <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={fr ? "Rechercher dans les conversations..." : "Search conversations..."}
+                placeholder={t("msg.searchConversations")}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none" />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto scrollbar-thin">
+            {filteredConversations.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="text-sm font-medium text-foreground">Aucune conversation</p>
+                <p className="text-xs text-muted-foreground mt-1">Commencez une nouvelle conversation.</p>
+              </div>
+            )}
             {filteredConversations.map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => setSelectedConv(conv)}
-                className={`w-full flex items-start gap-3 p-4 border-b border-border text-left transition-colors ${
+                className={`group relative flex items-start gap-3 p-4 border-b border-border transition-colors ${
                   selectedConv.id === conv.id
                     ? "bg-primary/5 border-l-2 border-l-primary"
                     : "hover:bg-muted/30"
                 }`}
               >
-                <div className="relative shrink-0 mt-0.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg">
-                    {conv.isGroup ? "👥" : conv.avatar}
-                  </div>
-                  {!conv.isGroup && (
-                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${presenceColor[conv.presence]}`} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold text-foreground truncate">{conv.nom}</p>
-                      {conv.isGroup && <Users className="h-3 w-3 text-muted-foreground" />}
+                {/* Zone cliquable principale */}
+                <button
+                  className="flex flex-1 items-start gap-3 text-left min-w-0"
+                  onClick={() => setSelectedConv(conv)}
+                >
+                  <div className="relative shrink-0 mt-0.5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg">
+                      {conv.isGroup ? "👥" : conv.avatar}
                     </div>
-                    {conv.unread > 0 && (
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ml-2">
-                        {conv.unread}
-                      </span>
+                    {!conv.isGroup && (
+                      <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${presenceColor[conv.presence]}`} />
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mb-1">{conv.time}</p>
-                  <p className="text-xs text-muted-foreground truncate">{conv.lastMsg}</p>
-                  {conv.dossier && (
-                    <Badge variant="outline" className="mt-1.5 text-[10px] text-primary border-primary/30 bg-primary/5">
-                      {conv.dossier}
-                    </Badge>
-                  )}
-                  {conv.isGroup && conv.members && (
-                    <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {fr ? "membres" : "members"}</p>
-                  )}
-                </div>
-              </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-semibold text-foreground truncate">{conv.nom}</p>
+                        {conv.isGroup && <Users className="h-3 w-3 text-muted-foreground" />}
+                      </div>
+                      {conv.unread > 0 && (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ml-2">
+                          {conv.unread}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-1">{conv.time}</p>
+                    <p className="text-xs text-muted-foreground truncate">{conv.lastMsg}</p>
+                    {conv.dossier && (
+                      <Badge variant="outline" className="mt-1.5 text-[10px] text-primary border-primary/30 bg-primary/5">
+                        {conv.dossier}
+                      </Badge>
+                    )}
+                    {conv.isGroup && conv.members && (
+                      <p className="text-[10px] text-muted-foreground mt-1">{conv.members.length} {t("msg.members")}</p>
+                    )}
+                  </div>
+                </button>
+                {/* Menu contextuel — visible au survol */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-muted mt-0.5">
+                      <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteConvId(conv.id); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Supprimer la conversation
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ))}
           </div>
         </div>
@@ -322,7 +389,7 @@ export default function Messagerie() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-foreground">{selectedConv.nom}</p>
-                {selectedConv.isGroup && <Badge variant="outline" className="text-[10px]">{selectedConv.members?.length} {fr ? "membres" : "members"}</Badge>}
+                {selectedConv.isGroup && <Badge variant="outline" className="text-[10px]">{selectedConv.members?.length} {t("msg.members")}</Badge>}
               </div>
               {selectedConv.dossier && (
                 <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/5">
@@ -332,10 +399,10 @@ export default function Messagerie() {
             </div>
             <div className="flex gap-1">
               <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <Phone className="h-3.5 w-3.5" /> {fr ? "Appel" : "Call"}
+                <Phone className="h-3.5 w-3.5" /> {t("msg.call")}
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                <Video className="h-3.5 w-3.5" /> {fr ? "Visio" : "Video"}
+                <Video className="h-3.5 w-3.5" /> {t("msg.video")}
               </Button>
             </div>
           </div>
@@ -370,19 +437,48 @@ export default function Messagerie() {
           </div>
 
           {/* Zone de saisie de message */}
-          <div className="border-t border-border bg-card p-4">
+          <div className="border-t border-border bg-card p-4 space-y-2">
+            {/* Pièces jointes en attente */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((name, i) => (
+                  <span key={i} className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+                    <Paperclip className="h-3 w-3 text-muted-foreground" />
+                    {name}
+                    <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))} className="ml-0.5 text-muted-foreground hover:text-destructive">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Emoji picker */}
+            {showEmojiPicker && (
+              <div className="rounded-xl border border-border bg-card shadow-lg p-3">
+                <div className="grid grid-cols-10 gap-1">
+                  {EMOJI_LIST.map(emoji => (
+                    <button key={emoji} onClick={() => handleEmojiSelect(emoji)}
+                      className="flex items-center justify-center h-8 w-8 rounded-md text-lg hover:bg-muted transition-colors">
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2">
-              <button className="rounded-lg p-2 hover:bg-muted transition-colors">
+              <button onClick={() => setShowEmojiPicker(v => !v)}
+                className={cn("rounded-lg p-2 hover:bg-muted transition-colors", showEmojiPicker && "bg-muted")}>
                 <Smile className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button className="rounded-lg p-2 hover:bg-muted transition-colors">
+              <button onClick={() => fileInputRef.current?.click()} className="rounded-lg p-2 hover:bg-muted transition-colors">
                 <Paperclip className="h-4 w-4 text-muted-foreground" />
               </button>
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
               <input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && envoyer()}
-                placeholder={fr ? "Écrire un message..." : "Type a message..."}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && envoyer()}
+                placeholder={t("msg.writeMessage")}
                 className="flex-1 rounded-lg bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none"
               />
               <Button onClick={envoyer} size="icon" className="shrink-0">
@@ -393,26 +489,47 @@ export default function Messagerie() {
         </div>
       </div>
 
+      {/* ═══ Confirmation de suppression de conversation ═══ */}
+      <AlertDialog open={!!deleteConvId} onOpenChange={(open) => !open && setDeleteConvId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette conversation ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement la conversation et tous ses messages. Elle ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { handleDeleteConversation(deleteConvId!); setDeleteConvId(null); }}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ═══ Modal de création de groupe ═══ */}
       <Dialog open={showGroupModal} onOpenChange={setShowGroupModal}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              {fr ? "Créer un groupe" : "Create a group"}
+              {t("msg.groupModalTitle")}
             </DialogTitle>
-            <DialogDescription>{fr ? "Créez un groupe de discussion et ajoutez des employés du cabinet" : "Create a chat group and add office employees"}</DialogDescription>
+            <DialogDescription>{t("msg.groupModalDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Nom du groupe */}
             <div className="space-y-2">
-              <Label>{fr ? "Nom du groupe" : "Group name"} *</Label>
-              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder={fr ? "Ex: Équipe Dossiers Urgents" : "e.g. Urgent Cases Team"} />
+              <Label>{t("msg.groupName")} *</Label>
+              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder={t("msg.groupNamePlaceholder")} />
             </div>
 
             {/* Sélection des membres */}
             <div className="space-y-2">
-              <Label>{fr ? "Membres" : "Members"} ({selectedMembers.length} {fr ? "sélectionnés" : "selected"})</Label>
+              <Label>{t("msg.membersLabel")} ({selectedMembers.length} {t("msg.selected")})</Label>
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {cabinetEmployees.map(emp => (
                   <label key={emp.id} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
@@ -443,9 +560,9 @@ export default function Messagerie() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGroupModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => setShowGroupModal(false)}>{t("msg.cancelGroup")}</Button>
             <Button className="bg-primary text-primary-foreground gap-2" onClick={handleCreateGroup} disabled={!groupName.trim() || selectedMembers.length === 0}>
-              <Users className="h-4 w-4" /> {fr ? "Créer le groupe" : "Create group"}
+              <Users className="h-4 w-4" /> {t("msg.createGroupBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>

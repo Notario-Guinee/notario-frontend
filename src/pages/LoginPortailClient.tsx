@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Connexion Portail Client — Authentification du client
+// Accès à l'espace client personnel pour consulter dossiers,
+// documents et messages avec le cabinet notarial
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, User, FileText, FolderOpen, MessageSquare, Bell } from "lucide-react";
@@ -14,8 +20,6 @@ export default function LoginPortailClient() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const cabinetName = "Cabinet Maître Sylla";
-  const subdomain = "sylla.notariale.com";
 
   const features = [
     { icon: FolderOpen, label: t("login.clientFeature1") },
@@ -44,8 +48,8 @@ export default function LoginPortailClient() {
                 <User className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-white font-medium text-[15px]">{cabinetName}</p>
-                <p className="text-white/50 text-[11px]">{t("login.clientPortal")} — {subdomain}</p>
+                <p className="text-white font-medium text-[15px]">Notario</p>
+                <p className="text-white/50 text-[11px]">{t("login.clientPortal")}</p>
               </div>
             </div>
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">{t("login.clientTitle")}</h2>
@@ -113,7 +117,7 @@ export default function LoginPortailClient() {
           <div className="mt-6 rounded-lg bg-muted/50 px-3.5 py-2.5 flex items-center gap-2.5">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="text-[11px] text-muted-foreground">
-              {t("login.clientPortalIndicator")} — <strong className="text-foreground">{cabinetName}</strong>
+              {t("login.clientPortalIndicator")}
             </span>
           </div>
         </div>

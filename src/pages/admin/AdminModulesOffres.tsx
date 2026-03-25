@@ -1,3 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// Page Admin Modules & Offres — Configuration des modules SaaS
+// Gestion des modules disponibles (activation, tarification) et
+// des offres/plans associés aux tenants de la plateforme
+// ═══════════════════════════════════════════════════════════════
+
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Package, Plus, Edit, Trash2, GripVertical, ArrowRight } from "lucide-react";

@@ -105,8 +105,7 @@ function generateCertificate(ressource: Ressource) {
 }
 
 export default function Formation() {
-  const { lang } = useLanguage();
-  const fr = lang === "FR";
+  const { t } = useLanguage();
   const [ressources, setRessources] = useState(initialRessources);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("Tous");
@@ -135,7 +134,7 @@ export default function Formation() {
   const handleSave = () => {
     if (editingRes) {
       setRessources(prev => prev.map(r => r.id === editingRes.id ? { ...r, titre: form.titre, type: form.type, duree: form.duree, description: form.description, icone: typeEmoji[form.type] || "📖" } : r));
-      toast.success(fr ? "Formation modifiée" : "Training updated");
+      toast.success(t("formation.updated"));
     } else {
       const newRes: Ressource = {
         id: String(Date.now()), titre: form.titre, type: form.type,
@@ -143,7 +142,7 @@ export default function Formation() {
         icone: typeEmoji[form.type] || "📖", progress: 0,
       };
       setRessources(prev => [...prev, newRes]);
-      toast.success(fr ? "Formation ajoutée" : "Training added");
+      toast.success(t("formation.added"));
     }
     setShowModal(false);
     resetForm();
@@ -152,7 +151,7 @@ export default function Formation() {
   // Supprimer une formation
   const handleDelete = (id: string) => {
     setRessources(prev => prev.filter(r => r.id !== id));
-    toast.success(fr ? "Formation supprimée" : "Training deleted");
+    toast.success(t("formation.deleted"));
   };
 
   // Progresser dans une formation (simule une avancée de 25%)
@@ -170,16 +169,14 @@ export default function Formation() {
         };
         // Notification au gérant
         toast.success(
-          fr
-            ? `🎓 ${currentUser.name} a terminé la formation « ${r.titre} » ! Un certificat est disponible.`
-            : `🎓 ${currentUser.name} completed training "${r.titre}"! A certificate is available.`,
+          `🎓 ${currentUser.name} ${t("formation.completed")} « ${r.titre} » ! ${t("formation.downloadCert")}.`,
           { duration: 6000 }
         );
         return completedR;
       }
       return { ...r, progress: newProgress };
     }));
-    toast.success(fr ? "Progression mise à jour" : "Progress updated");
+    toast.success(t("formation.progressUpdated"));
   };
 
   // Ouvrir le modal de certificat
@@ -199,15 +196,15 @@ export default function Formation() {
     <div className="space-y-6">
       {/* En-tête avec recherche et filtres */}
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className="font-heading text-xl font-bold text-foreground">{fr ? "Espace Formation" : "Training Center"}</h1>
+        <h1 className="font-heading text-xl font-bold text-foreground">{t("formation.title")}</h1>
         <div className="ml-auto flex items-center gap-3">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={fr ? "Rechercher..." : "Search..."} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
+            <Input placeholder={t("formation.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9 w-56" />
           </div>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             onClick={() => { resetForm(); setShowModal(true); }}>
-            <Plus className="mr-1 h-4 w-4" /> {fr ? "Ajouter" : "Add"}
+            <Plus className="mr-1 h-4 w-4" /> {t("formation.add")}
           </Button>
         </div>
       </div>
@@ -215,10 +212,10 @@ export default function Formation() {
       {/* Cartes KPI */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { icon: Trophy, value: completedCount, label: fr ? "Complétés" : "Completed", bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
-          { icon: Clock, value: inProgressCount, label: fr ? "En cours" : "In progress", bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
-          { icon: BookOpen, value: ressources.length, label: fr ? "Total formations" : "Total trainings", bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
-          { icon: Star, value: `${globalProgress}%`, label: fr ? "Progression globale" : "Overall progress", bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
+          { icon: Trophy, value: completedCount, label: t("formation.completed_count"), bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
+          { icon: Clock, value: inProgressCount, label: t("formation.inProgress"), bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
+          { icon: BookOpen, value: ressources.length, label: t("formation.totalTrainings"), bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
+          { icon: Star, value: `${globalProgress}%`, label: t("formation.overallProgress"), bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
         ].map((kpi, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className={`rounded-xl border border-border p-4 flex items-center gap-3 ${kpi.bg}`}>
@@ -236,13 +233,13 @@ export default function Formation() {
       {/* Barre de progression globale */}
       <div className="rounded-xl border border-border bg-card p-5 shadow-card">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-foreground">{fr ? "Progression globale" : "Overall progress"}</p>
+          <p className="text-sm font-medium text-foreground">{t("formation.overallProgress")}</p>
           <span className="text-sm font-bold text-primary">{globalProgress}%</span>
         </div>
         <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
           <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${globalProgress}%` }} />
         </div>
-        <p className="text-xs text-muted-foreground mt-2">{completedCount} {fr ? "sur" : "of"} {ressources.length} {fr ? "modules complétés" : "modules completed"}</p>
+        <p className="text-xs text-muted-foreground mt-2">{completedCount} {t("formation.of")} {ressources.length} {t("formation.modulesCompletedOf")}</p>
       </div>
 
       {/* Filtres par catégorie */}
@@ -250,7 +247,7 @@ export default function Formation() {
         {categories.map(c => (
           <button key={c} onClick={() => setFilterType(c)}
             className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${filterType === c ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}>
-            {c === "Tous" ? (fr ? "Tous" : "All") : c}
+            {c === "Tous" ? t("formation.all") : c}
           </button>
         ))}
       </div>
@@ -267,8 +264,8 @@ export default function Formation() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><MoreHorizontal className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEdit(r)}><Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(r.id)}><Trash2 className="mr-2 h-4 w-4" /> {fr ? "Supprimer" : "Delete"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openEdit(r)}><Edit className="mr-2 h-4 w-4" /> {t("formation.edit")}</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(r.id)}><Trash2 className="mr-2 h-4 w-4" /> {t("formation.delete")}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -293,7 +290,7 @@ export default function Formation() {
               {r.progress > 0 && (
                 <div>
                   <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                    <span>{fr ? "Progression" : "Progress"}</span><span>{r.progress}%</span>
+                    <span>{t("formation.progress")}</span><span>{r.progress}%</span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                     <div className={`h-full rounded-full ${r.progress === 100 ? "bg-success" : "bg-primary"}`} style={{ width: `${r.progress}%` }} />
@@ -304,18 +301,18 @@ export default function Formation() {
               {/* Boutons d'action selon l'état */}
               {r.progress === 0 && (
                 <button onClick={() => startFormation(r.id)} className="mt-2 w-full rounded-lg border border-border py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors">
-                  {fr ? "Commencer" : "Start"}
+                  {t("formation.start")}
                 </button>
               )}
               {r.progress > 0 && r.progress < 100 && (
                 <button onClick={() => startFormation(r.id)} className="mt-2 w-full rounded-lg border border-primary/30 bg-primary/5 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors">
-                  {fr ? "Continuer" : "Continue"}
+                  {t("formation.continue")}
                 </button>
               )}
               {r.progress === 100 && (
                 <div className="mt-2 space-y-2">
                   <div className="flex items-center gap-1 text-xs font-medium text-success">
-                    <Award className="h-3 w-3" /> {fr ? "Complété" : "Completed"}
+                    <Award className="h-3 w-3" /> {t("formation.completed")}
                     {r.completedDate && <span className="text-muted-foreground ml-1">— {r.completedDate}</span>}
                   </div>
                   {/* Bouton de téléchargement du certificat */}
@@ -323,7 +320,7 @@ export default function Formation() {
                     onClick={() => openCertificate(r)}
                     className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
                   >
-                    <Download className="h-3 w-3" /> {fr ? "Télécharger le certificat" : "Download certificate"}
+                    <Download className="h-3 w-3" /> {t("formation.downloadCert")}
                   </button>
                 </div>
               )}
@@ -337,30 +334,30 @@ export default function Formation() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
-              🏆 {fr ? "Certificat de formation" : "Training Certificate"}
+              🏆 {t("formation.certTitle")}
             </DialogTitle>
-            <DialogDescription>{fr ? "Téléchargez votre certificat de réussite" : "Download your completion certificate"}</DialogDescription>
+            <DialogDescription>{t("formation.certDesc")}</DialogDescription>
           </DialogHeader>
           {certRes && (
             <div className="space-y-4 py-2">
               {/* Aperçu du certificat */}
               <div className="rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-card p-6 text-center space-y-3">
-                <p className="text-[10px] uppercase tracking-[3px] text-amber-600">{fr ? "Étude Notariale Diallo & Associés" : "Diallo & Associates Notarial Office"}</p>
+                <p className="text-[10px] uppercase tracking-[3px] text-amber-600">{t("formation.notarialOffice")}</p>
                 <p className="text-2xl">🏆</p>
-                <h3 className="font-heading text-lg font-bold text-foreground">{fr ? "Certificat de Formation" : "Training Certificate"}</h3>
-                <p className="text-sm text-muted-foreground">{fr ? "Décerné à" : "Awarded to"}</p>
+                <h3 className="font-heading text-lg font-bold text-foreground">{t("formation.trainingCertTitle")}</h3>
+                <p className="text-sm text-muted-foreground">{t("formation.awardedTo")}</p>
                 <p className="text-lg font-semibold text-foreground italic">{certRes.completedBy || currentUser.name}</p>
-                <p className="text-sm text-muted-foreground">{fr ? "Pour avoir complété" : "For completing"}</p>
+                <p className="text-sm text-muted-foreground">{t("formation.forCompleting")}</p>
                 <p className="text-base font-bold text-primary bg-primary/5 rounded-lg py-2 px-4 inline-block">« {certRes.titre} »</p>
                 <p className="text-xs text-muted-foreground">{certRes.type} · {certRes.duree}</p>
-                <p className="text-xs text-muted-foreground">{fr ? "Date d'obtention" : "Date"}: {certRes.completedDate || new Date().toLocaleDateString("fr-FR")}</p>
+                <p className="text-xs text-muted-foreground">{t("formation.dateObtained")}: {certRes.completedDate || new Date().toLocaleDateString("fr-FR")}</p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCertModal(false)}>{fr ? "Fermer" : "Close"}</Button>
-            <Button className="bg-primary text-primary-foreground gap-2" onClick={() => { if (certRes) generateCertificate(certRes); toast.success(fr ? "Certificat téléchargé !" : "Certificate downloaded!"); }}>
-              <Download className="h-4 w-4" /> {fr ? "Télécharger" : "Download"}
+            <Button variant="outline" onClick={() => setShowCertModal(false)}>{t("formation.close")}</Button>
+            <Button className="bg-primary text-primary-foreground gap-2" onClick={() => { if (certRes) generateCertificate(certRes); toast.success(t("formation.certDownloaded")); }}>
+              <Download className="h-4 w-4" /> {t("formation.download")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -370,36 +367,36 @@ export default function Formation() {
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="font-heading">{editingRes ? (fr ? "Modifier la formation" : "Edit training") : (fr ? "Ajouter une formation" : "Add training")}</DialogTitle>
-            <DialogDescription>{editingRes ? (fr ? "Modifiez les informations de la formation" : "Edit training details") : (fr ? "Ajoutez une nouvelle ressource de formation" : "Add a new training resource")}</DialogDescription>
+            <DialogTitle className="font-heading">{editingRes ? t("formation.editModule") : t("formation.addModule")}</DialogTitle>
+            <DialogDescription>{editingRes ? t("formation.editModuleInfo") : t("formation.addModuleInfo")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{fr ? "Titre" : "Title"} *</Label>
-              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder={fr ? "Ex: Introduction à la rédaction d'actes" : "e.g. Introduction to deed writing"} />
+              <Label>{t("formation.titleLabel")} *</Label>
+              <Input value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} placeholder={t("formation.titlePlaceholder")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Type</Label>
+                <Label>{t("formation.moduleType")}</Label>
                 <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{typesFormation.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{fr ? "Durée / Format" : "Duration / Format"}</Label>
-                <Input value={form.duree} onChange={e => setForm(f => ({ ...f, duree: e.target.value }))} placeholder={fr ? "Ex: 15 min, PDF · 10 pages" : "e.g. 15 min, PDF · 10 pages"} />
+                <Label>{t("formation.moduleDuration")}</Label>
+                <Input value={form.duree} onChange={e => setForm(f => ({ ...f, duree: e.target.value }))} placeholder={t("formation.durationPlaceholder")} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={fr ? "Description de la formation..." : "Training description..."} rows={3} />
+              <Label>{t("formation.descriptionLabel")}</Label>
+              <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t("formation.descriptionPlaceholder")} rows={3} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="outline" onClick={() => { setShowModal(false); resetForm(); }}>{t("formation.cancel")}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleSave} disabled={!form.titre}>
-              {editingRes ? (fr ? "Enregistrer" : "Save") : (fr ? "Ajouter la formation" : "Add training")}
+              {editingRes ? t("formation.save") : t("formation.addTraining")}
             </Button>
           </DialogFooter>
         </DialogContent>
