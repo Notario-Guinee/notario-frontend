@@ -5,12 +5,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useRef, useEffect } from "react";
-import { Building2, Upload, User, Shield, Mail, Phone, Camera, ImagePlus, Loader2 } from "lucide-react";
+import { Building2, Upload, User, Shield, Mail, Phone, Camera, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
@@ -18,7 +19,7 @@ import { cabinetService, authService, type CabinetConfig } from "@/services/cabi
 
 export default function MonCabinet() {
   const { t } = useLanguage();
-  const { user, login } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"cabinet" | "profil" | "securite">("cabinet");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +27,8 @@ export default function MonCabinet() {
   // État chargement initial
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [cabinetVersion, setCabinetVersion] = useState<number>(0);
+  const [deletingCabinet, setDeletingCabinet] = useState(false);
+  const [deletingInProgress, setDeletingInProgress] = useState(false);
 
   // États des formulaires
   const [cabinetForm, setCabinetForm] = useState({
@@ -120,23 +123,41 @@ export default function MonCabinet() {
     reader.readAsDataURL(file);
   };
 
-  // ── Sauvegarde des infos cabinet ────────────────────────────────────────────
+  // ── Sauvegarde des infos cabinet (PUT complet avec verrou optimiste) ────────
   const handleSaveCabinet = async () => {
     setSavingCabinet(true);
     try {
-      await cabinetService.updateContact({
+      const updated = await cabinetService.updateConfig({
+        version: cabinetVersion,
         adresse: cabinetForm.adresse,
         ville: cabinetForm.ville,
         telephone: cabinetForm.telephone,
         email: cabinetForm.email,
+        devise: cabinetForm.devise,
+        configurationFactureJson: cabinetForm.formatFacture,
       });
-      await cabinetService.updateDevise(cabinetForm.devise);
+      setCabinetVersion(updated.version);
       toast.success(t("cabinet.toastSettingsSaved"));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur lors de la sauvegarde";
       toast.error(message);
     } finally {
       setSavingCabinet(false);
+    }
+  };
+
+  // ── Suppression du cabinet ───────────────────────────────────────────────────
+  const handleDeleteCabinet = async () => {
+    setDeletingInProgress(true);
+    try {
+      await cabinetService.deleteConfig();
+      toast.success("Cabinet supprimé avec succès");
+      setDeletingCabinet(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la suppression";
+      toast.error(message);
+    } finally {
+      setDeletingInProgress(false);
     }
   };
 
@@ -286,24 +307,67 @@ export default function MonCabinet() {
               {t("cabinet.saveSettings")}
             </Button>
           </div>
-          <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-            <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("cabinet.storage")}</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative h-20 w-20">
-                <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-                  <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3"/>
-                  <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray="77.5, 100" strokeLinecap="round"/>
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center font-heading text-sm font-bold text-foreground">78%</span>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+              <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("cabinet.storage")}</h2>
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20">
+                  <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
+                    <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3"/>
+                    <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray="77.5, 100" strokeLinecap="round"/>
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center font-heading text-sm font-bold text-foreground">78%</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">15.5 Go</p>
+                  <p className="text-xs text-muted-foreground">{t("cabinet.storageUsed")}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-lg font-bold text-foreground">15.5 Go</p>
-                <p className="text-xs text-muted-foreground">{t("cabinet.storageUsed")}</p>
-              </div>
+            </div>
+
+            {/* Zone danger */}
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 shadow-card">
+              <h2 className="font-heading text-sm font-semibold text-destructive mb-1">Zone de danger</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                La suppression du cabinet est irréversible. Toutes les données seront désactivées.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground gap-2"
+                onClick={() => setDeletingCabinet(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer le cabinet
+              </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Confirmation suppression cabinet */}
+      <AlertDialog open={deletingCabinet} onOpenChange={setDeletingCabinet}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le cabinet ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action va désactiver <strong>{cabinetForm.nom}</strong> et toutes ses données.
+              Cette opération est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingInProgress}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCabinet}
+              disabled={deletingInProgress}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingInProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Profil Tab */}
       {activeTab === "profil" && (

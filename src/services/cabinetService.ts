@@ -28,6 +28,7 @@ export interface CabinetConfig {
   maxStockageGo: number | null;
   notificationsSmsActives: boolean;
   notificationsEmailActives: boolean;
+  actif: boolean;
   configurationComplete: boolean;
   pourcentageCompletion: number;
   version: number;
@@ -38,12 +39,28 @@ export interface CabinetConfig {
 }
 
 export interface CreateCabinetConfigDto {
+  tenantId: string;
+  sousDomaine: string;
   nomCabinet: string;
   devise: string;
   adresse?: string;
   ville?: string;
+  codePostal?: string;
+  pays?: string;
   telephone?: string;
   email?: string;
+  siteWeb?: string;
+  numeroInscription?: string;
+  dateInscription?: string;
+  chambreRattachement?: string;
+  configurationFactureJson?: string;
+  themeCouleur?: string;
+  langueDefaut?: string;
+  fuseauHoraire?: string;
+  maxUtilisateurs?: number;
+  maxStockageMo?: number;
+  notificationsSmsActives?: boolean;
+  notificationsEmailActives?: boolean;
 }
 
 export interface UpdateCabinetContactDto {
@@ -59,6 +76,30 @@ export interface UpdateCabinetDeviseDto {
 
 export interface UpdateCabinetLogoDto {
   logoUrl: string;
+}
+
+export interface UpdateCabinetConfigDto {
+  version: number;
+  nomCabinet?: string;
+  logoUrl?: string;
+  devise?: string;
+  adresse?: string;
+  ville?: string;
+  codePostal?: string;
+  pays?: string;
+  telephone?: string;
+  email?: string;
+  siteWeb?: string;
+  numeroInscription?: string;
+  chambreRattachement?: string;
+  configurationFactureJson?: string;
+  themeCouleur?: string;
+  langueDefaut?: string;
+  fuseauHoraire?: string;
+  maxUtilisateurs?: number;
+  maxStockageMo?: number;
+  notificationsSmsActives?: boolean;
+  notificationsEmailActives?: boolean;
 }
 
 export interface UpdateUserProfileDto {
@@ -91,6 +132,7 @@ export interface ChangePasswordDto {
 
 export interface CabinetResume {
   id: number;
+  tenantId: string;
   nomCabinet: string;
   logoUrl: string | null;
   devise: string;
@@ -99,6 +141,7 @@ export interface CabinetResume {
   configurationComplete: boolean;
   pourcentageCompletion: number;
   derniereMiseAJour: string | null;
+  actif: boolean;
 }
 
 export const cabinetService = {
@@ -106,21 +149,38 @@ export const cabinetService = {
   getAllConfigs: () =>
     apiClient.get<CabinetResume[]>("/api/cabinet/configs"),
 
-  // Récupère la configuration complète du cabinet
-  getConfig: () =>
-    apiClient.get<CabinetConfig>("/api/cabinet/config"),
+  // Récupère la configuration complète du cabinet (tenantId pour admin cross-tenant)
+  getConfig: (tenantId?: string) =>
+    apiClient.get<CabinetConfig>("/api/cabinet/config", tenantId ? { "X-Tenant-ID": tenantId } : undefined),
 
   // Met à jour les coordonnées du cabinet
-  updateContact: (dto: UpdateCabinetContactDto) =>
-    apiClient.put<CabinetConfig>("/api/cabinet/config/contact", dto),
+  updateContact: (dto: UpdateCabinetContactDto, tenantId?: string) =>
+    apiClient.put<CabinetConfig>("/api/cabinet/config/contact", dto, tenantId ? { "X-Tenant-ID": tenantId } : undefined),
 
   // Met à jour la devise
-  updateDevise: (devise: string) =>
-    apiClient.put<CabinetConfig>("/api/cabinet/config/devise", { devise }),
+  updateDevise: (devise: string, tenantId?: string) =>
+    apiClient.put<CabinetConfig>("/api/cabinet/config/devise", { devise }, tenantId ? { "X-Tenant-ID": tenantId } : undefined),
 
   // Met à jour le logo
-  updateLogo: (logoUrl: string) =>
-    apiClient.put<CabinetConfig>("/api/cabinet/config/logo", { logoUrl }),
+  updateLogo: (logoUrl: string, tenantId?: string) =>
+    apiClient.put<CabinetConfig>("/api/cabinet/config/logo", { logoUrl }, tenantId ? { "X-Tenant-ID": tenantId } : undefined),
+
+  // Crée la configuration initiale du cabinet
+  // L'admin passe le tenantId du nouveau cabinet via X-Tenant-ID pour que le backend crée pour ce tenant
+  createConfig: (dto: CreateCabinetConfigDto) =>
+    apiClient.post<CabinetConfig>("/api/cabinet/config", dto, { "X-Tenant-ID": dto.tenantId }),
+
+  // Met à jour la configuration complète du cabinet (PUT avec version pour le verrou optimiste)
+  updateConfig: (dto: UpdateCabinetConfigDto, tenantId?: string) =>
+    apiClient.put<CabinetConfig>("/api/cabinet/config", dto, tenantId ? { "X-Tenant-ID": tenantId } : undefined),
+
+  // Désactive le cabinet (actif → false)
+  toggleActif: (tenantId: string) =>
+    apiClient.delete<void>("/api/cabinet/config", { "X-Tenant-ID": tenantId }),
+
+  // Réactive le cabinet (actif → true) — nécessite PATCH /api/cabinet/config/reactiver côté backend
+  reactiverConfig: (tenantId: string) =>
+    apiClient.patch<void>("/api/cabinet/config/reactiver", undefined, { "X-Tenant-ID": tenantId }),
 };
 
 export const authService = {
