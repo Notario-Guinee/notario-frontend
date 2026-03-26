@@ -27,6 +27,7 @@ const LoginAdmin          = lazy(() => import("./pages/LoginAdmin"));
 const LoginPortailClient  = lazy(() => import("./pages/LoginPortailClient"));
 const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
+const ActivationCompte    = lazy(() => import("./pages/ActivationCompte"));
 
 // ─── Portail client (espace externe) ───
 // Chunk « portail » — utilisateurs non-collaborateurs
@@ -54,6 +55,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const Formation         = lazy(() => import("./pages/Formation"));
 const Administration    = lazy(() => import("./pages/Administration"));
 const Utilisateurs      = lazy(() => import("./pages/Utilisateurs"));
+const Conges            = lazy(() => import("./pages/Conges"));
 const MonCabinet        = lazy(() => import("./pages/MonCabinet"));
 const StockagePage      = lazy(() => import("./components/stockage/StockagePage"));
 
@@ -131,6 +133,7 @@ const App = () => (
               <Route path="/client/login"    element={<LoginPortailClient />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password"  element={<ResetPassword />} />
+              <Route path="/activation-compte" element={<ActivationCompte />} />
 
               {/* ═══ Portail client (hors layout dashboard) ═══ */}
               <Route path="/espace-client"      element={<EspaceClient />} />
@@ -162,6 +165,7 @@ const App = () => (
                 <Route path="/portail"            element={<PortailClient />} />
                 <Route path="/administration"     element={<Administration />} />
                 <Route path="/utilisateurs"       element={<Utilisateurs />} />
+                <Route path="/conges"             element={<Conges />} />
                 <Route path="/cabinet"            element={<MonCabinet />} />
                 {/* Gestion du stockage et de l'abonnement */}
                 <Route path="/stockage"           element={<StockagePage />} />

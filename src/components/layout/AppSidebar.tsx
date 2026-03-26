@@ -15,7 +15,7 @@ import {
   Receipt, CreditCard, Landmark, Wallet, BarChart3, Settings,
   Search, Package, FileText, MessageSquare, Bell,
   GraduationCap, Globe, Building2, UserCog, Shield,
-  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive,
+  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive, CalendarCheck,
 } from "lucide-react";
 
 /** Structure d'un élément de navigation */
@@ -75,6 +75,7 @@ export function AppSidebar() {
       items: [
         { title: t("sidebar.cabinetProfile"), path: "/administration?tab=cabinet", icon: Building2 },
         { title: t("sidebar.users"), path: "/utilisateurs", icon: Users },
+        { title: t("sidebar.conges"), path: "/conges", icon: CalendarCheck },
         { title: t("sidebar.storageplan"), path: "/stockage", icon: HardDrive },
         { title: t("sidebar.auditLog"), path: "/administration?tab=audit", icon: Shield },
         { title: t("sidebar.securityAccess"), path: "/administration?tab=securite", icon: UserCog },
