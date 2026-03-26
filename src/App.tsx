@@ -135,8 +135,6 @@ const App = () => (
             <Routes>
               {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
               <Route path="/login"           element={<LoginTenant />} />
-              <Route path="/admin/login"     element={<LoginAdmin />} />
-              <Route path="/client/login"    element={<LoginPortailClient />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password"  element={<ResetPassword />} />
               <Route path="/activation-compte" element={<ActivationCompte />} />
