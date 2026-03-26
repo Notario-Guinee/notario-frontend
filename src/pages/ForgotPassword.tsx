@@ -13,6 +13,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { authService } from "@/services/cabinetService";
 
 type PortalType = "admin" | "tenant" | "client";
 
@@ -50,12 +51,21 @@ export default function ForgotPassword() {
   const config = configs[portal] || configs.tenant;
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) { toast.error(t("forgot.errorEmpty")); return; }
-    setSubmitted(true);
-    toast.success(t("forgot.successToast"));
+    setLoading(true);
+    try {
+      await authService.forgotPassword(email.trim());
+      setSubmitted(true);
+      toast.success(t("forgot.successToast"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'envoi");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const Icon = config.icon;
@@ -120,8 +130,8 @@ export default function ForgotPassword() {
                     <Input type="email" placeholder={t("forgot.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" autoFocus />
                   </div>
                 </div>
-                <Button type="submit" className={`w-full ${config.accentColor} ${config.accentHover} text-white font-medium h-11`}>
-                  {t("forgot.submit")}
+                <Button type="submit" disabled={loading} className={`w-full ${config.accentColor} ${config.accentHover} text-white font-medium h-11`}>
+                  {loading ? "Envoi en cours..." : t("forgot.submit")}
                 </Button>
               </form>
               <div className="h-px bg-border my-6" />

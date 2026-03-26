@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // Composant racine de l'application Notario
 // Configure les providers globaux (thème, langue, rôle, sidebar,
-// React Query) et définit toutes les routes client-side
+// React Query, DossierTabs et ActeSteps) et définit toutes les routes client-side
 // ═══════════════════════════════════════════════════════════════
 
 import { lazy, Suspense } from "react";
@@ -21,22 +21,17 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageLoader } from "@/components/ui/loading-spinner";
 
 // ─── Pages d'authentification ───
-// Chunk « auth » — chargé uniquement sur /login, /admin/login, etc.
 const LoginTenant         = lazy(() => import("./pages/LoginTenant"));
-const LoginAdmin          = lazy(() => import("./pages/LoginAdmin"));
-const LoginPortailClient  = lazy(() => import("./pages/LoginPortailClient"));
 const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
 const ActivationCompte    = lazy(() => import("./pages/ActivationCompte"));
 
-// ─── Portail client (espace externe) ───
-// Chunk « portail » — utilisateurs non-collaborateurs
+// ─── Portail client ───
 const EspaceClient      = lazy(() => import("./pages/EspaceClient"));
 const InscriptionClient = lazy(() => import("./pages/InscriptionClient"));
 const PortailClient     = lazy(() => import("./pages/PortailClient"));
 
 // ─── Pages principales du gérant ───
-// Chunk « app » — pages métier quotidiennes
 const Dashboard         = lazy(() => import("./pages/Dashboard"));
 const Clients           = lazy(() => import("./pages/Clients"));
 const Dossiers          = lazy(() => import("./pages/Dossiers"));
@@ -60,13 +55,11 @@ const MonCabinet        = lazy(() => import("./pages/MonCabinet"));
 const StockagePage      = lazy(() => import("./components/stockage/StockagePage"));
 
 // ─── Pages archives & documents ───
-// Chunk « archives » — chargé à la demande
 const ArchivesNumeriques = lazy(() => import("./pages/ArchivesNumeriques"));
 const ArchivesPhysiques  = lazy(() => import("./pages/ArchivesPhysiques"));
 const ModelesDocuments   = lazy(() => import("./pages/ModelesDocuments"));
 
 // ─── Pages d'administration globale ───
-// Chunk « admin » — réservé aux super-admins
 const AdminDashboard        = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminTenantsPage      = lazy(() => import("./pages/admin/AdminTenantsPage"));
 const AdminModulesOffres    = lazy(() => import("./pages/admin/AdminModulesOffres"));
@@ -86,30 +79,43 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient();
 
 // ─── Protection des routes privées ───
-// Pour la démo : vérifie localStorage.getItem("notario_auth")
-// En production : remplacer par vérification JWT/session réelle
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuth = localStorage.getItem("notario_auth") === "true";
-  if (!isAuth) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!isAuth) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
-/**
- * Garde de route — redirige vers /login si l'utilisateur n'est pas connecté
- * Utilisé pour protéger toutes les routes du dashboard
- */
+// ─── Garde de route avec AuthContext ───
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) return null;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
-/**
- * Composant racine — enveloppe l'arbre avec tous les providers
- * et définit la structure de routage de l'application
- */
+
+// ─── Redirige les utilisateurs déjà connectés hors de la page login ───
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) return null;
+  if (isAuthenticated) {
+    const role = user?.role?.toUpperCase();
+    if (role === "ADMIN" || role === "SUPER_ADMIN") return <Navigate to="/admin/dashboard" replace />;
+    if (role === "CLIENT") return <Navigate to="/espace-client" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
+// ─── Portail client protégé ───
+function ClientRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login?portal=client" replace />;
+  const role = user?.role?.toUpperCase();
+  if (role !== "CLIENT") return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+// ─── Composant racine ───
 const App = () => (
   <ThemeProvider>
     <LanguageProvider>

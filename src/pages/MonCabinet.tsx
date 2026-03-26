@@ -4,39 +4,56 @@
 // et gestion de l'avatar du gérant avec upload d'image
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useRef } from "react";
-import { Building2, Upload, User, Shield, Mail, Phone, MapPin, Camera, ImagePlus } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Building2, Upload, User, Shield, Mail, Phone, Camera, ImagePlus, Loader2, Trash2, MapPin, Calendar, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { currentUser } from "@/data/mockData";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
+import { cabinetService, authService, type CabinetConfig } from "@/services/cabinetService";
 
 export default function MonCabinet() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"cabinet" | "profil" | "securite">("cabinet");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  // État chargement initial
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [cabinetVersion, setCabinetVersion] = useState<number>(0);
+  const [deletingCabinet, setDeletingCabinet] = useState(false);
+  const [deletingInProgress, setDeletingInProgress] = useState(false);
+
+  // États des formulaires
   const [cabinetForm, setCabinetForm] = useState({
-    nom: currentUser.cabinet,
-    email: "contact@diallo-notaires.gn",
-    telephone: "+224 622 00 11 22",
-    adresse: "Quartier Almamya, Commune de Kaloum, Conakry",
+    nom: "",
+    email: "",
+    telephone: "",
+    adresse: "",
+    ville: "",
     devise: "GNF",
     formatFacture: "FAC-{ANNEE}-{SEQ}",
   });
 
   const [profilForm, setProfilForm] = useState({
-    nom: "Diallo",
-    prenom: currentUser.firstName,
-    email: currentUser.email,
-    telephone: "+224 622 00 11 22",
-    role: currentUser.role,
+    nom: user?.nom ?? "",
+    prenom: user?.prenom ?? "",
+    email: user?.email ?? "",
+    telephone: user?.telephone ?? "",
+    role: user?.role ?? "",
+    dateNaissance: user?.dateNaissance ?? "",
+    lieuNaissance: user?.lieuNaissance ?? "",
+    adresse: user?.adresse ?? "",
+    photoUrl: user?.photoUrl ?? "",
   });
+  const [photoPreview, setPhotoPreview] = useState<string>(user?.photoUrl ?? "");
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [securiteForm, setSecuriteForm] = useState({
     oldPassword: "",
@@ -46,12 +63,57 @@ export default function MonCabinet() {
     sessionTimeout: "30",
   });
 
+  // États de sauvegarde
+  const [savingCabinet, setSavingCabinet] = useState(false);
+  const [savingProfil, setSavingProfil] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // ── Chargement de la config cabinet au montage ──────────────────────────────
+  useEffect(() => {
+    cabinetService.getConfig()
+      .then((config: CabinetConfig) => {
+        setCabinetVersion(config.version);
+        setLogoPreview(config.logoUrl ?? null);
+        setCabinetForm({
+          nom: config.nomCabinet ?? "",
+          email: config.email ?? "",
+          telephone: config.telephone ?? "",
+          adresse: config.adresse ?? "",
+          ville: config.ville ?? "",
+          devise: config.devise ?? "GNF",
+          formatFacture: config.configurationFactureJson ?? "FAC-{ANNEE}-{SEQ}",
+        });
+      })
+      .catch(() => toast.error("Impossible de charger la configuration du cabinet"))
+      .finally(() => setLoadingConfig(false));
+  }, []);
+
+  // ── Synchronise le formulaire profil avec l'utilisateur connecté ────────────
+  useEffect(() => {
+    if (user) {
+      setProfilForm(f => ({
+        ...f,
+        nom: user.nom,
+        prenom: user.prenom,
+        email: user.email,
+        telephone: user.telephone ?? f.telephone,
+        role: user.role,
+        dateNaissance: user.dateNaissance ?? f.dateNaissance,
+        lieuNaissance: user.lieuNaissance ?? f.lieuNaissance,
+        adresse: user.adresse ?? f.adresse,
+        photoUrl: user.photoUrl ?? f.photoUrl,
+      }));
+      setPhotoPreview(user.photoUrl ?? "");
+    }
+  }, [user]);
+
   const tabs = [
     { id: "cabinet" as const, label: t("cabinet.tabCabinet"), icon: Building2 },
     { id: "profil" as const, label: t("cabinet.tabProfil"), icon: User },
     { id: "securite" as const, label: t("cabinet.tabSecurite"), icon: Shield },
   ];
 
+  // ── Gestion du logo ─────────────────────────────────────────────────────────
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -60,12 +122,119 @@ export default function MonCabinet() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setLogoPreview(ev.target?.result as string);
-      toast.success(t("cabinet.toastLogoUpdated"));
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setLogoPreview(dataUrl);
+      try {
+        await cabinetService.updateLogo(dataUrl);
+        toast.success(t("cabinet.toastLogoUpdated"));
+      } catch {
+        toast.error("Erreur lors de la mise à jour du logo");
+      }
     };
     reader.readAsDataURL(file);
   };
+
+  // ── Sauvegarde des infos cabinet (PUT complet avec verrou optimiste) ────────
+  const handleSaveCabinet = async () => {
+    setSavingCabinet(true);
+    try {
+      const updated = await cabinetService.updateConfig({
+        version: cabinetVersion,
+        adresse: cabinetForm.adresse,
+        ville: cabinetForm.ville,
+        telephone: cabinetForm.telephone,
+        email: cabinetForm.email,
+        devise: cabinetForm.devise,
+        configurationFactureJson: cabinetForm.formatFacture,
+      });
+      setCabinetVersion(updated.version);
+      toast.success(t("cabinet.toastSettingsSaved"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la sauvegarde";
+      toast.error(message);
+    } finally {
+      setSavingCabinet(false);
+    }
+  };
+
+  // ── Suppression du cabinet ───────────────────────────────────────────────────
+  const handleDeleteCabinet = async () => {
+    setDeletingInProgress(true);
+    try {
+      await cabinetService.deleteConfig();
+      toast.success("Cabinet supprimé avec succès");
+      setDeletingCabinet(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la suppression";
+      toast.error(message);
+    } finally {
+      setDeletingInProgress(false);
+    }
+  };
+
+  // ── Sauvegarde du profil ─────────────────────────────────────────────────────
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfil = async () => {
+    setSavingProfil(true);
+    try {
+      await authService.updateProfile({
+        nom: profilForm.nom,
+        prenom: profilForm.prenom,
+        email: profilForm.email,
+        telephone: profilForm.telephone || undefined,
+        role: profilForm.role,
+        dateNaissance: profilForm.dateNaissance || undefined,
+        lieuNaissance: profilForm.lieuNaissance || undefined,
+        adresse: profilForm.adresse || undefined,
+        photoUrl: profilForm.photoUrl || undefined,
+      });
+      toast.success(t("cabinet.toastProfileSaved"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la sauvegarde";
+      toast.error(message);
+    } finally {
+      setSavingProfil(false);
+    }
+  };
+
+  // ── Changement de mot de passe ───────────────────────────────────────────────
+  const handleChangePassword = async () => {
+    if (securiteForm.newPassword !== securiteForm.confirmPassword) {
+      toast.error(t("cabinet.toastPasswordMismatch"));
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      await authService.changePassword({
+        ancienMotDePasse: securiteForm.oldPassword,
+        nouveauMotDePasse: securiteForm.newPassword,
+        confirmationMotDePasse: securiteForm.confirmPassword,
+      });
+      toast.success(t("cabinet.toastPasswordChanged"));
+      setSecuriteForm(f => ({ ...f, oldPassword: "", newPassword: "", confirmPassword: "" }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors du changement de mot de passe";
+      toast.error(message);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  if (loadingConfig) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,7 +254,7 @@ export default function MonCabinet() {
       {activeTab === "cabinet" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-5">
-            {/* Logo section - prominent */}
+            {/* Logo section */}
             <div className="flex items-center gap-5 mb-4">
               <div className="relative group">
                 <input type="file" ref={logoInputRef} accept="image/*" className="hidden" onChange={handleLogoChange} />
@@ -105,7 +274,7 @@ export default function MonCabinet() {
               </div>
               <div className="flex-1">
                 <p className="font-heading text-lg font-bold text-foreground">{cabinetForm.nom}</p>
-                <p className="text-xs text-muted-foreground mb-2">Conakry, Guinée</p>
+                <p className="text-xs text-muted-foreground mb-2">{cabinetForm.ville || "—"}</p>
                 <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} className="gap-2 text-xs">
                   <Upload className="h-3.5 w-3.5" /> {t("cabinet.changeLogo")}
                 </Button>
@@ -114,7 +283,7 @@ export default function MonCabinet() {
 
             <div className="space-y-2">
               <Label>{t("cabinet.officeName")}</Label>
-              <Input value={cabinetForm.nom} onChange={e => setCabinetForm(f => ({ ...f, nom: e.target.value }))} />
+              <Input value={cabinetForm.nom} disabled className="opacity-60" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -126,9 +295,15 @@ export default function MonCabinet() {
                 <Input value={cabinetForm.telephone} onChange={e => setCabinetForm(f => ({ ...f, telephone: e.target.value }))} />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>{t("cabinet.officeAddress")}</Label>
-              <Input value={cabinetForm.adresse} onChange={e => setCabinetForm(f => ({ ...f, adresse: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("cabinet.officeAddress")}</Label>
+                <Input value={cabinetForm.adresse} onChange={e => setCabinetForm(f => ({ ...f, adresse: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Ville</Label>
+                <Input value={cabinetForm.ville} onChange={e => setCabinetForm(f => ({ ...f, ville: e.target.value }))} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -147,47 +322,120 @@ export default function MonCabinet() {
                 <Input value={cabinetForm.formatFacture} onChange={e => setCabinetForm(f => ({ ...f, formatFacture: e.target.value }))} />
               </div>
             </div>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => toast.success(t("cabinet.toastSettingsSaved"))}>
+            <Button
+              className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+              onClick={handleSaveCabinet}
+              disabled={savingCabinet}
+            >
+              {savingCabinet && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("cabinet.saveSettings")}
             </Button>
           </div>
-          <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-            <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("cabinet.storage")}</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative h-20 w-20">
-                <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
-                  <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3"/>
-                  <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray="77.5, 100" strokeLinecap="round"/>
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center font-heading text-sm font-bold text-foreground">78%</span>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+              <h2 className="font-heading text-sm font-semibold text-foreground mb-4">{t("cabinet.storage")}</h2>
+              <div className="flex items-center gap-4">
+                <div className="relative h-20 w-20">
+                  <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
+                    <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--muted))" strokeWidth="3"/>
+                    <path d="M18 2.0845a 15.9155 15.9155 0 0 1 0 31.831a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="hsl(var(--primary))" strokeWidth="3" strokeDasharray="77.5, 100" strokeLinecap="round"/>
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center font-heading text-sm font-bold text-foreground">78%</span>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-foreground">15.5 Go</p>
+                  <p className="text-xs text-muted-foreground">{t("cabinet.storageUsed")}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-lg font-bold text-foreground">15.5 Go</p>
-                <p className="text-xs text-muted-foreground">{t("cabinet.storageUsed")}</p>
-              </div>
+            </div>
+
+            {/* Zone danger */}
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 shadow-card">
+              <h2 className="font-heading text-sm font-semibold text-destructive mb-1">Zone de danger</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                La suppression du cabinet est irréversible. Toutes les données seront désactivées.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground gap-2"
+                onClick={() => setDeletingCabinet(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer le cabinet
+              </Button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Confirmation suppression cabinet */}
+      <AlertDialog open={deletingCabinet} onOpenChange={setDeletingCabinet}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le cabinet ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action va désactiver <strong>{cabinetForm.nom}</strong> et toutes ses données.
+              Cette opération est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingInProgress}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCabinet}
+              disabled={deletingInProgress}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingInProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Profil Tab */}
       {activeTab === "profil" && (
         <div className="max-w-2xl">
           <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-5">
-            <div className="flex items-center gap-4 mb-4">
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4 mb-2">
               <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/20 font-heading text-2xl font-bold text-primary">
-                  {profilForm.prenom.charAt(0)}{profilForm.nom.charAt(0)}
-                </div>
-                <button className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors">
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Photo profil" className="h-20 w-20 rounded-full object-cover border-2 border-primary/30 shadow-md" />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/20 font-heading text-2xl font-bold text-primary">
+                    {profilForm.prenom.charAt(0)}{profilForm.nom.charAt(0)}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                >
                   <Camera className="h-3.5 w-3.5" />
                 </button>
               </div>
               <div>
                 <p className="font-heading text-lg font-bold text-foreground">{profilForm.prenom} {profilForm.nom}</p>
-                <p className="text-sm text-muted-foreground">{profilForm.role} · {currentUser.cabinet}</p>
+                <p className="text-sm text-muted-foreground">{profilForm.role} · {cabinetForm.nom}</p>
               </div>
             </div>
+
+            {/* URL photo */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> URL de la photo</Label>
+              <Input
+                value={profilForm.photoUrl}
+                onChange={e => { setProfilForm(f => ({ ...f, photoUrl: e.target.value })); setPhotoPreview(e.target.value); }}
+                placeholder="https://cdn.example.com/photo.jpg"
+                className="font-mono text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">Le fichier sélectionné est une prévisualisation locale — saisissez une URL HTTPS pour l'enregistrer.</p>
+            </div>
+
+            {/* Nom / Prénom */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t("cabinet.lastName")}</Label>
@@ -198,21 +446,49 @@ export default function MonCabinet() {
                 <Input value={profilForm.prenom} onChange={e => setProfilForm(f => ({ ...f, prenom: e.target.value }))} />
               </div>
             </div>
+
+            {/* Email / Téléphone */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> {t("label.email")}</Label>
                 <Input value={profilForm.email} onChange={e => setProfilForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {t("cabinet.officePhone")}</Label>
-                <Input value={profilForm.telephone} onChange={e => setProfilForm(f => ({ ...f, telephone: e.target.value }))} />
+                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Téléphone</Label>
+                <Input value={profilForm.telephone} onChange={e => setProfilForm(f => ({ ...f, telephone: e.target.value }))} placeholder="+224 6XX XXX XXX" />
               </div>
             </div>
+
+            {/* Date / Lieu de naissance */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Date de naissance</Label>
+                <Input type="date" value={profilForm.dateNaissance} onChange={e => setProfilForm(f => ({ ...f, dateNaissance: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><Flag className="h-3.5 w-3.5" /> Lieu de naissance</Label>
+                <Input value={profilForm.lieuNaissance} onChange={e => setProfilForm(f => ({ ...f, lieuNaissance: e.target.value }))} placeholder="Ex: Conakry" />
+              </div>
+            </div>
+
+            {/* Adresse */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Adresse</Label>
+              <Input value={profilForm.adresse} onChange={e => setProfilForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Ex: Quartier Kaloum, Conakry" />
+            </div>
+
+            {/* Rôle (lecture seule) */}
             <div className="space-y-2">
               <Label>{t("cabinet.role")}</Label>
               <Input value={profilForm.role} disabled className="opacity-60" />
             </div>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => toast.success(t("cabinet.toastProfileSaved"))}>
+
+            <Button
+              className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+              onClick={handleSaveProfil}
+              disabled={savingProfil}
+            >
+              {savingProfil && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("cabinet.saveProfile")}
             </Button>
           </div>
@@ -238,11 +514,12 @@ export default function MonCabinet() {
                 <Input type="password" value={securiteForm.confirmPassword} onChange={e => setSecuriteForm(f => ({ ...f, confirmPassword: e.target.value }))} placeholder="••••••••" />
               </div>
             </div>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={() => {
-              if (securiteForm.newPassword !== securiteForm.confirmPassword) { toast.error(t("cabinet.toastPasswordMismatch")); return; }
-              toast.success(t("cabinet.toastPasswordChanged"));
-              setSecuriteForm(f => ({ ...f, oldPassword: "", newPassword: "", confirmPassword: "" }));
-            }}>
+            <Button
+              className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+              onClick={handleChangePassword}
+              disabled={savingPassword}
+            >
+              {savingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("cabinet.updatePasswordBtn")}
             </Button>
           </div>

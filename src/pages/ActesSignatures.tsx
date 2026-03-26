@@ -4,7 +4,7 @@
 // d'actes personnalisables par catégorie (ajout/renommage/suppression)
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, FileText, PenLine, CheckCircle2, DollarSign, Eye, X, MoreHorizontal, Receipt, Settings2, Trash2, GripVertical, Save, FolderPlus, ChevronDown, ChevronRight, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -370,10 +370,10 @@ export default function ActesSignatures() {
         </Button>
       </div>
 
-      {/* ── Tab: Actes (supprimé) ──────────────────────────────── */}
-      {false && (
+      {/* ── Tab: Actes (masqué mais gardé pour référence) ──────── */}
+      {activeTab === "catalogue" && (
         <>
-          {/* KPIs */}
+          {/* KPIs - caché mais gardé pour stats visuelles */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
             {[
               { label: t("actes.kpi.total"), value: String(stats.total), icon: FileText, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
@@ -493,73 +493,72 @@ export default function ActesSignatures() {
       )}
 
       {/* ── Catalogue ──────────────────────────────────────────── */}
-      {(
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {fr
-                  ? "Personnalisez les catégories et les actes notariés proposés dans votre cabinet. Ces modifications s'appliqueront lors de la création de nouveaux dossiers."
-                  : "Customize the categories and notarial acts offered by your office. These changes will apply when creating new cases."}
-              </p>
-            </div>
-            <Button size="sm" className="bg-primary text-primary-foreground gap-2 shrink-0" onClick={saveCatalogue}>
-              <Save className="h-4 w-4" /> {fr ? "Enregistrer" : "Save"}
-            </Button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {fr
+                ? "Personnalisez les catégories et les actes notariés proposés dans votre cabinet. Ces modifications s'appliqueront lors de la création de nouveaux dossiers."
+                : "Customize the categories and notarial acts offered by your office. These changes will apply when creating new cases."}
+            </p>
           </div>
+          <Button size="sm" className="bg-primary text-primary-foreground gap-2 shrink-0" onClick={saveCatalogue}>
+            <Save className="h-4 w-4" /> {fr ? "Enregistrer" : "Save"}
+          </Button>
+        </div>
 
-          <div className="space-y-3">
-            {catalogue.map((cat, catIdx) => (
-              <div key={catIdx} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-                {/* Category header */}
-                <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border">
-                  <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-                  <button onClick={() => toggleCat(catIdx)} className="flex items-center gap-2 flex-1 text-left">
-                    {expandedCats.has(catIdx)
-                      ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                      : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-                    {editingCat?.idx === catIdx ? (
-                      <Input
-                        className="h-7 text-sm w-64"
-                        value={editingCat.label}
-                        autoFocus
-                        onChange={e => setEditingCat({ idx: catIdx, label: e.target.value })}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") saveCategory(catIdx, editingCat.label);
-                          if (e.key === "Escape") setEditingCat(null);
-                        }}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-foreground">{cat.label}</span>
-                    )}
-                    <span className="text-xs text-muted-foreground ml-1">({cat.actes.length} {fr ? "actes" : "acts"})</span>
-                  </button>
-                  <div className="flex items-center gap-1 ml-auto">
-                    {editingCat?.idx === catIdx ? (
-                      <>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => saveCategory(catIdx, editingCat.label)}>{fr ? "OK" : "OK"}</Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditingCat(null)}>{fr ? "Annuler" : "Cancel"}</Button>
-                      </>
-                    ) : (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCat({ idx: catIdx, label: cat.label })}>
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteCat({ idx: catIdx, label: cat.label, acteCount: cat.actes.length })}>
-                      <Trash2 className="h-3.5 w-3.5" />
+        <div className="space-y-3">
+          {catalogue.map((cat, catIdx) => (
+            <div key={catIdx} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+              {/* Category header */}
+              <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border">
+                <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+                <button onClick={() => toggleCat(catIdx)} className="flex items-center gap-2 flex-1 text-left">
+                  {expandedCats.has(catIdx)
+                    ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                  {editingCat?.idx === catIdx ? (
+                    <Input
+                      className="h-7 text-sm w-64"
+                      value={editingCat.label}
+                      autoFocus
+                      onChange={e => setEditingCat({ idx: catIdx, label: e.target.value })}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") saveCategory(catIdx, editingCat.label);
+                        if (e.key === "Escape") setEditingCat(null);
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="text-sm font-semibold text-foreground">{cat.label}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground ml-1">({cat.actes.length} {fr ? "actes" : "acts"})</span>
+                </button>
+                <div className="flex items-center gap-1 ml-auto">
+                  {editingCat?.idx === catIdx ? (
+                    <>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => saveCategory(catIdx, editingCat.label)}>{fr ? "OK" : "OK"}</Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditingCat(null)}>{fr ? "Annuler" : "Cancel"}</Button>
+                    </>
+                  ) : (
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCat({ idx: catIdx, label: cat.label })}>
+                      <Edit2 className="h-3.5 w-3.5" />
                     </Button>
-                  </div>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteCat({ idx: catIdx, label: cat.label, acteCount: cat.actes.length })}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
+              </div>
 
-                {/* Acts list */}
-                {expandedCats.has(catIdx) && (
-                  <div className="p-3 space-y-1.5">
-                    {cat.actes.map((acte, acteIdx) => {
-                      const stepKey = `${catIdx}-${acteIdx}`;
-                      const stepsOpen = expandedActeSteps.has(stepKey);
-                      const steps = getSteps(acte);
-                      return (
+              {/* Acts list */}
+              {expandedCats.has(catIdx) && (
+                <div className="p-3 space-y-1.5">
+                  {cat.actes.map((acte, acteIdx) => {
+                    const stepKey = `${catIdx}-${acteIdx}`;
+                    const stepsOpen = expandedActeSteps.has(stepKey);
+                    const steps = getSteps(acte);
+                    return (
                       <div key={acteIdx} className="rounded-lg border border-border/50 bg-muted/10 overflow-hidden">
                         {/* Act row */}
                         <div className="flex items-center gap-2 group px-3 py-2 hover:bg-muted/30 transition-colors">
@@ -685,77 +684,76 @@ export default function ActesSignatures() {
                           </div>
                         )}
                       </div>
-                      );
-                    })}
+                    );
+                  })}
 
-                    {/* Add act */}
-                    {addActeForCat === catIdx ? (
-                      <div className="flex items-center gap-2 px-3 py-2">
-                        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <Input
-                          className="h-7 text-sm flex-1"
-                          placeholder={fr ? "Nom de l'acte..." : "Act name..."}
-                          value={newActeLabel}
-                          autoFocus
-                          onChange={e => setNewActeLabel(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter") addActe(catIdx);
-                            if (e.key === "Escape") { setAddActeForCat(null); setNewActeLabel(""); }
-                          }}
-                        />
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => addActe(catIdx)}>{fr ? "Ajouter" : "Add"}</Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setAddActeForCat(null); setNewActeLabel(""); }}>✕</Button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => { setAddActeForCat(catIdx); setNewActeLabel(""); }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-xs text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        {fr ? "Ajouter un acte" : "Add an act"}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Add category */}
-          {showAddCat ? (
-            <div className="flex items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3">
-              <FolderPlus className="h-4 w-4 text-primary shrink-0" />
-              <Input
-                className="h-8 text-sm flex-1"
-                placeholder={fr ? "Nom de la catégorie..." : "Category name..."}
-                value={newCatLabel}
-                autoFocus
-                onChange={e => setNewCatLabel(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") addCategory();
-                  if (e.key === "Escape") { setShowAddCat(false); setNewCatLabel(""); }
-                }}
-              />
-              <Button size="sm" onClick={addCategory}>{fr ? "Créer" : "Create"}</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowAddCat(false); setNewCatLabel(""); }}>✕</Button>
+                  {/* Add act */}
+                  {addActeForCat === catIdx ? (
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <Input
+                        className="h-7 text-sm flex-1"
+                        placeholder={fr ? "Nom de l'acte..." : "Act name..."}
+                        value={newActeLabel}
+                        autoFocus
+                        onChange={e => setNewActeLabel(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") addActe(catIdx);
+                          if (e.key === "Escape") { setAddActeForCat(null); setNewActeLabel(""); }
+                        }}
+                      />
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => addActe(catIdx)}>{fr ? "Ajouter" : "Add"}</Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setAddActeForCat(null); setNewActeLabel(""); }}>✕</Button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setAddActeForCat(catIdx); setNewActeLabel(""); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {fr ? "Ajouter un acte" : "Add an act"}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <button
-              onClick={() => setShowAddCat(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
-            >
-              <FolderPlus className="h-4 w-4" />
-              {fr ? "Ajouter une catégorie" : "Add a category"}
-            </button>
-          )}
-
-          <div className="flex justify-end pt-2">
-            <Button className="bg-primary text-primary-foreground gap-2" onClick={saveCatalogue}>
-              <Save className="h-4 w-4" /> {fr ? "Enregistrer le catalogue" : "Save catalogue"}
-            </Button>
-          </div>
+          ))}
         </div>
-      )}
+
+        {/* Add category */}
+        {showAddCat ? (
+          <div className="flex items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3">
+            <FolderPlus className="h-4 w-4 text-primary shrink-0" />
+            <Input
+              className="h-8 text-sm flex-1"
+              placeholder={fr ? "Nom de la catégorie..." : "Category name..."}
+              value={newCatLabel}
+              autoFocus
+              onChange={e => setNewCatLabel(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") addCategory();
+                if (e.key === "Escape") { setShowAddCat(false); setNewCatLabel(""); }
+              }}
+            />
+            <Button size="sm" onClick={addCategory}>{fr ? "Créer" : "Create"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => { setShowAddCat(false); setNewCatLabel(""); }}>✕</Button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddCat(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
+          >
+            <FolderPlus className="h-4 w-4" />
+            {fr ? "Ajouter une catégorie" : "Add a category"}
+          </button>
+        )}
+
+        <div className="flex justify-end pt-2">
+          <Button className="bg-primary text-primary-foreground gap-2" onClick={saveCatalogue}>
+            <Save className="h-4 w-4" /> {fr ? "Enregistrer le catalogue" : "Save catalogue"}
+          </Button>
+        </div>
+      </div>
 
       {/* ── Detail Drawer with Workflow ───────────────────────── */}
       <AnimatePresence>
@@ -977,3 +975,4 @@ export default function ActesSignatures() {
     </div>
   );
 }
+

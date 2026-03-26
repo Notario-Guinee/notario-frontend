@@ -12,6 +12,7 @@ import { Lock, Eye, EyeOff, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { authService } from "@/services/cabinetService";
 
 type PortalType = "admin" | "tenant" | "client";
 
@@ -19,6 +20,8 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const portal = (searchParams.get("portal") as PortalType) || "tenant";
+  const token = searchParams.get("token") ?? "";
+  const tenantId = searchParams.get("tenant") ?? "";
   const { t } = useLanguage();
 
   const [password, setPassword] = useState("");
@@ -26,6 +29,7 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const configs: Record<PortalType, { title: string; gradient: string; loginPath: string }> = {
     admin: {
@@ -57,8 +61,12 @@ export default function ResetPassword() {
 
   const allValid = passwordChecks.every((c) => c.valid);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token || !tenantId) {
+      toast.error("Lien invalide ou expiré");
+      return;
+    }
     if (!allValid) {
       toast.error(t("reset.requirementsNotMet"));
       return;
@@ -67,9 +75,16 @@ export default function ResetPassword() {
       toast.error(t("reset.mismatch"));
       return;
     }
-    // TODO: call supabase.auth.updateUser({ password })
-    setSubmitted(true);
-    toast.success(t("reset.success"));
+    setLoading(true);
+    try {
+      await authService.resetPassword(token, password, tenantId);
+      setSubmitted(true);
+      toast.success(t("reset.success"));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la réinitialisation");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -156,8 +171,8 @@ export default function ResetPassword() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={!allValid || !confirmPassword}>
-                  {t("reset.submit")}
+                <Button type="submit" className="w-full" disabled={!allValid || !confirmPassword || loading}>
+                  {loading ? "Réinitialisation..." : t("reset.submit")}
                 </Button>
               </form>
             ) : (
