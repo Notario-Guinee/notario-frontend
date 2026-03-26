@@ -57,6 +57,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Sidebar items
     "sidebar.cabinetProfile": "Profil cabinet",
     "sidebar.users": "Utilisateurs",
+    "sidebar.conges": "Demandes de congés",
     "sidebar.storageplan": "Stockage & Abonnement",
     "sidebar.auditLog": "Journal d'audit",
     "sidebar.securityAccess": "Sécurité & Accès",
@@ -1460,6 +1461,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Sidebar items
     "sidebar.cabinetProfile": "Office Profile",
     "sidebar.users": "Users",
+    "sidebar.conges": "Leave Requests",
     "sidebar.storageplan": "Storage & Plan",
     "sidebar.auditLog": "Audit Log",
     "sidebar.securityAccess": "Security",

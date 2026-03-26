@@ -24,6 +24,7 @@ import { PageLoader } from "@/components/ui/loading-spinner";
 const LoginTenant         = lazy(() => import("./pages/LoginTenant"));
 const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
+const ActivationCompte    = lazy(() => import("./pages/ActivationCompte"));
 
 // ─── Portail client ───
 const EspaceClient      = lazy(() => import("./pages/EspaceClient"));
@@ -49,6 +50,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const Formation         = lazy(() => import("./pages/Formation"));
 const Administration    = lazy(() => import("./pages/Administration"));
 const Utilisateurs      = lazy(() => import("./pages/Utilisateurs"));
+const Conges            = lazy(() => import("./pages/Conges"));
 const MonCabinet        = lazy(() => import("./pages/MonCabinet"));
 const StockagePage      = lazy(() => import("./components/stockage/StockagePage"));
 
@@ -117,83 +119,89 @@ function ClientRoute({ children }: { children: React.ReactNode }) {
 const App = () => (
   <ThemeProvider>
     <LanguageProvider>
-      <AuthProvider>
-        <RoleProvider>
-          <SidebarProvider>
-            <DossierTabsProvider>
-              <ActeStepsProvider>
-                <QueryClientProvider client={queryClient}>
-                  <TooltipProvider>
-                    <Toaster />
-                    <Sonner />
-                    <BrowserRouter>
-                      <Suspense fallback={<PageLoader />}>
-                        <Routes>
-                          {/* Pages d'authentification (redirige si déjà connecté) */}
-                          <Route path="/login"           element={<GuestRoute><LoginTenant /></GuestRoute>} />
-                          <Route path="/admin/login"     element={<Navigate to="/login?portal=admin" replace />} />
-                          <Route path="/client/login"    element={<Navigate to="/login?portal=client" replace />} />
-                          <Route path="/forgot-password" element={<ForgotPassword />} />
-                          <Route path="/reset-password"  element={<ResetPassword />} />
+    {/* AuthProvider ajouté pour gérer l'authentification JWT avec le backend */}
+    <AuthProvider>
+    <RoleProvider>
+    <SidebarProvider>
+    <DossierTabsProvider>
+    <ActeStepsProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {/* Systèmes de notifications toast */}
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
+              <Route path="/login"           element={<LoginTenant />} />
+              <Route path="/admin/login"     element={<LoginAdmin />} />
+              <Route path="/client/login"    element={<LoginPortailClient />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password"  element={<ResetPassword />} />
+              <Route path="/activation-compte" element={<ActivationCompte />} />
 
-                          {/* Portail client (protégé — rôle CLIENT requis) */}
-                          <Route path="/espace-client"      element={<ClientRoute><EspaceClient /></ClientRoute>} />
-                          <Route path="/inscription-client" element={<InscriptionClient />} />
+              {/* ═══ Portail client (hors layout dashboard) ═══ */}
+              <Route path="/espace-client"      element={<EspaceClient />} />
+              <Route path="/inscription-client" element={<InscriptionClient />} />
 
-                          {/* Routes protégées avec layout Dashboard */}
-                          <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-                            <Route index                      element={<Dashboard />} />
-                            <Route path="/dashboard"          element={<Dashboard />} />
-                            <Route path="/clients"            element={<Clients />} />
-                            <Route path="/dossiers"           element={<Dossiers />} />
-                            <Route path="/types-actions"      element={<TypesActions />} />
-                            <Route path="/actes"              element={<ActesSignatures />} />
-                            <Route path="/factures"           element={<Factures />} />
-                            <Route path="/kanban"             element={<Kanban />} />
-                            <Route path="/synthese"           element={<SyntheseFinanciere />} />
-                            <Route path="/agenda"             element={<Agenda />} />
-                            <Route path="/paiements"          element={<Paiements />} />
-                            <Route path="/comptes"            element={<ComptesBancaires />} />
-                            <Route path="/caisse"             element={<Caisse />} />
-                            <Route path="/tarifs"             element={<Tarifs />} />
-                            <Route path="/archives-numeriques" element={<ArchivesNumeriques />} />
-                            <Route path="/archives-physiques"  element={<ArchivesPhysiques />} />
-                            <Route path="/modeles"            element={<ModelesDocuments />} />
-                            <Route path="/messagerie"         element={<Messagerie />} />
-                            <Route path="/notifications"      element={<NotificationsPage />} />
-                            <Route path="/formation"          element={<Formation />} />
-                            <Route path="/portail"            element={<PortailClient />} />
-                            <Route path="/administration"     element={<Administration />} />
-                            <Route path="/utilisateurs"       element={<Utilisateurs />} />
-                            <Route path="/cabinet"            element={<MonCabinet />} />
-                            <Route path="/stockage"           element={<StockagePage />} />
+              {/* ═══ Routes protégées avec layout Dashboard ═══ */}
+              <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+                {/* Routes du gérant */}
+                <Route index                      element={<Dashboard />} />
+                <Route path="/dashboard"          element={<Dashboard />} />
+                <Route path="/clients"            element={<Clients />} />
+                <Route path="/dossiers"           element={<Dossiers />} />
+                <Route path="/types-actions"      element={<TypesActions />} />
+                <Route path="/actes"              element={<ActesSignatures />} />
+                <Route path="/factures"           element={<Factures />} />
+                <Route path="/kanban"             element={<Kanban />} />
+                <Route path="/synthese"           element={<SyntheseFinanciere />} />
+                <Route path="/agenda"             element={<Agenda />} />
+                <Route path="/paiements"          element={<Paiements />} />
+                <Route path="/comptes"            element={<ComptesBancaires />} />
+                <Route path="/caisse"             element={<Caisse />} />
+                <Route path="/tarifs"             element={<Tarifs />} />
+                <Route path="/archives-numeriques" element={<ArchivesNumeriques />} />
+                <Route path="/archives-physiques"  element={<ArchivesPhysiques />} />
+                <Route path="/modeles"            element={<ModelesDocuments />} />
+                <Route path="/messagerie"         element={<Messagerie />} />
+                <Route path="/notifications"      element={<NotificationsPage />} />
+                <Route path="/formation"          element={<Formation />} />
+                <Route path="/portail"            element={<PortailClient />} />
+                <Route path="/administration"     element={<Administration />} />
+                <Route path="/utilisateurs"       element={<Utilisateurs />} />
+                <Route path="/conges"             element={<Conges />} />
+                <Route path="/cabinet"            element={<MonCabinet />} />
+                {/* Gestion du stockage et de l'abonnement */}
+                <Route path="/stockage"           element={<StockagePage />} />
 
-                            {/* Routes d'administration globale */}
-                            <Route path="/admin/dashboard"  element={<AdminDashboard />} />
-                            <Route path="/admin/tenants"    element={<AdminTenantsPage />} />
-                            <Route path="/admin/modules"    element={<AdminModulesOffres />} />
-                            <Route path="/admin/leads"      element={<AdminLeadsPage />} />
-                            <Route path="/admin/licenses"   element={<AdminLicenses />} />
-                            <Route path="/admin/users"      element={<AdminUsersGlobal />} />
-                            <Route path="/admin/roles"      element={<AdminRoles />} />
-                            <Route path="/admin/audit"      element={<AdminAudit />} />
-                            <Route path="/admin/billing"    element={<AdminBilling />} />
-                            <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-                            <Route path="/admin/security"   element={<AdminSecurityPolicies />} />
-                          </Route>
+                {/* Routes d'administration globale */}
+                <Route path="/admin/dashboard"  element={<AdminDashboard />} />
+                <Route path="/admin/tenants"    element={<AdminTenantsPage />} />
+                <Route path="/admin/modules"    element={<AdminModulesOffres />} />
+                <Route path="/admin/leads"      element={<AdminLeadsPage />} />
+                <Route path="/admin/licenses"   element={<AdminLicenses />} />
+                <Route path="/admin/users"      element={<AdminUsersGlobal />} />
+                <Route path="/admin/roles"      element={<AdminRoles />} />
+                <Route path="/admin/audit"      element={<AdminAudit />} />
+                <Route path="/admin/billing"    element={<AdminBilling />} />
+                <Route path="/admin/monitoring" element={<AdminMonitoring />} />
+                <Route path="/admin/security"   element={<AdminSecurityPolicies />} />
+              </Route>
 
-                          {/* Page 404 */}
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
-                      </Suspense>
-                    </BrowserRouter>
-                  </TooltipProvider>
-                </QueryClientProvider>
-              </ActeStepsProvider>
-            </DossierTabsProvider>
-          </SidebarProvider>
-        </RoleProvider>
-      </AuthProvider>
+              {/* Page 404 — route de secours */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+    </ActeStepsProvider>
+    </DossierTabsProvider>
+    </SidebarProvider>
+    </RoleProvider>
+    </AuthProvider>
     </LanguageProvider>
   </ThemeProvider>
 );

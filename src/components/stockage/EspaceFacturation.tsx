@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect, FormEvent } from 'react';
-import { Building2, CreditCard, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, Eye, EyeOff, Download, AlertTriangle } from 'lucide-react';
+import { Building2, CreditCard, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, Eye, EyeOff, Download, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -145,6 +145,7 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
   const [isLoadingFactures, setIsLoadingFactures] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingCarte, setIsSavingCarte] = useState(false);
+  const [carteTermsAccepted, setCarteTermsAccepted] = useState(false);
   /** Afficher/masquer le numéro de carte */
   const [showCardNumber, setShowCardNumber] = useState(false);
   /** Afficher/masquer le CVV */
@@ -557,20 +558,39 @@ export function EspaceFacturation({ recap, isLoadingRecap }: EspaceFacturationPr
               {t("subs.card.securityNote")}
             </p>
 
+            {/* Conditions à accepter avant de mettre à jour la carte */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                Vous acceptez que Notario débite votre carte pour les services auxquels vous souscrirez et de manière récurrente mensuelle jusqu'à ce que vous annuliez conformément à nos conditions, notamment en exerçant votre droit d'annulation de votre abonnement dans les 14 jours suivant la date d'abonnement. Vous pouvez annuler à tout moment dans les paramètres de votre compte.
+              </p>
+              <label className="flex items-start gap-2.5 cursor-pointer group">
+                <div className="relative mt-0.5 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={carteTermsAccepted}
+                    onChange={e => setCarteTermsAccepted(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${carteTermsAccepted ? 'bg-primary border-primary' : 'border-muted-foreground/40 group-hover:border-primary/60'}`}>
+                    {carteTermsAccepted && <ShieldCheck className="w-3 h-3 text-white" />}
+                  </div>
+                </div>
+                <span className="text-[11px] text-foreground leading-relaxed select-none">
+                  J'ai lu et j'accepte les conditions ci-dessus pour mettre à jour ma carte.
+                </span>
+              </label>
+            </div>
+
             <Button
               type="submit"
               className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
-              disabled={isSavingCarte}
+              disabled={isSavingCarte || !carteTermsAccepted}
             >
               {isSavingCarte
                 ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("subs.card.saving")}</>
                 : t("subs.card.save")
               }
             </Button>
-
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
-              Vous acceptez que Notario débite votre carte pour les services auxquels vous souscrirez et de manière récurrente mensuelle jusqu'à ce que vous annuliez conformément à nos conditions, notamment en exerçant votre droit d'annulation de votre abonnement dans les 14 jours suivant la date d'abonnement. Vous pouvez annuler à tout moment dans les paramètres de votre compte.
-            </p>
           </form>
         ) : null}
       </div>
