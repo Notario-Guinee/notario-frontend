@@ -108,6 +108,10 @@ export interface UpdateUserProfileDto {
   email: string;
   telephone?: string;
   role: string;
+  dateNaissance?: string;
+  lieuNaissance?: string;
+  adresse?: string;
+  photoUrl?: string;
 }
 
 export interface UserDto {
@@ -191,4 +195,12 @@ export const authService = {
   // Change le mot de passe de l'utilisateur connecté
   changePassword: (dto: ChangePasswordDto) =>
     apiClient.post<void>("/api/auth/change-password", dto),
+
+  // Demande de réinitialisation de mot de passe (sans token requis)
+  forgotPassword: (email: string) =>
+    apiClient.post<void>("/api/auth/forgot-password", { email }),
+
+  // Réinitialise le mot de passe avec le token reçu par email
+  resetPassword: (token: string, newPassword: string, tenantId: string) =>
+    apiClient.post<void>("/api/auth/reset-password", { token, newPassword }, { "X-Tenant-ID": tenantId }),
 };

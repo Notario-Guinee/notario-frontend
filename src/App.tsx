@@ -22,8 +22,6 @@ import { PageLoader } from "@/components/ui/loading-spinner";
 
 // ─── Pages d'authentification ───
 const LoginTenant         = lazy(() => import("./pages/LoginTenant"));
-const LoginAdmin          = lazy(() => import("./pages/LoginAdmin"));
-const LoginPortailClient  = lazy(() => import("./pages/LoginPortailClient"));
 const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
 
@@ -92,6 +90,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+// ─── Redirige les utilisateurs déjà connectés hors de la page login ───
+function GuestRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) return null;
+  if (isAuthenticated) {
+    const role = user?.role?.toUpperCase();
+    if (role === "ADMIN" || role === "SUPER_ADMIN") return <Navigate to="/admin/dashboard" replace />;
+    if (role === "CLIENT") return <Navigate to="/espace-client" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
+
+// ─── Portail client protégé ───
+function ClientRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login?portal=client" replace />;
+  const role = user?.role?.toUpperCase();
+  if (role !== "CLIENT") return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
 // ─── Composant racine ───
 const App = () => (
   <ThemeProvider>
@@ -108,15 +129,15 @@ const App = () => (
                     <BrowserRouter>
                       <Suspense fallback={<PageLoader />}>
                         <Routes>
-                          {/* Pages d'authentification */}
-                          <Route path="/login"           element={<LoginTenant />} />
-                          <Route path="/admin/login"     element={<LoginAdmin />} />
-                          <Route path="/client/login"    element={<LoginPortailClient />} />
+                          {/* Pages d'authentification (redirige si déjà connecté) */}
+                          <Route path="/login"           element={<GuestRoute><LoginTenant /></GuestRoute>} />
+                          <Route path="/admin/login"     element={<Navigate to="/login?portal=admin" replace />} />
+                          <Route path="/client/login"    element={<Navigate to="/login?portal=client" replace />} />
                           <Route path="/forgot-password" element={<ForgotPassword />} />
                           <Route path="/reset-password"  element={<ResetPassword />} />
 
-                          {/* Portail client */}
-                          <Route path="/espace-client"      element={<EspaceClient />} />
+                          {/* Portail client (protégé — rôle CLIENT requis) */}
+                          <Route path="/espace-client"      element={<ClientRoute><EspaceClient /></ClientRoute>} />
                           <Route path="/inscription-client" element={<InscriptionClient />} />
 
                           {/* Routes protégées avec layout Dashboard */}

@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useRef, useEffect } from "react";
-import { Building2, Upload, User, Shield, Mail, Phone, Camera, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { Building2, Upload, User, Shield, Mail, Phone, Camera, ImagePlus, Loader2, Trash2, MapPin, Calendar, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,9 +45,15 @@ export default function MonCabinet() {
     nom: user?.nom ?? "",
     prenom: user?.prenom ?? "",
     email: user?.email ?? "",
-    telephone: "",
+    telephone: user?.telephone ?? "",
     role: user?.role ?? "",
+    dateNaissance: user?.dateNaissance ?? "",
+    lieuNaissance: user?.lieuNaissance ?? "",
+    adresse: user?.adresse ?? "",
+    photoUrl: user?.photoUrl ?? "",
   });
+  const [photoPreview, setPhotoPreview] = useState<string>(user?.photoUrl ?? "");
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [securiteForm, setSecuriteForm] = useState({
     oldPassword: "",
@@ -90,8 +96,14 @@ export default function MonCabinet() {
         nom: user.nom,
         prenom: user.prenom,
         email: user.email,
+        telephone: user.telephone ?? f.telephone,
         role: user.role,
+        dateNaissance: user.dateNaissance ?? f.dateNaissance,
+        lieuNaissance: user.lieuNaissance ?? f.lieuNaissance,
+        adresse: user.adresse ?? f.adresse,
+        photoUrl: user.photoUrl ?? f.photoUrl,
       }));
+      setPhotoPreview(user.photoUrl ?? "");
     }
   }, [user]);
 
@@ -162,6 +174,14 @@ export default function MonCabinet() {
   };
 
   // ── Sauvegarde du profil ─────────────────────────────────────────────────────
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveProfil = async () => {
     setSavingProfil(true);
     try {
@@ -169,8 +189,12 @@ export default function MonCabinet() {
         nom: profilForm.nom,
         prenom: profilForm.prenom,
         email: profilForm.email,
-        telephone: profilForm.telephone,
+        telephone: profilForm.telephone || undefined,
         role: profilForm.role,
+        dateNaissance: profilForm.dateNaissance || undefined,
+        lieuNaissance: profilForm.lieuNaissance || undefined,
+        adresse: profilForm.adresse || undefined,
+        photoUrl: profilForm.photoUrl || undefined,
       });
       toast.success(t("cabinet.toastProfileSaved"));
     } catch (err: unknown) {
@@ -373,12 +397,23 @@ export default function MonCabinet() {
       {activeTab === "profil" && (
         <div className="max-w-2xl">
           <div className="rounded-xl border border-border bg-card p-6 shadow-card space-y-5">
-            <div className="flex items-center gap-4 mb-4">
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4 mb-2">
               <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/20 font-heading text-2xl font-bold text-primary">
-                  {profilForm.prenom.charAt(0)}{profilForm.nom.charAt(0)}
-                </div>
-                <button className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors">
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Photo profil" className="h-20 w-20 rounded-full object-cover border-2 border-primary/30 shadow-md" />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/20 font-heading text-2xl font-bold text-primary">
+                    {profilForm.prenom.charAt(0)}{profilForm.nom.charAt(0)}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                >
                   <Camera className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -387,6 +422,20 @@ export default function MonCabinet() {
                 <p className="text-sm text-muted-foreground">{profilForm.role} · {cabinetForm.nom}</p>
               </div>
             </div>
+
+            {/* URL photo */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> URL de la photo</Label>
+              <Input
+                value={profilForm.photoUrl}
+                onChange={e => { setProfilForm(f => ({ ...f, photoUrl: e.target.value })); setPhotoPreview(e.target.value); }}
+                placeholder="https://cdn.example.com/photo.jpg"
+                className="font-mono text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">Le fichier sélectionné est une prévisualisation locale — saisissez une URL HTTPS pour l'enregistrer.</p>
+            </div>
+
+            {/* Nom / Prénom */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>{t("cabinet.lastName")}</Label>
@@ -397,20 +446,43 @@ export default function MonCabinet() {
                 <Input value={profilForm.prenom} onChange={e => setProfilForm(f => ({ ...f, prenom: e.target.value }))} />
               </div>
             </div>
+
+            {/* Email / Téléphone */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> {t("label.email")}</Label>
                 <Input value={profilForm.email} onChange={e => setProfilForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {t("cabinet.officePhone")}</Label>
-                <Input value={profilForm.telephone} onChange={e => setProfilForm(f => ({ ...f, telephone: e.target.value }))} />
+                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Téléphone</Label>
+                <Input value={profilForm.telephone} onChange={e => setProfilForm(f => ({ ...f, telephone: e.target.value }))} placeholder="+224 6XX XXX XXX" />
               </div>
             </div>
+
+            {/* Date / Lieu de naissance */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Date de naissance</Label>
+                <Input type="date" value={profilForm.dateNaissance} onChange={e => setProfilForm(f => ({ ...f, dateNaissance: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1"><Flag className="h-3.5 w-3.5" /> Lieu de naissance</Label>
+                <Input value={profilForm.lieuNaissance} onChange={e => setProfilForm(f => ({ ...f, lieuNaissance: e.target.value }))} placeholder="Ex: Conakry" />
+              </div>
+            </div>
+
+            {/* Adresse */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Adresse</Label>
+              <Input value={profilForm.adresse} onChange={e => setProfilForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Ex: Quartier Kaloum, Conakry" />
+            </div>
+
+            {/* Rôle (lecture seule) */}
             <div className="space-y-2">
               <Label>{t("cabinet.role")}</Label>
               <Input value={profilForm.role} disabled className="opacity-60" />
             </div>
+
             <Button
               className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
               onClick={handleSaveProfil}

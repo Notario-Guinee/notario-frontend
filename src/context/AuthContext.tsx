@@ -9,6 +9,11 @@ interface User {
   actif: boolean;
   nomComplet: string;
   initiales: string;
+  telephone?: string | null;
+  dateNaissance?: string | null;
+  lieuNaissance?: string | null;
+  adresse?: string | null;
+  photoUrl?: string | null;
 }
 
 interface ApiResponse<T> {
@@ -21,7 +26,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, tenantId?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -65,10 +70,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, tenantId?: string) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (tenantId) headers["X-Tenant-ID"] = tenantId;
     const res = await fetch("/api/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ email, password }),
     });
 
