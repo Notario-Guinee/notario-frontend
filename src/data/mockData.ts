@@ -49,6 +49,7 @@ export interface Dossier {
   notaire: string;
   clerc?: string;
   parties?: PartiePrenanteEntry[];
+  deleted?: boolean;
 }
 
 /** Liste des notaires du cabinet */

@@ -4,7 +4,7 @@
 // gestion des parties prenantes, filtres, export CSV/PDF
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
@@ -14,7 +14,12 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
-import { mockDossiers, mockClients, mockNotaires, mockClercs, formatGNF, rolesParties, currentUser, type Dossier, type PartiePrenanteEntry } from "@/data/mockData";
+import { mockClients, mockNotaires, mockClercs, formatGNF, rolesParties, currentUser, type Dossier, type PartiePrenanteEntry } from "@/data/mockData";
+import {
+  dossierService, typeActeService,
+  statutLabel, statutValue, prioriteLabel, prioriteValue, roleLabel,
+  type DossierDto, type TypeActeDto,
+} from "@/services/dossierService";
 import { CATEGORIES_ACTES, TYPES_ACTE } from "@/data/constants";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -34,9 +39,59 @@ import { workflowTemplates, WORKFLOW_PALETTE, type WorkflowConfig, type Workflow
 import { useDossierTabs } from "@/context/DossierTabsContext";
 import { useActeSteps } from "@/context/ActeStepsContext";
 
-const categoriesActes = CATEGORIES_ACTES;
+// categoriesActes est défini dans le composant pour pouvoir accéder à typeActes
+// La constante statique reste disponible comme fallback
 const statuts: Dossier["statut"][] = ["En cours", "En signature", "En attente pièces", "Terminé", "Suspendu", "Archivé"];
 const priorites: Dossier["priorite"][] = ["Basse", "Normale", "Haute", "Urgente"];
+
+
+/** Convertit un DossierDto (API) en Dossier local (UI).
+ *  Gère les deux conventions de nommage possibles du backend. */
+function mapDtoToLocal(dto: DossierDto): Dossier {
+  const code: string = dto.numeroDossier ?? dto.code ?? String(dto.id);
+
+  const typeActeLibelle: string =
+    dto.typeActeLibelle ??
+    dto.typeActeNom ??
+    (typeof dto.typeActe === "object" && dto.typeActe !== null
+      ? (dto.typeActe.nom ?? dto.typeActe.libelle ?? "")
+      : typeof dto.typeActe === "string"
+      ? dto.typeActe
+      : "");
+
+  const montant: number = dto.montantTotal ?? dto.montant ?? 0;
+  const avancement: number = dto.pourcentageAvancement ?? dto.avancement ?? 0;
+
+  const dateRaw: string = dto.dateOuverture ?? dto.createdAt ?? dto.dateCreation ?? "";
+  const dateLocale: string = dateRaw ? new Date(dateRaw).toLocaleDateString("fr-FR") : "";
+
+  const notaire: string = dto.notaireChargeNom ?? dto.notaireNom ?? "";
+  const clerc: string | undefined = dto.assistantChargeNom ?? dto.clercNom;
+
+  return {
+    id: String(dto.id),
+    code,
+    typeActe: typeActeLibelle,
+    objet: dto.objet ?? dto.description ?? "",
+    clients: dto.parties?.map(p => p.clientNom) ?? [],
+    clientDate: dateLocale,
+    montant,
+    statut: statutLabel(dto.statut) as Dossier["statut"],
+    priorite: prioriteLabel(dto.priorite) as Dossier["priorite"],
+    avancement,
+    nbActes: 0,
+    nbPieces: dto.nbDocuments ?? 0,
+    date: dateRaw,
+    notaire,
+    clerc,
+    parties: dto.parties?.map(p => ({
+      clientCode: p.clientCode,
+      nom: p.clientNom,
+      role: roleLabel(p.role) as PartiePrenanteEntry["role"],
+    })),
+    deleted: dto.deleted ?? false,
+  };
+}
 
 const PAGE_SIZE = 20;
 
@@ -56,7 +111,23 @@ export default function Dossiers() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
-  const [dossiers, setDossiers] = useState<Dossier[]>(mockDossiers);
+
+  const [dossiers, setDossiers] = useState<Dossier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [typeActes, setTypeActes] = useState<TypeActeDto[]>([]);
+
+  // Categories d'actes : API si disponible, constantes sinon
+  const categoriesActes = useMemo(() => {
+    if (typeActes.length === 0) return CATEGORIES_ACTES;
+    const grouped: Record<string, string[]> = {};
+    for (const t of typeActes) {
+      const cat = t.categorieReference ?? t.categorie ?? "Autres";
+      const label = t.nom ?? t.libelle ?? t.code;
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(label);
+    }
+    return Object.entries(grouped).map(([label, actes]) => ({ label, actes }));
+  }, [typeActes]);
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState<string>("all");
   const [filterPriorite, setFilterPriorite] = useState<string>("all");
@@ -79,6 +150,42 @@ export default function Dossiers() {
   const pageTab = activeTabId === "dossiers" ? "dossiers" : (activeTab?.type ?? "dossiers");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ═══ Chargement initial depuis l'API ═══
+const loadDossiers = useCallback(async () => {
+  try {
+    setLoading(true);
+    const page = await dossierService.getAll({ page: 0, size: 100 });
+    console.log("✅ Réponse dossiers:", page);
+    console.log("✅ Type:", typeof page, Array.isArray(page));
+    console.log("✅ Clés:", page ? Object.keys(page) : "null");
+
+    // Gère les 3 formats possibles
+  const raw = page as { content?: DossierDto[]; data?: DossierDto[]; dossiers?: DossierDto[] };
+  const items: DossierDto[] = Array.isArray(page)
+    ? (page as DossierDto[])
+    : raw.content ?? raw.data ?? raw.dossiers ?? [];
+
+  console.log("✅ Items extraits:", items.length);
+  setDossiers(
+    items
+      .filter((d) => !d.deleted)
+      .map(mapDtoToLocal)
+  );
+  } catch (err) {
+    console.error("❌ Erreur complète:", err);
+    toast.error(err instanceof Error ? err.message : "Erreur inconnue");
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+useEffect(() => {
+  loadDossiers();
+  typeActeService.getActifs()
+    .then(data => setTypeActes(data))
+    .catch(() => {});
+}, [loadDossiers]);
 
   // Parties prenantes modal
   const [showPartiesModal, setShowPartiesModal] = useState(false);
@@ -235,7 +342,7 @@ export default function Dossiers() {
     priorite: "Normale" as Dossier["priorite"], notaire: mockNotaires[0], clerc: "", notes: "",
   });
 
-  const resetForm = useCallback(() => setForm({ categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", statut: "En cours", priorite: "Normale", notaire: mockNotaires[0], clerc: "", notes: "" }), []);
+  const resetForm = useCallback(() => setForm({ categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", statut: "En cours", priorite: "Normale", notaire: mockNotaires[0] ?? "", clerc: "", notes: "" }), []);
 
   const filtered = useMemo(() => dossiers.filter((d) => {
     if (filterStatut !== "all" && d.statut !== filterStatut) return false;
@@ -261,84 +368,130 @@ export default function Dossiers() {
     totalMontant: dossiers.reduce((s, d) => s + d.montant, 0),
   }), [dossiers]);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (!form.typeActe?.trim()) {
       toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
       return;
     }
-    if (!form.clients?.trim()) {
-      toast.error(fr ? "Le ou les clients sont obligatoires." : "At least one client is required.");
-      return;
-    }
     setIsSubmitting(true);
     try {
-      const clientNames = form.clients.split(",").map(c => c.trim()).filter(Boolean);
-      const newDossier: Dossier = {
-        id: String(Date.now()),
-        code: `N-2025-${(107 + dossiers.length).toString().padStart(3, "0")}`,
-        typeActe: form.typeActe,
+      // Recherche du typeActeId depuis la liste chargée en API
+      const typeActe = typeActes.find(t => t.libelle === form.typeActe);
+      if (!typeActe) {
+        toast.error(fr ? "Type d'acte non reconnu par le serveur." : "Deed type not recognized by server.");
+        return;
+      }
+      const created = await dossierService.create({
+        typeActeId: typeActe.id,
         objet: form.objet || form.typeActe,
-        clients: clientNames,
-        clientDate: new Date().toLocaleDateString("fr-FR"),
+        statut: statutValue(form.statut),
+        priorite: prioriteValue(form.priorite),
         montant: Number(form.montant) || 0,
-        statut: form.statut,
-        priorite: form.priorite,
-        avancement: 0,
-        nbActes: 0,
-        nbPieces: 0,
-        date: new Date().toISOString().slice(0, 10),
-        notaire: form.notaire,
-        clerc: form.clerc || undefined,
-        parties: [],
-      };
-      setDossiers(prev => [newDossier, ...prev]);
+        notes: form.notes,
+      });
+      setDossiers(prev => [mapDtoToLocal(created), ...prev]);
       setShowCreateModal(false);
       resetForm();
       toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
       announce(fr ? "Dossier créé" : "Case created");
     } catch (err) {
-      toast.error(fr ? "Erreur lors de la création" : "Error creating case");
+      toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la création" : "Error creating case"));
       console.error(err);
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, fr, dossiers.length, announce, resetForm]);
+  }, [form, fr, typeActes, announce, resetForm]);
 
-  const handleEdit = useCallback(() => {
-    if (!editingDossier) return;
-    setDossiers(prev => prev.map(d => d.id === editingDossier.id ? {
-      ...editingDossier,
-      typeActe: form.typeActe || editingDossier.typeActe,
-      objet: form.objet || editingDossier.objet,
-      clients: form.clients ? form.clients.split(",").map(c => c.trim()).filter(Boolean) : editingDossier.clients,
-      montant: form.montant ? Number(form.montant) : editingDossier.montant,
-      statut: form.statut,
-      priorite: form.priorite,
-      notaire: form.notaire || editingDossier.notaire,
-      clerc: form.clerc || undefined,
-    } : d));
+const handleEdit = useCallback(async () => {
+  if (!editingDossier) return;
+  setIsSubmitting(true);
+  try {
+    const typeActe = form.typeActe
+      ? typeActes.find(t => (t.nom ?? t.libelle) === form.typeActe)
+      : null;
+
+    // 1. Mise à jour des champs principaux
+    const payload: UpdateDossierDto = {
+      ...(typeActe ? { typeActeId: typeActe.id } : {}),
+      objet: form.objet?.trim() || editingDossier.objet,
+      priorite: prioriteValue(form.priorite),
+      ...(form.montant ? { montant: Number(form.montant) } : {}),
+    };
+
+    let updated = await dossierService.update(Number(editingDossier.id), payload);
+
+    // 2. Changement de statut via endpoint dédié si modifié
+    if (form.statut !== editingDossier.statut) {
+      updated = await dossierService.changerStatut(
+        Number(editingDossier.id),
+        statutValue(form.statut)
+      );
+    }
+
+    setDossiers(prev =>
+      prev.map(d => d.id === editingDossier.id ? mapDtoToLocal(updated) : d)
+    );
     setShowEditModal(false);
     toast.success(fr ? "Dossier modifié avec succès" : "Case updated successfully");
-  }, [editingDossier, form, fr]);
+  } catch (err) {
+    console.error("❌ Erreur modification:", err);
+    toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la modification" : "Error updating case"));
+  } finally {
+    setIsSubmitting(false);
+  }
+}, [editingDossier, form, fr, typeActes]);
 
-  const handleDelete = useCallback(() => {
-    if (!editingDossier) return;
-    try {
+const handleDelete = useCallback(async () => {
+  if (!editingDossier) return;
+  try {
+    await dossierService.delete(Number(editingDossier.id));
+
+    // Retire immédiatement de l'UI sans recharger
+    setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
+
+    // Ferme les onglets ouverts sur ce dossier
+    closeTab(`${editingDossier.id}-details`);
+    closeTab(`${editingDossier.id}-workflow`);
+    setActiveTabId("dossiers");
+
+    setShowDeleteDialog(false);
+    setEditingDossier(null);
+    toast.success(fr ? "Dossier supprimé" : "Case deleted");
+    announce(fr ? "Dossier supprimé" : "Case deleted");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+
+    // Le backend retourne "Dossier supprimé" si déjà soft-deleted
+    // → on traite ça comme un succès côté UI
+    if (message === "Dossier supprimé" || message.toLowerCase().includes("supprim")) {
       setDossiers(prev => prev.filter(d => d.id !== editingDossier.id));
+      closeTab(`${editingDossier.id}-details`);
+      closeTab(`${editingDossier.id}-workflow`);
+      setActiveTabId("dossiers");
       setShowDeleteDialog(false);
       setEditingDossier(null);
       toast.success(fr ? "Dossier supprimé" : "Case deleted");
-      announce(fr ? "Dossier supprimé" : "Case deleted");
+      return;
+    }
+
+    console.error("❌ Erreur suppression:", err);
+    toast.error(message || (fr ? "Erreur lors de la suppression" : "Error deleting case"));
+  } finally {
+    // Recharge la liste pour être en sync avec le backend
+    loadDossiers();
+  }
+}, [editingDossier, fr, announce, closeTab, setActiveTabId, loadDossiers]);
+
+  const handleArchive = useCallback(async (d: Dossier) => {
+    try {
+      const updated = await dossierService.archiver(Number(d.id));
+      setDossiers(prev => prev.map(dos => dos.id === d.id ? mapDtoToLocal(updated) : dos));
+      toast.success(fr ? `Dossier ${d.code} archivé` : `Case ${d.code} archived`);
+      announce(fr ? "Dossier archivé" : "Case archived");
     } catch (err) {
-      toast.error(fr ? "Erreur lors de la suppression" : "Error deleting case");
+      toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de l'archivage" : "Error archiving case"));
       console.error(err);
     }
-  }, [editingDossier, fr, announce]);
-
-  const handleArchive = useCallback((d: Dossier) => {
-    setDossiers(prev => prev.map(dos => dos.id === d.id ? { ...dos, statut: "Archivé" as Dossier["statut"] } : dos));
-    toast.success(fr ? `Dossier ${d.code} archivé` : `Case ${d.code} archived`);
-    announce(fr ? "Dossier archivé" : "Case archived");
   }, [fr, announce]);
 
   const openEdit = useCallback((d: Dossier) => {
@@ -350,7 +503,7 @@ export default function Dossiers() {
       notaire: d.notaire, clerc: d.clerc || "", notes: "",
     });
     setShowEditModal(true);
-  }, []);
+  }, [categoriesActes]);
 
   const openDelete = useCallback((d: Dossier) => {
     setEditingDossier(d);
@@ -509,6 +662,14 @@ export default function Dossiers() {
       {/* ── Tab: Dossiers ──────────────────────────────────────── */}
       {pageTab === "dossiers" && (<>
 
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      )}
+
+      {!loading && (<>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
@@ -591,11 +752,14 @@ export default function Dossiers() {
               <tbody>
                 {visibleDossiers.map((d) => (
                   <tr key={d.id}
-                    className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                    className={cn("border-b border-border last:border-0 hover:bg-muted/20 transition-colors", d.deleted && "opacity-50 bg-muted/30")}>
                     <td className="px-4 py-4">
-                      <span className="text-sm font-mono font-medium text-primary cursor-pointer hover:underline" onClick={() => openDossierTab(d, "details")}>
-                        {d.code}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn("text-sm font-mono font-medium cursor-pointer hover:underline", d.deleted ? "text-muted-foreground line-through" : "text-primary")} onClick={() => openDossierTab(d, "details")}>
+                          {d.code}
+                        </span>
+                        {d.deleted && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive/15 text-destructive">{fr ? "Supprimé" : "Deleted"}</span>}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <div>
@@ -662,10 +826,13 @@ export default function Dossiers() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibleDossiers.map((d, i) => (
             <motion.div key={d.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-              className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className={cn("rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer", d.deleted && "opacity-50 border-dashed")}
               onClick={() => openDossierTab(d, "details")}>
               <div className="flex items-start justify-between mb-3">
-                <span className="text-sm font-mono font-medium text-primary">{d.code}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-sm font-mono font-medium", d.deleted ? "text-muted-foreground line-through" : "text-primary")}>{d.code}</span>
+                  {d.deleted && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive/15 text-destructive">{fr ? "Supprimé" : "Deleted"}</span>}
+                </div>
                 <StatusBadge status={d.statut} />
               </div>
               <h3 className="font-heading font-semibold text-foreground mb-1">{d.objet}</h3>
@@ -710,6 +877,8 @@ export default function Dossiers() {
           )}
         </div>
       )}
+
+      </>)}
 
       </>)}
 
@@ -1161,19 +1330,20 @@ export default function Dossiers() {
                 </SelectContent>
               </Select>
             </div>
-            {form.categorieActe && (
-              <div className="space-y-2">
-                <Label>{fr ? "Acte spécifique" : "Specific act"}</Label>
-                <Select value={form.typeActe} onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}>
-                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un acte" : "Select an act"} /></SelectTrigger>
-                  <SelectContent>
-                    {(categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>{fr ? "Acte spécifique" : "Specific act"}</Label>
+              <Select value={form.typeActe} onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}>
+                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un acte" : "Select an act"} /></SelectTrigger>
+                <SelectContent>
+                  {(form.categorieActe
+                    ? (categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? [])
+                    : categoriesActes.flatMap(c => c.actes)
+                  ).map(a => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>{fr ? "Statut" : "Status"}</Label>
               <Select value={form.statut} onValueChange={v => setForm(f => ({ ...f, statut: v as Dossier["statut"] }))}>
