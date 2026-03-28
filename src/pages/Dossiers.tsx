@@ -19,7 +19,13 @@ import {
   dossierService, typeActeService,
   statutLabel, statutValue, prioriteLabel, roleLabel,
   STATUT_TRANSITIONS, STATUTS_TERMINAUX,
-  type DossierDto, type TypeActeDto, type StatutDossier,
+  type DossierDto, 
+  type TypeActeDto, 
+  type StatutDossier,
+  type DocumentDossierDto,
+  type CreateDocumentDto, 
+  type WorkflowEtapeDto,  
+  type UpdateDossierDto,      
 } from "@/services/dossierService";
 import { TYPES_ACTE } from "@/data/constants";
 import { motion } from "framer-motion";
@@ -185,34 +191,40 @@ export default function Dossiers() {
     confidentiel: false,
   });
 
-  // ═══ Chargement initial depuis l'API ═══
-const loadDossiers = useCallback(async () => {
-  try {
-    setLoading(true);
-    const page = await dossierService.getAll({ page: 0, size: 100 });
-    console.log("✅ Réponse dossiers:", page);
-    console.log("✅ Type:", typeof page, Array.isArray(page));
-    console.log("✅ Clés:", page ? Object.keys(page) : "null");
+  // ═══ Signature électronique ═══
+  const [signatureEnCours, setSignatureEnCours] = useState(false);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [documentASigner, setDocumentASigner] = useState<DocumentDossierDto | null>(null);
 
-    // Gère les 3 formats possibles
-  const raw = page as { content?: DossierDto[]; data?: DossierDto[]; dossiers?: DossierDto[] };
-  const items: DossierDto[] = Array.isArray(page)
-    ? (page as DossierDto[])
-    : raw.content ?? raw.data ?? raw.dossiers ?? [];
 
-  console.log("✅ Items extraits:", items.length);
-  setDossiers(
-    items
-      .filter((d) => !d.deleted)
-      .map(mapDtoToLocal)
-  );
-  } catch (err) {
-    console.error("❌ Erreur complète:", err);
-    toast.error(err instanceof Error ? err.message : "Erreur inconnue");
-  } finally {
-    setLoading(false);
-  }
-}, []);
+    // ═══ Chargement initial depuis l'API ═══
+  const loadDossiers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const page = await dossierService.getAll({ page: 0, size: 100 });
+      console.log("✅ Réponse dossiers:", page);
+      console.log("✅ Type:", typeof page, Array.isArray(page));
+      console.log("✅ Clés:", page ? Object.keys(page) : "null");
+
+      // Gère les 3 formats possibles
+    const raw = page as { content?: DossierDto[]; data?: DossierDto[]; dossiers?: DossierDto[] };
+    const items: DossierDto[] = Array.isArray(page)
+      ? (page as DossierDto[])
+      : raw.content ?? raw.data ?? raw.dossiers ?? [];
+
+    console.log("✅ Items extraits:", items.length);
+    setDossiers(
+      items
+        .filter((d) => !d.deleted)
+        .map(mapDtoToLocal)
+    );
+    } catch (err) {
+      console.error("❌ Erreur complète:", err);
+      toast.error(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
 // ═══ Chargement du workflow depuis l'API ═══
 const loadWorkflow = useCallback(async (dossierId: number) => {
@@ -259,6 +271,73 @@ useEffect(() => {
   }
 }, [selectedDossier, detailTab, loadDocuments]);
 
+
+ const openSignatureModal = (document: DocumentDossierDto) => {
+    setDocumentASigner(document);
+    setShowSignatureModal(true);
+  };
+
+  /** Signer un document */
+  const handleSignerDocument = async (documentId: number) => {
+    if (!selectedDossier) return;
+    
+    try {
+      setSignatureEnCours(true);
+      
+      const response = await dossierService.signerDocument(
+        Number(selectedDossier.id), 
+        documentId
+      );
+      
+      // ✅ Si la réponse est enveloppée dans un objet "data"
+      const result = response.data || response;
+      
+      if (result.success) {
+        if (result.urlSignature) {
+          window.open(result.urlSignature, "_blank");
+          toast.info(
+            fr 
+              ? "Redirection vers la plateforme de signature..." 
+              : "Redirecting to signature platform..."
+          );
+        } else if (result.pdfSigne) {
+          const link = document.createElement("a");
+          const base64Data = result.pdfSigne;
+          const blob = base64ToBlob(base64Data, "application/pdf");
+          const url = URL.createObjectURL(blob);
+          link.href = url;
+          link.download = `document_signe_${documentId}.pdf`;
+          link.click();
+          URL.revokeObjectURL(url);
+          
+          toast.success(fr ? "Document signé avec succès" : "Document signed successfully");
+        }
+        
+        await loadDocuments(Number(selectedDossier.id));
+        setShowSignatureModal(false);
+        setDocumentASigner(null);
+      } else {
+        toast.error(result.message || (fr ? "Erreur lors de la signature" : "Error during signature"));
+      }
+      
+    } catch (error) {
+      console.error("Erreur signature:", error);
+      toast.error(fr ? "Erreur lors de la signature" : "Error during signature");
+    } finally {
+      setSignatureEnCours(false);
+    }
+  };
+
+  /** Helper: convertir base64 en Blob */
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  };
 
 // ═══ Gestion des documents ═══
 
@@ -337,7 +416,7 @@ const handleValiderDocument = async (documentId: number) => {
 };
 
 /** Téléchargement d'un document */
-const handleDownloadDocument = async (documentId: number, nom: string) => {
+const handleDownloadDocument = async (documentId: number, _nom: string) => {
   if (!selectedDossier) return;
   
   try {
@@ -423,8 +502,6 @@ useEffect(() => {
   const [dossierComments, setDossierComments] = useState<Record<string, { user: string; text: string; date: string }[]>>({});
   const [newComment, setNewComment] = useState("");
 
-  // ═══ Pièces jointes par dossier ═══
-  const [dossierPieces, setDossierPieces] = useState<Record<string, Array<{nom: string, date: string, taille: string}>>>({});
   const pieceInputRef = useRef<HTMLInputElement>(null);
   const factureImportRef = useRef<HTMLInputElement>(null);
 
@@ -467,17 +544,6 @@ useEffect(() => {
     toast.success(fr ? "Commentaire ajouté" : "Comment added");
   };
 
-  const handlePieceImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedDossier || !e.target.files) return;
-    const files = Array.from(e.target.files).map(f => ({
-      nom: f.name,
-      date: new Date().toLocaleDateString(fr ? "fr-FR" : "en-US"),
-      taille: f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} Mo` : `${Math.round(f.size / 1024)} Ko`,
-    }));
-    setDossierPieces(prev => ({ ...prev, [selectedDossier.id]: [...(prev[selectedDossier.id] || []), ...files] }));
-    toast.success(fr ? `${files.length} pièce(s) importée(s)` : `${files.length} document(s) imported`);
-    e.target.value = "";
-  };
 
   const handleFactureFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
@@ -1474,10 +1540,12 @@ const handleDelete = useCallback(async () => {
                               {fr ? "Ajouté le" : "Added on"} {new Date(doc.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
                               {doc.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${doc.valideParNom}`}
                               {doc.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${doc.signeParNom}`}
+                              {doc.dateSignature && ` · ${new Date(doc.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            {!doc.valideParNom && doc.statut !== "VALIDE" && (
+                            {/* Bouton Valider - visible si non validé et non signé */}
+                            {!doc.valideParNom && doc.statut !== "VALIDE" && !doc.signe && (
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
@@ -1488,6 +1556,21 @@ const handleDelete = useCallback(async () => {
                                 {fr ? "Valider" : "Validate"}
                               </Button>
                             )}
+                            
+                            {/* ✅ Bouton Signer - visible si validé, signature requise, et non signé */}
+                            {doc.valideParNom && doc.signatureRequise && !doc.signe && (
+                              <Button 
+                                variant="default" 
+                                size="sm" 
+                                className="h-7 text-xs bg-primary"
+                                onClick={() => openSignatureModal(doc)}
+                              >
+                                <FileSignature className="h-3.5 w-3.5 mr-1" />
+                                {fr ? "Signer" : "Sign"}
+                              </Button>
+                            )}
+                            
+                            {/* Bouton Télécharger */}
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -1496,6 +1579,8 @@ const handleDelete = useCallback(async () => {
                             >
                               <FileDown className="h-3.5 w-3.5" />
                             </Button>
+                            
+                            {/* Bouton Supprimer */}
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -1578,7 +1663,7 @@ const handleDelete = useCallback(async () => {
           </div>
         )
       )}
-
+ 
       {/* ── Tab: Workflow ──────────────────────────────────────── */}
       {pageTab === "workflow" && (
         selectedDossier ? (
@@ -2292,6 +2377,64 @@ const handleDelete = useCallback(async () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de signature électronique */}
+<Dialog open={showSignatureModal} onOpenChange={setShowSignatureModal}>
+  <DialogContent className="max-w-md">
+    <DialogHeader>
+      <DialogTitle className="font-heading">{fr ? "Signature électronique" : "Electronic Signature"}</DialogTitle>
+      <DialogDescription>
+        {fr 
+          ? `Vous allez signer le document : ${documentASigner?.nomDocument}`
+          : `You are about to sign: ${documentASigner?.nomDocument}`}
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="space-y-4 py-4">
+      <div className="rounded-lg bg-muted/30 border border-border p-4 text-center">
+        <FileSignature className="h-12 w-12 mx-auto text-primary mb-2" />
+        <p className="text-sm text-muted-foreground">
+          {fr 
+            ? "En cliquant sur \"Signer\", vous apposez votre signature électronique sur ce document."
+            : "By clicking \"Sign\", you apply your electronic signature to this document."}
+        </p>
+        <p className="text-xs text-muted-foreground mt-2">
+          {fr 
+            ? "La signature est juridiquement valable et équivaut à une signature manuscrite."
+            : "The signature is legally valid and equivalent to a handwritten signature."}
+        </p>
+      </div>
+      
+      {documentASigner?.observations && (
+        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3">
+          <p className="text-xs text-yellow-800 dark:text-yellow-200">
+            {documentASigner.observations}
+          </p>
+        </div>
+      )}
+    </div>
+    
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowSignatureModal(false)}>
+        {fr ? "Annuler" : "Cancel"}
+      </Button>
+      <Button 
+        className="bg-primary text-primary-foreground"
+        onClick={() => documentASigner && handleSignerDocument(documentASigner.id)}
+        disabled={signatureEnCours}
+      >
+        {signatureEnCours ? (
+          <>
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+            {fr ? "Signature..." : "Signing..."}
+          </>
+        ) : (
+          <>{fr ? "Signer" : "Sign"}</>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </div>
   );
 }

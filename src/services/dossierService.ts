@@ -19,11 +19,8 @@ export interface Page<T> {
 export interface TypeActeDto {
   id: number;
   code: string;
-  /** Nom du type d'acte — champ réel du backend */
   nom: string;
-  /** Catégorie de référence — champ réel du backend */
   categorieReference?: string;
-  /** Alias pour compatibilité (si le backend expose aussi 'libelle') */
   libelle?: string;
   categorie?: string;
   description?: string;
@@ -63,28 +60,25 @@ export type StatutDossier =
   | "ANNULE"
   | "ARCHIVE";
 
-/** Transitions autorisées par statut (workflow) */
 export const STATUT_TRANSITIONS: Record<StatutDossier, StatutDossier[]> = {
-  BROUILLON:              ["EN_COURS", "ANNULE"],
-  EN_COURS:               ["EN_ATTENTE", "EN_ATTENTE_VALIDATION", "PRET_SIGNATURE", "SUSPENDU", "ANNULE"],
-  EN_ATTENTE:             ["EN_COURS", "EN_ATTENTE_SIGNATURE", "ANNULE"],
-  EN_ATTENTE_SIGNATURE:   ["SIGNE", "EN_COURS", "ANNULE"],
-  EN_ATTENTE_VALIDATION:  ["PRET_SIGNATURE", "EN_COURS", "ANNULE"],
-  PRET_SIGNATURE:         ["SIGNE", "EN_COURS", "ANNULE"],
-  SIGNE:                  ["ENREGISTRE", "CLOTURE"],
-  ENREGISTRE:             ["CLOTURE"],
-  SUSPENDU:               ["EN_COURS", "ANNULE"],
-  CLOTURE:                ["ARCHIVE"],
-  ANNULE:                 [],
-  ARCHIVE:                [],
+  BROUILLON: ["EN_COURS", "ANNULE"],
+  EN_COURS: ["EN_ATTENTE", "EN_ATTENTE_VALIDATION", "PRET_SIGNATURE", "SUSPENDU", "ANNULE"],
+  EN_ATTENTE: ["EN_COURS", "EN_ATTENTE_SIGNATURE", "ANNULE"],
+  EN_ATTENTE_SIGNATURE: ["SIGNE", "EN_COURS", "ANNULE"],
+  EN_ATTENTE_VALIDATION: ["PRET_SIGNATURE", "EN_COURS", "ANNULE"],
+  PRET_SIGNATURE: ["SIGNE", "EN_COURS", "ANNULE"],
+  SIGNE: ["ENREGISTRE", "CLOTURE"],
+  ENREGISTRE: ["CLOTURE"],
+  SUSPENDU: ["EN_COURS", "ANNULE"],
+  CLOTURE: ["ARCHIVE"],
+  ANNULE: [],
+  ARCHIVE: [],
 };
 
-/** Statuts terminaux — aucune transition possible */
 export const STATUTS_TERMINAUX: StatutDossier[] = ["CLOTURE", "ANNULE", "ARCHIVE"];
-
 export type PrioriteDossier = "BASSE" | "NORMALE" | "HAUTE" | "URGENTE";
 
-// ── Types Documents ─────────────────────────────────────────────────────────
+// ── Types Documents (UN SEUL) ─────────────────────────────────────────────────
 
 export interface DocumentDossierDto {
   id: number;
@@ -133,54 +127,14 @@ export interface UpdateDocumentDto {
   confidentiel?: boolean;
 }
 
-
-export type RolePartie =
-  | "ACHETEUR"
-  | "VENDEUR"
-  | "BENEFICIAIRE"
-  | "MANDANT"
-  | "MANDATAIRE"
-  | "PRENEUR"
-  | "BAILLEUR"
-  | "DONATEUR"
-  | "DONATAIRE"
-  | "HERITIER"
-  | "AUTRE";
-
-export interface PartiePrenanteDto {
-  id: number;
-  clientId: number;
-  clientCode: string;
-  clientNom: string;
-  role: RolePartie;
+export interface SignatureResponse {
+  success: boolean;
+  urlSignature?: string;
+  pdfSigne?: string;
+  message?: string;
 }
 
-export interface DocumentDossierDto {
-  id: number;
-  nom: string;
-  type: string;
-  taille: number;
-  dateAjout: string;
-  ajoutePar: string;
-  url?: string;
-}
-
-export interface CommentaireDto {
-  id: number;
-  texte: string;
-  auteur: string;
-  dateCreation: string;
-}
-
-export interface HistoriqueEntreeDto {
-  id: number;
-  action: string;
-  detail?: string;
-  auteur: string;
-  date: string;
-}
-
-// À ajouter dans les types
+// ── Types Workflow ────────────────────────────────────────────────────────────
 
 export interface WorkflowEtapeDto {
   id: number;
@@ -210,13 +164,48 @@ export interface WorkflowDossierDto {
   etapes: WorkflowEtapeDto[];
 }
 
+// ── Autres types ──────────────────────────────────────────────────────────────
+
+export type RolePartie =
+  | "ACHETEUR"
+  | "VENDEUR"
+  | "BENEFICIAIRE"
+  | "MANDANT"
+  | "MANDATAIRE"
+  | "PRENEUR"
+  | "BAILLEUR"
+  | "DONATEUR"
+  | "DONATAIRE"
+  | "HERITIER"
+  | "AUTRE";
+
+export interface PartiePrenanteDto {
+  id: number;
+  clientId: number;
+  clientCode: string;
+  clientNom: string;
+  role: RolePartie;
+}
+
+export interface CommentaireDto {
+  id: number;
+  texte: string;
+  auteur: string;
+  dateCreation: string;
+}
+
+export interface HistoriqueEntreeDto {
+  id: number;
+  action: string;
+  detail?: string;
+  auteur: string;
+  date: string;
+}
+
 export interface DossierDto {
   id: number;
-  /** Numéro du dossier — champ réel backend (colonne numero_dossier) */
   numeroDossier?: string;
-  /** Alias si le backend expose 'code' dans le DTO */
   code?: string;
-  /** Référence à l'entité TypeActe — peut être un objet ou juste l'id */
   typeActe?: { id: number; nom?: string; libelle?: string; categorieReference?: string } | string;
   typeActeId?: number;
   typeActeLibelle?: string;
@@ -225,17 +214,11 @@ export interface DossierDto {
   description?: string;
   statut: StatutDossier;
   priorite: PrioriteDossier;
-  /** Pourcentage d'avancement — colonne pourcentage_avancement */
   pourcentageAvancement?: number;
-  /** Alias si le backend expose 'avancement' */
   avancement?: number;
-  /** Montant total — colonne montant_total */
   montantTotal?: number;
-  /** Alias si le backend expose 'montant' */
   montant?: number;
-  /** Date d'ouverture — colonne date_ouverture */
   dateOuverture?: string;
-  /** Alias si le backend expose createdAt */
   createdAt?: string;
   dateCreation?: string;
   dateEcheance?: string;
@@ -251,7 +234,6 @@ export interface DossierDto {
   nbDocuments?: number;
   parties?: PartiePrenanteDto[];
   deleted?: boolean;
-  // Champs détaillés
   honorairesHT?: number;
   honorairesTTC?: number;
   tva?: number;
@@ -355,47 +337,44 @@ export interface GenerateFactureDto {
   echeance?: string;
 }
 
-// ── Helpers de conversion statut / priorité ───────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Statut backend → label FR affiché dans l'UI */
 export function statutLabel(s: StatutDossier): string {
   const map: Record<StatutDossier, string> = {
-    BROUILLON:             "Brouillon",
-    EN_COURS:              "En Cours",
-    EN_ATTENTE:            "En Attente",
-    EN_ATTENTE_SIGNATURE:  "En Attente de Signature",
+    BROUILLON: "Brouillon",
+    EN_COURS: "En Cours",
+    EN_ATTENTE: "En Attente",
+    EN_ATTENTE_SIGNATURE: "En Attente de Signature",
     EN_ATTENTE_VALIDATION: "En Attente de Validation",
-    PRET_SIGNATURE:        "Prêt pour Signature",
-    SIGNE:                 "Signé",
-    ENREGISTRE:            "Enregistré",
-    SUSPENDU:              "Suspendu",
-    CLOTURE:               "Clôturé",
-    ANNULE:                "Annulé",
-    ARCHIVE:               "Archivé",
+    PRET_SIGNATURE: "Prêt pour Signature",
+    SIGNE: "Signé",
+    ENREGISTRE: "Enregistré",
+    SUSPENDU: "Suspendu",
+    CLOTURE: "Clôturé",
+    ANNULE: "Annulé",
+    ARCHIVE: "Archivé",
   };
   return map[s] ?? s;
 }
 
-/** Label UI → valeur backend */
 export function statutValue(label: string): StatutDossier {
   const map: Record<string, StatutDossier> = {
-    "Brouillon":                 "BROUILLON",
-    "En Cours":                  "EN_COURS",
-    "En Attente":                "EN_ATTENTE",
-    "En Attente de Signature":   "EN_ATTENTE_SIGNATURE",
-    "En Attente de Validation":  "EN_ATTENTE_VALIDATION",
-    "Prêt pour Signature":       "PRET_SIGNATURE",
-    "Signé":                     "SIGNE",
-    "Enregistré":                "ENREGISTRE",
-    "Suspendu":                  "SUSPENDU",
-    "Clôturé":                   "CLOTURE",
-    "Annulé":                    "ANNULE",
-    "Archivé":                   "ARCHIVE",
+    "Brouillon": "BROUILLON",
+    "En Cours": "EN_COURS",
+    "En Attente": "EN_ATTENTE",
+    "En Attente de Signature": "EN_ATTENTE_SIGNATURE",
+    "En Attente de Validation": "EN_ATTENTE_VALIDATION",
+    "Prêt pour Signature": "PRET_SIGNATURE",
+    "Signé": "SIGNE",
+    "Enregistré": "ENREGISTRE",
+    "Suspendu": "SUSPENDU",
+    "Clôturé": "CLOTURE",
+    "Annulé": "ANNULE",
+    "Archivé": "ARCHIVE",
   };
   return map[label] ?? "BROUILLON";
 }
 
-/** Priorité backend → label FR */
 export function prioriteLabel(p: PrioriteDossier): string {
   const map: Record<PrioriteDossier, string> = {
     BASSE: "Basse",
@@ -406,7 +385,6 @@ export function prioriteLabel(p: PrioriteDossier): string {
   return map[p] ?? p;
 }
 
-/** Label UI → valeur backend */
 export function prioriteValue(label: string): PrioriteDossier {
   const map: Record<string, PrioriteDossier> = {
     Basse: "BASSE",
@@ -417,7 +395,6 @@ export function prioriteValue(label: string): PrioriteDossier {
   return map[label] ?? "NORMALE";
 }
 
-/** Rôle backend → label FR */
 export function roleLabel(r: RolePartie): string {
   const map: Record<RolePartie, string> = {
     ACHETEUR: "Acheteur",
@@ -435,7 +412,6 @@ export function roleLabel(r: RolePartie): string {
   return map[r] ?? r;
 }
 
-/** Label UI → valeur backend */
 export function roleValue(label: string): RolePartie {
   const map: Record<string, RolePartie> = {
     Acheteur: "ACHETEUR",
@@ -456,63 +432,24 @@ export function roleValue(label: string): RolePartie {
 // ── Service TypeActe ──────────────────────────────────────────────────────────
 
 export const typeActeService = {
-  /** Liste tous les types d'actes (paginée ou complète) */
   getAll: (page = 0, size = 100) =>
     apiClient.get<Page<TypeActeDto>>(`/api/types-actes?page=${page}&size=${size}`),
-
-  /** Uniquement les types actifs */
-  getActifs: () =>
-    apiClient.get<TypeActeDto[]>("/api/types-actes/actifs"),
-
-  /** Liste des catégories disponibles */
-  getCategories: () =>
-    apiClient.get<string[]>("/api/types-actes/categories"),
-
-  /** Recherche full-text */
-  search: (q: string) =>
-    apiClient.get<TypeActeDto[]>(`/api/types-actes/search?q=${encodeURIComponent(q)}`),
-
-  /** Détail d'un type d'acte */
-  getById: (id: number) =>
-    apiClient.get<TypeActeDto>(`/api/types-actes/${id}`),
-
-  /** Créer un type d'acte */
-  create: (dto: CreateTypeActeDto) =>
-    apiClient.post<TypeActeDto>("/api/types-actes", dto),
-
-  /** Modifier un type d'acte */
-  update: (id: number, dto: UpdateTypeActeDto) =>
-    apiClient.put<TypeActeDto>(`/api/types-actes/${id}`, dto),
-
-  /** Activer un type d'acte */
-  activer: (id: number) =>
-    apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/activer`),
-
-  /** Désactiver un type d'acte */
-  desactiver: (id: number) =>
-    apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/desactiver`),
-
-  /** Supprimer un type d'acte */
-  delete: (id: number) =>
-    apiClient.delete<void>(`/api/types-actes/${id}`),
+  getActifs: () => apiClient.get<TypeActeDto[]>("/api/types-actes/actifs"),
+  getCategories: () => apiClient.get<string[]>("/api/types-actes/categories"),
+  search: (q: string) => apiClient.get<TypeActeDto[]>(`/api/types-actes/search?q=${encodeURIComponent(q)}`),
+  getById: (id: number) => apiClient.get<TypeActeDto>(`/api/types-actes/${id}`),
+  create: (dto: CreateTypeActeDto) => apiClient.post<TypeActeDto>("/api/types-actes", dto),
+  update: (id: number, dto: UpdateTypeActeDto) => apiClient.put<TypeActeDto>(`/api/types-actes/${id}`, dto),
+  activer: (id: number) => apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/activer`),
+  desactiver: (id: number) => apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/desactiver`),
+  delete: (id: number) => apiClient.delete<void>(`/api/types-actes/${id}`),
 };
 
 // ── Service Dossier ───────────────────────────────────────────────────────────
 
 export const dossierService = {
-  // ── CRUD de base ──────────────────────────────────────────────────────────
-
-  /** Liste paginée avec filtres optionnels */
-  getAll: (params?: {
-    page?: number;
-    size?: number;
-    statut?: StatutDossier;
-    priorite?: PrioriteDossier;
-    typeActeId?: number;
-    search?: string;
-    dateDebut?: string;
-    dateFin?: string;
-  }) => {
+  // CRUD
+  getAll: (params?: { page?: number; size?: number; statut?: StatutDossier; priorite?: PrioriteDossier; typeActeId?: number; search?: string; dateDebut?: string; dateFin?: string }) => {
     const p = params ?? {};
     const qs = new URLSearchParams();
     if (p.page !== undefined) qs.set("page", String(p.page));
@@ -525,304 +462,96 @@ export const dossierService = {
     if (p.dateFin) qs.set("dateFin", p.dateFin);
     return apiClient.get<Page<DossierDto>>(`/api/dossiers?${qs.toString()}`);
   },
+  search: (q: string, page = 0, size = 20) => apiClient.get<Page<DossierDto>>(`/api/dossiers/search?q=${encodeURIComponent(q)}&page=${page}&size=${size}`),
+  getById: (id: number) => apiClient.get<DossierDto>(`/api/dossiers/${id}`),
+  create: (dto: CreateDossierDto) => apiClient.post<DossierDto>("/api/dossiers", dto),
+  update: (id: number, dto: UpdateDossierDto) => apiClient.put<DossierDto>(`/api/dossiers/${id}`, dto),
+  delete: (id: number) => apiClient.delete<void>(`/api/dossiers/${id}`),
 
-  /** Recherche full-text */
-  search: (q: string, page = 0, size = 20) =>
-    apiClient.get<Page<DossierDto>>(
-      `/api/dossiers/search?q=${encodeURIComponent(q)}&page=${page}&size=${size}`
-    ),
+  // Statut
+  changerStatut: (id: number, statut: StatutDossier) => apiClient.put<DossierDto>(`/api/dossiers/${id}/statut?statut=${statut}`),
+  archiver: (id: number) => apiClient.patch<DossierDto>(`/api/dossiers/${id}/archiver`),
+  suspendre: (id: number) => apiClient.patch<DossierDto>(`/api/dossiers/${id}/suspendre`),
 
-  /** Détail d'un dossier (avec parties) */
-  getById: (id: number) =>
-    apiClient.get<DossierDto>(`/api/dossiers/${id}`),
+  // Avancement
+  getAvancement: (id: number) => apiClient.get<{ avancement: number }>(`/api/dossiers/${id}/avancement`),
+  updateAvancement: (id: number, avancement: number) => apiClient.patch<DossierDto>(`/api/dossiers/${id}/avancement`, { avancement }),
 
-  /** Créer un dossier */
-  create: (dto: CreateDossierDto) =>
-    apiClient.post<DossierDto>("/api/dossiers", dto),
+  // Parties prenantes
+  getParties: (id: number) => apiClient.get<PartiePrenanteDto[]>(`/api/dossiers/${id}/parties`),
+  addPartie: (id: number, dto: AddPartieDto) => apiClient.post<PartiePrenanteDto>(`/api/dossiers/${id}/parties`, dto),
+  updatePartie: (id: number, partieId: number, dto: UpdatePartieDto) => apiClient.put<PartiePrenanteDto>(`/api/dossiers/${id}/parties/${partieId}`, dto),
+  removePartie: (id: number, partieId: number) => apiClient.delete<void>(`/api/dossiers/${id}/parties/${partieId}`),
+  searchParties: (id: number, q: string) => apiClient.get<{ id: number; code: string; nom: string; prenom: string }[]>(`/api/dossiers/${id}/parties/search?q=${encodeURIComponent(q)}`),
 
-  /** Modifier un dossier */
-  update: (id: number, dto: UpdateDossierDto) =>
-    apiClient.put<DossierDto>(`/api/dossiers/${id}`, dto),
-
-  /** Supprimer un dossier */
-  delete: (id: number) =>
-    apiClient.delete<void>(`/api/dossiers/${id}`),
-
-  // ── Statut ────────────────────────────────────────────────────────────────
-
-  /** Changer le statut d'un dossier */
-changerStatut: (id: number, statut: StatutDossier) =>
-  apiClient.put<DossierDto>(`/api/dossiers/${id}/statut?statut=${statut}`),
-
-  /** Archiver un dossier */
-  archiver: (id: number) =>
-    apiClient.patch<DossierDto>(`/api/dossiers/${id}/archiver`),
-
-  /** Suspendre un dossier */
-  suspendre: (id: number) =>
-    apiClient.patch<DossierDto>(`/api/dossiers/${id}/suspendre`),
-
-  // ── Avancement ────────────────────────────────────────────────────────────
-
-  /** Récupérer l'avancement */
-  getAvancement: (id: number) =>
-    apiClient.get<{ avancement: number }>(`/api/dossiers/${id}/avancement`),
-
-  /** Mettre à jour l'avancement (0–100) */
-  updateAvancement: (id: number, avancement: number) =>
-    apiClient.patch<DossierDto>(`/api/dossiers/${id}/avancement`, { avancement }),
-
-  // ── Parties prenantes ─────────────────────────────────────────────────────
-
-  /** Liste des parties d'un dossier */
-  getParties: (id: number) =>
-    apiClient.get<PartiePrenanteDto[]>(`/api/dossiers/${id}/parties`),
-
-  /** Ajouter une partie prenante */
-  addPartie: (id: number, dto: AddPartieDto) =>
-    apiClient.post<PartiePrenanteDto>(`/api/dossiers/${id}/parties`, dto),
-
-  /** Modifier le rôle d'une partie */
-  updatePartie: (id: number, partieId: number, dto: UpdatePartieDto) =>
-    apiClient.put<PartiePrenanteDto>(`/api/dossiers/${id}/parties/${partieId}`, dto),
-
-  /** Retirer une partie prenante */
-  removePartie: (id: number, partieId: number) =>
-    apiClient.delete<void>(`/api/dossiers/${id}/parties/${partieId}`),
-
-  /** Rechercher des parties possibles (clients) */
-  searchParties: (id: number, q: string) =>
-    apiClient.get<{ id: number; code: string; nom: string; prenom: string }[]>(
-      `/api/dossiers/${id}/parties/search?q=${encodeURIComponent(q)}`
-    ),
-
-  // ── Documents ─────────────────────────────────────────────────────────────
-
-  /** Liste des documents d'un dossier */
-  getDocuments: (id: number) =>
-    apiClient.get<DocumentDossierDto[]>(`/api/dossiers/${id}/documents`),
-
-  /** Ajouter un document (multipart géré séparément via fetch natif) */
-/** Ajouter un document (upload) */
-/** Ajouter un document (upload) */
-  addDocument: (dossierId: number, file: File, metadata?: {
-    nomDocument?: string;
-    typeDocument?: string;
-    description?: string;
-    signatureRequise?: boolean;
-    confidentiel?: boolean;
-    obligatoire?: boolean;
-    observations?: string;
-  }) => {
+  // Documents
+  getDocuments: (id: number) => apiClient.get<DocumentDossierDto[]>(`/api/dossiers/${id}/documents`),
+  getDocument: (dossierId: number, documentId: number) => apiClient.get<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`),
+  addDocument: (dossierId: number, file: File, metadata: CreateDocumentDto) => {
     const formData = new FormData();
     formData.append("file", file);
-    
-    // Ajouter les champs optionnels s'ils sont présents
-    if (metadata?.nomDocument) formData.append("nomDocument", metadata.nomDocument);
-    if (metadata?.typeDocument) formData.append("typeDocument", metadata.typeDocument);
-    if (metadata?.description) formData.append("description", metadata.description);
-    if (metadata?.signatureRequise !== undefined) formData.append("signatureRequise", String(metadata.signatureRequise));
-    if (metadata?.confidentiel !== undefined) formData.append("confidentiel", String(metadata.confidentiel));
-    if (metadata?.obligatoire !== undefined) formData.append("obligatoire", String(metadata.obligatoire));
-    if (metadata?.observations) formData.append("observations", metadata.observations);
-    
+    formData.append("nomDocument", metadata.nomDocument);
+    formData.append("typeDocument", metadata.typeDocument);
+    if (metadata.description) formData.append("description", metadata.description);
+    if (metadata.signatureRequise !== undefined) formData.append("signatureRequise", String(metadata.signatureRequise));
+    if (metadata.obligatoire !== undefined) formData.append("obligatoire", String(metadata.obligatoire));
+    if (metadata.confidentiel !== undefined) formData.append("confidentiel", String(metadata.confidentiel));
     const token = localStorage.getItem("accessToken");
     return fetch(`/api/dossiers/${dossierId}/documents`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-    }).then(async (response) => {
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Upload failed");
-      }
-      return response.json();
-    }) as Promise<DocumentDossierDto>;
+    }).then(r => r.json()) as Promise<DocumentDossierDto>;
   },
+  updateDocument: (dossierId: number, documentId: number, data: UpdateDocumentDto) => apiClient.put<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`, data),
+  removeDocument: (dossierId: number, documentId: number) => apiClient.delete<void>(`/api/dossiers/${dossierId}/documents/${documentId}`),
+  validerDocument: (dossierId: number, documentId: number, commentaire?: string) => apiClient.post<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}/valider`, commentaire ? { commentaire } : {}),
+  getDocumentUrl: (dossierId: number, documentId: number) => apiClient.get<{ url: string; nom: string }>(`/api/dossiers/${dossierId}/documents/${documentId}/url`),
 
-  /** Supprimer un document */
-  removeDocument: (id: number, docId: number) =>
-    apiClient.delete<void>(`/api/dossiers/${id}/documents/${docId}`),
+  // Signature
+  signerDocument: (dossierId: number, documentId: number) => apiClient.post<SignatureResponse>(`/api/dossiers/${dossierId}/documents/${documentId}/signer`),
+  getStatutSignature: (dossierId: number, documentId: number) => apiClient.get<{ signe: boolean; signeParId?: number; signeParNom?: string; dateSignature?: string }>(`/api/dossiers/${dossierId}/documents/${documentId}/signature`),
 
-  // ── Workflow ──────────────────────────────────────────────────────────────
+  // Workflow
+  getWorkflow: (id: number) => apiClient.get<WorkflowDossierDto>(`/api/dossiers/${id}/workflow`),
+  getWorkflowEtapes: (id: number) => apiClient.get<WorkflowEtapeDto[]>(`/api/dossiers/${id}/workflow/etapes`),
+  getCurrentEtape: (id: number) => apiClient.get<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/current`),
+  nextEtape: (id: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/next`),
+  previousEtape: (id: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/previous`),
+  completeEtapeById: (dossierId: number, etapeId: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}/complete`),
 
-  /** Récupérer le workflow d'un dossier */
-  getWorkflow: (id: number) =>
-    apiClient.get<WorkflowDossierDto>(`/api/dossiers/${id}/workflow`),
+  // Commentaires
+  getCommentaires: (id: number) => apiClient.get<CommentaireDto[]>(`/api/dossiers/${id}/commentaires`),
+  addCommentaire: (id: number, dto: AddCommentaireDto) => apiClient.post<CommentaireDto>(`/api/dossiers/${id}/commentaires`, dto),
 
-  /** Démarrer une étape */
-  startEtape: (id: number, stepKey: string) =>
-    apiClient.post<WorkflowDossierDto>(`/api/dossiers/${id}/workflow/steps/${stepKey}/start`),
+  // Historique
+  getHistorique: (id: number) => apiClient.get<HistoriqueEntreeDto[]>(`/api/dossiers/${id}/historique`),
 
-  /** Compléter une étape */
-  completeEtape: (id: number, stepKey: string) =>
-    apiClient.post<WorkflowDossierDto>(`/api/dossiers/${id}/workflow/steps/${stepKey}/complete`),
-
-  /** Annuler / rouvrir une étape */
-  revertEtape: (id: number, stepKey: string) =>
-    apiClient.post<WorkflowDossierDto>(`/api/dossiers/${id}/workflow/steps/${stepKey}/revert`),
-
-  // ── Commentaires ──────────────────────────────────────────────────────────
-
-  /** Liste des commentaires d'un dossier */
-  getCommentaires: (id: number) =>
-    apiClient.get<CommentaireDto[]>(`/api/dossiers/${id}/commentaires`),
-
-  /** Ajouter un commentaire (global ou sur une étape) */
-  addCommentaire: (id: number, dto: AddCommentaireDto) =>
-    apiClient.post<CommentaireDto>(`/api/dossiers/${id}/commentaires`, dto),
-
-  // ── Historique ────────────────────────────────────────────────────────────
-
-  /** Journal d'activité d'un dossier */
-  getHistorique: (id: number) =>
-    apiClient.get<HistoriqueEntreeDto[]>(`/api/dossiers/${id}/historique`),
-
-  // ── Actions spéciales ─────────────────────────────────────────────────────
-
-  /** Générer une facture depuis un dossier */
-  generateFacture: (id: number, dto: GenerateFactureDto) =>
-    apiClient.post<{ factureId: number; numero: string }>(`/api/dossiers/${id}/facture`, dto),
-
-  /** Export CSV de la liste */
+  // Actions spéciales
+  generateFacture: (id: number, dto: GenerateFactureDto) => apiClient.post<{ factureId: number; numero: string }>(`/api/dossiers/${id}/facture`, dto),
   exportCsv: (params?: { statut?: StatutDossier; search?: string }) => {
     const qs = new URLSearchParams();
     if (params?.statut) qs.set("statut", params.statut);
     if (params?.search) qs.set("search", params.search);
     return apiClient.get<string>(`/api/dossiers/export?${qs.toString()}`);
   },
+  getStats: () => apiClient.get<DossierStatsDto>("/api/dossiers/statistiques"),
 
-  // ── Statistiques ──────────────────────────────────────────────────────────
+  // Assignation
+  assignerNotaire: (id: number, notaireId: number) => apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-notaire?notaireId=${notaireId}`),
+  assignerAssistant: (id: number, assistantId: number) => apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-assistant?assistantId=${assistantId}`),
 
-  /** Statistiques globales des dossiers du cabinet */
-  getStats: () =>
-    apiClient.get<DossierStatsDto>("/api/dossiers/statistiques"),
+  // Blocage / Alertes
+  bloquer: (id: number, raison: string) => apiClient.post<DossierDto>(`/api/dossiers/${id}/bloquer?raison=${encodeURIComponent(raison)}`),
+  debloquer: (id: number) => apiClient.post<DossierDto>(`/api/dossiers/${id}/debloquer`),
+  activerAlerte: (id: number, message: string) => apiClient.post<void>(`/api/dossiers/${id}/activer-alerte?message=${encodeURIComponent(message)}`),
+  desactiverAlerte: (id: number) => apiClient.delete<void>(`/api/dossiers/${id}/desactiver-alerte`),
 
+  // Calculs
+  calculerHonoraires: (id: number) => apiClient.post<void>(`/api/dossiers/${id}/calculer-honoraires`),
 
-
-
-  // ── Documents ─────────────────────────────────────────────────────────────
-
-/** Liste des documents d'un dossier */
-getDocuments: (id: number) =>
-  apiClient.get<DocumentDossierDto[]>(`/api/dossiers/${id}/documents`),
-
-/** Récupérer un document spécifique */
-getDocument: (dossierId: number, documentId: number) =>
-  apiClient.get<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`),
-
-/** Ajouter un document (upload) */
-addDocument: (dossierId: number, file: File, metadata: CreateDocumentDto) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("nomDocument", metadata.nomDocument);
-  formData.append("typeDocument", metadata.typeDocument);
-  if (metadata.description) formData.append("description", metadata.description);
-  if (metadata.signatureRequise !== undefined) formData.append("signatureRequise", String(metadata.signatureRequise));
-  if (metadata.obligatoire !== undefined) formData.append("obligatoire", String(metadata.obligatoire));
-  if (metadata.confidentiel !== undefined) formData.append("confidentiel", String(metadata.confidentiel));
-  
-  const token = localStorage.getItem("accessToken");
-  return fetch(`/api/dossiers/${dossierId}/documents`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  }).then(r => r.json()) as Promise<DocumentDossierDto>;
-},
-
-/** Mettre à jour les métadonnées d'un document */
-updateDocument: (dossierId: number, documentId: number, data: UpdateDocumentDto) =>
-  apiClient.put<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`, data),
-
-/** Supprimer un document */
-removeDocument: (dossierId: number, documentId: number) =>
-  apiClient.delete<void>(`/api/dossiers/${dossierId}/documents/${documentId}`),
-
-/** Valider un document (par le notaire) */
-validerDocument: (dossierId: number, documentId: number, commentaire?: string) =>
-  apiClient.post<DocumentDossierDto>(
-    `/api/dossiers/${dossierId}/documents/${documentId}/valider`,
-    commentaire ? { commentaire } : {}
-  ),
-
-/** Signer électroniquement un document */
-signerDocument: (dossierId: number, documentId: number) =>
-  apiClient.post<{ success: boolean; urlSignature?: string; pdfSigne?: string }>(
-    `/api/dossiers/${dossierId}/documents/${documentId}/signer`
-  ),
-
-/** Obtenir l'URL de téléchargement d'un document */
-getDocumentUrl: (dossierId: number, documentId: number) =>
-  apiClient.get<{ url: string; nom: string }>(`/api/dossiers/${dossierId}/documents/${documentId}/url`),
-
-
-// ── Workflow avancé (selon Swagger) ──────────────────────────────────────────────
-
-/** Récupérer toutes les étapes du workflow d'un dossier */
-getWorkflowEtapes: (id: number) =>
-  apiClient.get<WorkflowEtapeDto[]>(`/api/dossiers/${id}/workflow/etapes`),
-
-/** Récupérer l'étape courante du workflow */
-getCurrentEtape: (id: number) =>
-  apiClient.get<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/current`),
-
-/** Passer à l'étape suivante */
-nextEtape: (id: number) =>
-  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/next`),
-
-/** Revenir à l'étape précédente */
-previousEtape: (id: number) =>
-  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/previous`),
-
-/** Mettre à jour une étape spécifique */
-updateEtape: (dossierId: number, etapeId: number, data: Partial<WorkflowEtapeDto>) =>
-  apiClient.put<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}`, data),
-
-/** Marquer une étape comme complétée */
-completeEtapeById: (dossierId: number, etapeId: number) =>
-  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}/complete`),
-
-// ── Assignation (Swagger) ───────────────────────────────────────────────────────
-
-/** Assigner un notaire au dossier */
-assignerNotaire: (id: number, notaireId: number) =>
-  apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-notaire?notaireId=${notaireId}`),
-
-/** Assigner un assistant au dossier */
-assignerAssistant: (id: number, assistantId: number) =>
-  apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-assistant?assistantId=${assistantId}`),
-
-// ── Blocage / Déblocage (Swagger) ───────────────────────────────────────────────
-
-/** Bloquer un dossier (empêche toute modification) */
-bloquer: (id: number, raison: string) =>
-  apiClient.post<DossierDto>(`/api/dossiers/${id}/bloquer?raison=${encodeURIComponent(raison)}`),
-
-/** Débloquer un dossier */
-debloquer: (id: number) =>
-  apiClient.post<DossierDto>(`/api/dossiers/${id}/debloquer`),
-
-// ── Alertes (Swagger) ───────────────────────────────────────────────────────────
-
-/** Activer une alerte sur le dossier */
-activerAlerte: (id: number, message: string) =>
-  apiClient.post<void>(`/api/dossiers/${id}/activer-alerte?message=${encodeURIComponent(message)}`),
-
-/** Désactiver l'alerte du dossier */
-desactiverAlerte: (id: number) =>
-  apiClient.delete<void>(`/api/dossiers/${id}/desactiver-alerte`),
-
-// ── Calculs (Swagger) ───────────────────────────────────────────────────────────
-
-/** Calculer les honoraires automatiquement selon le barème */
-calculerHonoraires: (id: number) =>
-  apiClient.post<void>(`/api/dossiers/${id}/calculer-honoraires`),
-
-// ── Statistiques détaillées (Swagger) ──────────────────────────────────────────
-
-/** Récupérer les statistiques détaillées d'un dossier */
-getStatistiquesDetail: (id: number) =>
-  apiClient.get<{
+  // Statistiques détaillées
+  getStatistiquesDetail: (id: number) => apiClient.get<{
     dossierId: number;
     nombreParties: number;
     nombreDocuments: number;
@@ -842,46 +571,21 @@ getStatistiquesDetail: (id: number) =>
     statutActuel: string;
   }>(`/api/dossiers/${id}/statistiques`),
 
-// ── Recherches avancées (Swagger) ──────────────────────────────────────────────
-
-/** Dossiers en retard */
-getEnRetard: (page = 0, size = 20) =>
-  apiClient.get<Page<DossierDto>>(`/api/dossiers/en-retard?page=${page}&size=${size}`),
-
-/** Dossiers récents (N derniers jours) */
-getRecents: (days = 7) =>
-  apiClient.get<DossierDto[]>(`/api/dossiers/recent?days=${days}`),
-
-/** Dossiers d'un client */
-getByClient: (clientId: number, page = 0, size = 20) =>
-  apiClient.get<Page<DossierDto>>(`/api/dossiers/client/${clientId}?page=${page}&size=${size}`),
-
-/** Dossiers par type d'acte */
-getByTypeActe: (typeActe: string, page = 0, size = 20) =>
-  apiClient.get<Page<DossierDto>>(`/api/dossiers/by-type/${encodeURIComponent(typeActe)}?page=${page}&size=${size}`),
-
-/** Dossiers par statut */
-getByStatut: (statut: StatutDossier, page = 0, size = 20) =>
-  apiClient.get<Page<DossierDto>>(`/api/dossiers/by-statut/${statut}?page=${page}&size=${size}`),
-
-/** Recherche avancée multi-critères */
-advancedSearch: (params: {
-  typeActe?: string;
-  statut?: StatutDossier;
-  notaireId?: number;
-  urgent?: boolean;
-  query?: string;
-  page?: number;
-  size?: number;
-}) => {
-  const qs = new URLSearchParams();
-  if (params.typeActe) qs.set("typeActe", params.typeActe);
-  if (params.statut) qs.set("statut", params.statut);
-  if (params.notaireId) qs.set("notaireId", String(params.notaireId));
-  if (params.urgent !== undefined) qs.set("urgent", String(params.urgent));
-  if (params.query) qs.set("query", params.query);
-  if (params.page !== undefined) qs.set("page", String(params.page));
-  if (params.size !== undefined) qs.set("size", String(params.size));
-  return apiClient.get<Page<DossierDto>>(`/api/dossiers/advanced-search?${qs.toString()}`);
-},
+  // Recherches avancées
+  getEnRetard: (page = 0, size = 20) => apiClient.get<Page<DossierDto>>(`/api/dossiers/en-retard?page=${page}&size=${size}`),
+  getRecents: (days = 7) => apiClient.get<DossierDto[]>(`/api/dossiers/recent?days=${days}`),
+  getByClient: (clientId: number, page = 0, size = 20) => apiClient.get<Page<DossierDto>>(`/api/dossiers/client/${clientId}?page=${page}&size=${size}`),
+  getByTypeActe: (typeActe: string, page = 0, size = 20) => apiClient.get<Page<DossierDto>>(`/api/dossiers/by-type/${encodeURIComponent(typeActe)}?page=${page}&size=${size}`),
+  getByStatut: (statut: StatutDossier, page = 0, size = 20) => apiClient.get<Page<DossierDto>>(`/api/dossiers/by-statut/${statut}?page=${page}&size=${size}`),
+  advancedSearch: (params: { typeActe?: string; statut?: StatutDossier; notaireId?: number; urgent?: boolean; query?: string; page?: number; size?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.typeActe) qs.set("typeActe", params.typeActe);
+    if (params.statut) qs.set("statut", params.statut);
+    if (params.notaireId) qs.set("notaireId", String(params.notaireId));
+    if (params.urgent !== undefined) qs.set("urgent", String(params.urgent));
+    if (params.query) qs.set("query", params.query);
+    if (params.page !== undefined) qs.set("page", String(params.page));
+    if (params.size !== undefined) qs.set("size", String(params.size));
+    return apiClient.get<Page<DossierDto>>(`/api/dossiers/advanced-search?${qs.toString()}`);
+  },
 };
