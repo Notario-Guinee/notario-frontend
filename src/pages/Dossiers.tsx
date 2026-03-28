@@ -171,6 +171,20 @@ export default function Dossiers() {
   const [currentEtape, setCurrentEtape] = useState<WorkflowEtapeDto | null>(null);
   const [workflowLoading, setWorkflowLoading] = useState(false);
 
+  // ═══ Documents ═══
+  const [documents, setDocuments] = useState<DocumentDossierDto[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadMetadata, setUploadMetadata] = useState<CreateDocumentDto>({
+    nomDocument: "",
+    typeDocument: "AUTRE",
+    description: "",
+    signatureRequise: false,
+    obligatoire: false,
+    confidentiel: false,
+  });
+
   // ═══ Chargement initial depuis l'API ═══
 const loadDossiers = useCallback(async () => {
   try {
@@ -225,7 +239,129 @@ const loadWorkflow = useCallback(async (dossierId: number) => {
   }
 }, []);
 
+// ═══ Chargement des documents ═══
+const loadDocuments = useCallback(async (dossierId: number) => {
+  try {
+    setDocumentsLoading(true);
+    const docs = await dossierService.getDocuments(dossierId);
+    setDocuments(docs);
+  } catch (error) {
+    console.error("Erreur chargement documents:", error);
+  } finally {
+    setDocumentsLoading(false);
+  }
+}, []);
 
+// Charger les documents quand on est sur l'onglet "pieces" ou "signataires"
+useEffect(() => {
+  if (selectedDossier && (detailTab === "pieces" || detailTab === "signataires")) {
+    loadDocuments(Number(selectedDossier.id));
+  }
+}, [selectedDossier, detailTab, loadDocuments]);
+
+
+// ═══ Gestion des documents ═══
+
+/** Sélection d'un fichier pour upload */
+const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files && e.target.files[0]) {
+    setUploadFile(e.target.files[0]);
+    setUploadMetadata({
+      nomDocument: e.target.files[0].name,
+      typeDocument: "AUTRE",
+      description: "",
+      signatureRequise: false,
+      obligatoire: false,
+      confidentiel: false,
+    });
+    setShowUploadModal(true);
+  }
+  e.target.value = "";
+};
+
+/** Upload du document */
+/** Upload du document */
+const handleUploadDocument = async () => {
+  if (!selectedDossier || !uploadFile) return;
+  
+  try {
+    setDocumentsLoading(true);
+    
+    // Upload avec les métadonnées (toutes optionnelles)
+    const newDoc = await dossierService.addDocument(
+      Number(selectedDossier.id),
+      uploadFile,
+      {
+        nomDocument: uploadMetadata.nomDocument || undefined, // si vide, le backend utilise le nom du fichier
+        typeDocument: uploadMetadata.typeDocument !== "AUTRE" ? uploadMetadata.typeDocument : undefined,
+        description: uploadMetadata.description || undefined,
+        signatureRequise: uploadMetadata.signatureRequise,
+        confidentiel: uploadMetadata.confidentiel,
+        obligatoire: uploadMetadata.obligatoire,
+      }
+    );
+    
+    setDocuments(prev => [newDoc, ...prev]);
+    setShowUploadModal(false);
+    setUploadFile(null);
+    setUploadMetadata({
+      nomDocument: "",
+      typeDocument: "AUTRE",
+      description: "",
+      signatureRequise: false,
+      obligatoire: false,
+      confidentiel: false,
+    });
+    
+    toast.success(fr ? "Document ajouté avec succès" : "Document added successfully");
+  } catch (error) {
+    console.error("Erreur upload:", error);
+    toast.error(fr ? "Erreur lors de l'upload" : "Error uploading document");
+  } finally {
+    setDocumentsLoading(false);
+  }
+};
+
+/** Validation d'un document (notaire) */
+const handleValiderDocument = async (documentId: number) => {
+  if (!selectedDossier) return;
+  
+  try {
+    await dossierService.validerDocument(Number(selectedDossier.id), documentId);
+    await loadDocuments(Number(selectedDossier.id));
+    toast.success(fr ? "Document validé" : "Document validated");
+  } catch (error) {
+    console.error("Erreur validation:", error);
+    toast.error(fr ? "Erreur lors de la validation" : "Error validating document");
+  }
+};
+
+/** Téléchargement d'un document */
+const handleDownloadDocument = async (documentId: number, nom: string) => {
+  if (!selectedDossier) return;
+  
+  try {
+    const { url } = await dossierService.getDocumentUrl(Number(selectedDossier.id), documentId);
+    window.open(url, "_blank");
+  } catch (error) {
+    console.error("Erreur téléchargement:", error);
+    toast.error(fr ? "Erreur lors du téléchargement" : "Error downloading document");
+  }
+};
+
+/** Suppression d'un document */
+const handleDeleteDocument = async (documentId: number) => {
+  if (!selectedDossier) return;
+  
+  try {
+    await dossierService.removeDocument(Number(selectedDossier.id), documentId);
+    setDocuments(prev => prev.filter(d => d.id !== documentId));
+    toast.success(fr ? "Document supprimé" : "Document deleted");
+  } catch (error) {
+    console.error("Erreur suppression:", error);
+    toast.error(fr ? "Erreur lors de la suppression" : "Error deleting document");
+  }
+};
 
 // Passer à l'étape suivante
 const handleNextStep = useCallback(async (dossierId: number) => {
@@ -254,6 +390,7 @@ const handlePreviousStep = useCallback(async (dossierId: number) => {
     toast.error(fr ? "Impossible de revenir en arrière" : "Cannot go back");
   }
 }, [fr, loadWorkflow]);
+
 
 
 useEffect(() => {
@@ -1291,38 +1428,98 @@ const handleDelete = useCallback(async () => {
                 </div>
               )}
               {detailTab === "pieces" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-foreground">{(dossierPieces[selectedDossier.id]?.length ?? selectedDossier.nbPieces)} {fr ? "pièce(s)" : "document(s)"}</p>
-                    <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => pieceInputRef.current?.click()}>
-                      <Upload className="h-3.5 w-3.5" />{fr ? "Importer" : "Import"}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">
+                      {documents.length} {fr ? "document(s)" : "document(s)"}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => pieceInputRef.current?.click()}>
+                      <Upload className="h-4 w-4 mr-1" />
+                      {fr ? "Ajouter" : "Add"}
                     </Button>
                   </div>
-                  <input ref={pieceInputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="hidden" onChange={handlePieceImport} />
-                  {(dossierPieces[selectedDossier.id]?.length ?? 0) > 0 ? dossierPieces[selectedDossier.id].map((p, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{p.nom}</p>
-                        <p className="text-xs text-muted-foreground">{p.date} · {p.taille}</p>
-                      </div>
+                  
+                  <input 
+                    ref={pieceInputRef} 
+                    type="file" 
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
+                    className="hidden" 
+                    onChange={handleFileSelect} 
+                  />
+                  
+                  {documentsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     </div>
-                  )) : selectedDossier.nbPieces > 0 ? Array.from({ length: selectedDossier.nbPieces }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{fr ? "Pièce" : "Document"} {i + 1}</p>
-                        <p className="text-xs text-muted-foreground">{fr ? "Ajoutée le" : "Added on"} {selectedDossier.clientDate}</p>
-                      </div>
+                  ) : documents.length > 0 ? (
+                    <div className="space-y-2">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+                          <FileText className="h-5 w-5 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-foreground truncate">{doc.nomDocument}</p>
+                              {doc.tailleFichierFormatee && (
+                                <span className="text-xs text-muted-foreground">({doc.tailleFichierFormatee})</span>
+                              )}
+                              <StatusBadge 
+                                status={
+                                  doc.signe ? "Signé" : 
+                                  doc.valideParNom ? "Validé" : 
+                                  "Brouillon"
+                                } 
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {fr ? "Ajouté le" : "Added on"} {new Date(doc.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
+                              {doc.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${doc.valideParNom}`}
+                              {doc.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${doc.signeParNom}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!doc.valideParNom && doc.statut !== "VALIDE" && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 text-xs"
+                                onClick={() => handleValiderDocument(doc.id)}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                                {fr ? "Valider" : "Validate"}
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-xs"
+                              onClick={() => handleDownloadDocument(doc.id, doc.nomDocument)}
+                            >
+                              <FileDown className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-xs text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteDocument(doc.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileDown className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">{fr ? "Aucune pièce jointe" : "No documents attached"}</p>
-                      <Button variant="outline" size="sm" className="mt-3 gap-1" onClick={() => pieceInputRef.current?.click()}>
-                        <Upload className="h-4 w-4" />{fr ? "Importer une pièce" : "Import a document"}
-                      </Button>
-                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={FileDown}
+                      title={fr ? "Aucun document" : "No documents"}
+                      description={fr ? "Commencez par ajouter un document" : "Start by adding a document"}
+                      action={
+                        <Button variant="outline" size="sm" onClick={() => pieceInputRef.current?.click()}>
+                          <Upload className="h-4 w-4 mr-1" />
+                          {fr ? "Ajouter un document" : "Add a document"}
+                        </Button>
+                      }
+                    />
                   )}
                 </div>
               )}
@@ -1985,6 +2182,112 @@ const handleDelete = useCallback(async () => {
             <Button variant="outline" onClick={() => setShowFactureModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleCreateFacture} disabled={!factureForm.montant}>
               {fr ? "Créer la facture" : "Create invoice"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal d'upload de document */}
+      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading">{fr ? "Ajouter un document" : "Add document"}</DialogTitle>
+            <DialogDescription>
+              {fr ? "Renseignez les informations du document" : "Fill in the document information"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-muted/30 border border-border p-3">
+              <p className="text-sm font-medium truncate">{uploadFile?.name}</p>
+              {uploadFile && (
+                <p className="text-xs text-muted-foreground">
+                  {(uploadFile.size / 1024 / 1024).toFixed(2)} Mo
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{fr ? "Nom du document" : "Document name"} *</Label>
+              <Input 
+                value={uploadMetadata.nomDocument}
+                onChange={e => setUploadMetadata(prev => ({ ...prev, nomDocument: e.target.value }))}
+                placeholder={fr ? "Ex: Acte de vente" : "E.g.: Sale deed"}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{fr ? "Type de document" : "Document type"}</Label>
+              <Select 
+                value={uploadMetadata.typeDocument} 
+                onValueChange={v => setUploadMetadata(prev => ({ ...prev, typeDocument: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={fr ? "Sélectionner" : "Select"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTE">{fr ? "Acte notarial" : "Notarial deed"}</SelectItem>
+                  <SelectItem value="PROCURATION">Procuration</SelectItem>
+                  <SelectItem value="PIECE_IDENTITE">{fr ? "Pièce d'identité" : "ID document"}</SelectItem>
+                  <SelectItem value="TITRE_PROPRIETE">{fr ? "Titre de propriété" : "Property title"}</SelectItem>
+                  <SelectItem value="AUTRE">Autre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{fr ? "Description" : "Description"}</Label>
+              <Textarea 
+                value={uploadMetadata.description}
+                onChange={e => setUploadMetadata(prev => ({ ...prev, description: e.target.value }))}
+                rows={2}
+                placeholder={fr ? "Description du document..." : "Document description..."}
+              />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={uploadMetadata.signatureRequise}
+                  onChange={e => setUploadMetadata(prev => ({ ...prev, signatureRequise: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">{fr ? "Nécessite une signature électronique" : "Requires electronic signature"}</span>
+              </label>
+              
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={uploadMetadata.obligatoire}
+                  onChange={e => setUploadMetadata(prev => ({ ...prev, obligatoire: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">{fr ? "Document obligatoire" : "Mandatory document"}</span>
+              </label>
+              
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={uploadMetadata.confidentiel}
+                  onChange={e => setUploadMetadata(prev => ({ ...prev, confidentiel: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">{fr ? "Document confidentiel" : "Confidential document"}</span>
+              </label>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadModal(false)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button 
+              className="bg-primary text-primary-foreground"
+              onClick={handleUploadDocument}
+              disabled={!uploadFile || !uploadMetadata.nomDocument}
+            >
+              {fr ? "Ajouter" : "Add"}
             </Button>
           </DialogFooter>
         </DialogContent>

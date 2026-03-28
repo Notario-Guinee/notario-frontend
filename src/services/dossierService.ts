@@ -84,6 +84,56 @@ export const STATUTS_TERMINAUX: StatutDossier[] = ["CLOTURE", "ANNULE", "ARCHIVE
 
 export type PrioriteDossier = "BASSE" | "NORMALE" | "HAUTE" | "URGENTE";
 
+// ── Types Documents ─────────────────────────────────────────────────────────
+
+export interface DocumentDossierDto {
+  id: number;
+  dossierId: number;
+  nomDocument: string;
+  typeDocument: string;
+  description?: string;
+  cheminFichier?: string;
+  mimeType?: string;
+  tailleFichier?: number;
+  tailleFichierFormatee?: string;
+  extension?: string;
+  hashFichier?: string;
+  statut: "BROUILLON" | "VALIDE" | "SIGNE" | "REJETE";
+  dateAjout: string;
+  dateValidation?: string;
+  dateSignature?: string;
+  valideParId?: number;
+  valideParNom?: string;
+  signeParId?: number;
+  signeParNom?: string;
+  signatureRequise: boolean;
+  signe: boolean;
+  obligatoire: boolean;
+  original: boolean;
+  version: number;
+  observations?: string;
+  confidentiel?: boolean;
+  url?: string;
+}
+
+export interface CreateDocumentDto {
+  nomDocument: string;
+  typeDocument: string;
+  description?: string;
+  signatureRequise?: boolean;
+  obligatoire?: boolean;
+  confidentiel?: boolean;
+}
+
+export interface UpdateDocumentDto {
+  nomDocument?: string;
+  description?: string;
+  typeDocument?: string;
+  observations?: string;
+  confidentiel?: boolean;
+}
+
+
 export type RolePartie =
   | "ACHETEUR"
   | "VENDEUR"
@@ -553,15 +603,41 @@ changerStatut: (id: number, statut: StatutDossier) =>
     apiClient.get<DocumentDossierDto[]>(`/api/dossiers/${id}/documents`),
 
   /** Ajouter un document (multipart géré séparément via fetch natif) */
-  addDocument: (id: number, file: File) => {
+/** Ajouter un document (upload) */
+/** Ajouter un document (upload) */
+  addDocument: (dossierId: number, file: File, metadata?: {
+    nomDocument?: string;
+    typeDocument?: string;
+    description?: string;
+    signatureRequise?: boolean;
+    confidentiel?: boolean;
+    obligatoire?: boolean;
+    observations?: string;
+  }) => {
     const formData = new FormData();
     formData.append("file", file);
+    
+    // Ajouter les champs optionnels s'ils sont présents
+    if (metadata?.nomDocument) formData.append("nomDocument", metadata.nomDocument);
+    if (metadata?.typeDocument) formData.append("typeDocument", metadata.typeDocument);
+    if (metadata?.description) formData.append("description", metadata.description);
+    if (metadata?.signatureRequise !== undefined) formData.append("signatureRequise", String(metadata.signatureRequise));
+    if (metadata?.confidentiel !== undefined) formData.append("confidentiel", String(metadata.confidentiel));
+    if (metadata?.obligatoire !== undefined) formData.append("obligatoire", String(metadata.obligatoire));
+    if (metadata?.observations) formData.append("observations", metadata.observations);
+    
     const token = localStorage.getItem("accessToken");
-    return fetch(`/api/dossiers/${id}/documents`, {
+    return fetch(`/api/dossiers/${dossierId}/documents`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
-    }).then(r => r.json()) as Promise<DocumentDossierDto>;
+    }).then(async (response) => {
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Upload failed");
+      }
+      return response.json();
+    }) as Promise<DocumentDossierDto>;
   },
 
   /** Supprimer un document */
@@ -623,6 +699,61 @@ changerStatut: (id: number, statut: StatutDossier) =>
     apiClient.get<DossierStatsDto>("/api/dossiers/statistiques"),
 
 
+
+
+  // ── Documents ─────────────────────────────────────────────────────────────
+
+/** Liste des documents d'un dossier */
+getDocuments: (id: number) =>
+  apiClient.get<DocumentDossierDto[]>(`/api/dossiers/${id}/documents`),
+
+/** Récupérer un document spécifique */
+getDocument: (dossierId: number, documentId: number) =>
+  apiClient.get<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`),
+
+/** Ajouter un document (upload) */
+addDocument: (dossierId: number, file: File, metadata: CreateDocumentDto) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("nomDocument", metadata.nomDocument);
+  formData.append("typeDocument", metadata.typeDocument);
+  if (metadata.description) formData.append("description", metadata.description);
+  if (metadata.signatureRequise !== undefined) formData.append("signatureRequise", String(metadata.signatureRequise));
+  if (metadata.obligatoire !== undefined) formData.append("obligatoire", String(metadata.obligatoire));
+  if (metadata.confidentiel !== undefined) formData.append("confidentiel", String(metadata.confidentiel));
+  
+  const token = localStorage.getItem("accessToken");
+  return fetch(`/api/dossiers/${dossierId}/documents`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  }).then(r => r.json()) as Promise<DocumentDossierDto>;
+},
+
+/** Mettre à jour les métadonnées d'un document */
+updateDocument: (dossierId: number, documentId: number, data: UpdateDocumentDto) =>
+  apiClient.put<DocumentDossierDto>(`/api/dossiers/${dossierId}/documents/${documentId}`, data),
+
+/** Supprimer un document */
+removeDocument: (dossierId: number, documentId: number) =>
+  apiClient.delete<void>(`/api/dossiers/${dossierId}/documents/${documentId}`),
+
+/** Valider un document (par le notaire) */
+validerDocument: (dossierId: number, documentId: number, commentaire?: string) =>
+  apiClient.post<DocumentDossierDto>(
+    `/api/dossiers/${dossierId}/documents/${documentId}/valider`,
+    commentaire ? { commentaire } : {}
+  ),
+
+/** Signer électroniquement un document */
+signerDocument: (dossierId: number, documentId: number) =>
+  apiClient.post<{ success: boolean; urlSignature?: string; pdfSigne?: string }>(
+    `/api/dossiers/${dossierId}/documents/${documentId}/signer`
+  ),
+
+/** Obtenir l'URL de téléchargement d'un document */
+getDocumentUrl: (dossierId: number, documentId: number) =>
+  apiClient.get<{ url: string; nom: string }>(`/api/dossiers/${dossierId}/documents/${documentId}/url`),
 
 
 // ── Workflow avancé (selon Swagger) ──────────────────────────────────────────────
