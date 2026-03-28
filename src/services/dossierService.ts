@@ -44,6 +44,20 @@ export interface UpdateTypeActeDto {
   ordreAffichage?: number;
 }
 
+export interface HistoriqueEntreeDto {
+  id: number;
+  typeEvenement: string;
+  description: string;
+  dateEvenement: string;
+  userNom?: string;
+  userRole?: string;
+  ancienStatut?: string;
+  nouveauStatut?: string;
+  referenceId?: number;
+  referenceType?: string;
+  ipAddress?: string;
+}
+
 // ── Types Dossier ─────────────────────────────────────────────────────────────
 
 export type StatutDossier =
@@ -192,14 +206,6 @@ export interface CommentaireDto {
   texte: string;
   auteur: string;
   dateCreation: string;
-}
-
-export interface HistoriqueEntreeDto {
-  id: number;
-  action: string;
-  detail?: string;
-  auteur: string;
-  date: string;
 }
 
 export interface DossierDto {
@@ -429,6 +435,7 @@ export function roleValue(label: string): RolePartie {
   return map[label] ?? "AUTRE";
 }
 
+
 // ── Service TypeActe ──────────────────────────────────────────────────────────
 
 export const typeActeService = {
@@ -549,6 +556,17 @@ export const dossierService = {
 
   // Calculs
   calculerHonoraires: (id: number) => apiClient.post<void>(`/api/dossiers/${id}/calculer-honoraires`),
+  /** Ajouter un événement manuel à l'historique */
+  addHistoriqueEvent: (id: number, data: {
+    typeEvenement: string;
+    description: string;
+    userNom?: string;
+    userRole?: string;
+    ancienStatut?: string;
+    nouveauStatut?: string;
+    referenceId?: number;
+    referenceType?: string;
+  }) => apiClient.post<HistoriqueEntreeDto>(`/api/dossiers/${id}/historique`, data),
 
   // Statistiques détaillées
   getStatistiquesDetail: (id: number) => apiClient.get<{

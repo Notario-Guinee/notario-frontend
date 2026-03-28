@@ -25,7 +25,8 @@ import {
   type DocumentDossierDto,
   type CreateDocumentDto, 
   type WorkflowEtapeDto,  
-  type UpdateDossierDto,      
+  type UpdateDossierDto,    
+  type HistoriqueEntreeDto,  
 } from "@/services/dossierService";
 import { TYPES_ACTE } from "@/data/constants";
 import { motion } from "framer-motion";
@@ -196,6 +197,18 @@ export default function Dossiers() {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [documentASigner, setDocumentASigner] = useState<DocumentDossierDto | null>(null);
 
+  // ═══ Historique ═══
+  const [historique, setHistorique] = useState<HistoriqueEntreeDto[]>([]);
+  const [historiqueLoading, setHistoriqueLoading] = useState(false);
+
+  // ═══ Ajout manuel d'événement à l'historique ═══
+  const [showAddHistoriqueModal, setShowAddHistoriqueModal] = useState(false);
+  const [newHistoriqueEvent, setNewHistoriqueEvent] = useState({
+    typeEvenement: "COMMENTAIRE",
+    description: "",
+  });
+  const [isAddingHistorique, setIsAddingHistorique] = useState(false);
+
 
     // ═══ Chargement initial depuis l'API ═══
   const loadDossiers = useCallback(async () => {
@@ -264,6 +277,19 @@ const loadDocuments = useCallback(async (dossierId: number) => {
   }
 }, []);
 
+  // ═══ Chargement de l'historique ═══
+  const loadHistorique = useCallback(async (dossierId: number) => {
+    try {
+      setHistoriqueLoading(true);
+      const data = await dossierService.getHistorique(dossierId);
+      setHistorique(data);
+    } catch (error) {
+      console.error("Erreur chargement historique:", error);
+    } finally {
+      setHistoriqueLoading(false);
+    }
+  }, []);
+
 // Charger les documents quand on est sur l'onglet "pieces" ou "signataires"
 useEffect(() => {
   if (selectedDossier && (detailTab === "pieces" || detailTab === "signataires")) {
@@ -271,6 +297,12 @@ useEffect(() => {
   }
 }, [selectedDossier, detailTab, loadDocuments]);
 
+// Charger l'historique quand on est sur l'onglet historique
+useEffect(() => {
+  if (selectedDossier && detailTab === "historique") {
+    loadHistorique(Number(selectedDossier.id));
+  }
+}, [selectedDossier, detailTab, loadHistorique]);
 
  const openSignatureModal = (document: DocumentDossierDto) => {
     setDocumentASigner(document);
@@ -440,6 +472,103 @@ const handleDeleteDocument = async (documentId: number) => {
     console.error("Erreur suppression:", error);
     toast.error(fr ? "Erreur lors de la suppression" : "Error deleting document");
   }
+};
+
+// ═══ Ajouter un événement à l'historique ═══
+const handleAddHistoriqueEvent = async () => {
+  if (!selectedDossier) return;
+  
+  if (!newHistoriqueEvent.description.trim()) {
+    toast.error(fr ? "Veuillez saisir une description" : "Please enter a description");
+    return;
+  }
+  
+  try {
+    setIsAddingHistorique(true);
+    
+    await dossierService.addHistoriqueEvent(Number(selectedDossier.id), {
+      typeEvenement: newHistoriqueEvent.typeEvenement,
+      description: newHistoriqueEvent.description,
+      userNom: user?.prenom + " " + user?.nom || currentUser.name,
+      userRole: user?.role,
+    });
+    
+    // Recharger l'historique
+    await loadHistorique(Number(selectedDossier.id));
+    
+    toast.success(fr ? "Événement ajouté à l'historique" : "Event added to history");
+    setShowAddHistoriqueModal(false);
+    setNewHistoriqueEvent({
+      typeEvenement: "COMMENTAIRE",
+      description: "",
+    });
+    
+  } catch (error) {
+    console.error("Erreur ajout historique:", error);
+    toast.error(fr ? "Erreur lors de l'ajout" : "Error adding event");
+  } finally {
+    setIsAddingHistorique(false);
+  }
+};
+
+// ═══ Helpers pour l'historique ═══
+const getEventIcon = (type: string): string => {
+  const icons: Record<string, string> = {
+    "CREATION": "📄",
+    "MODIFICATION": "✏️",
+    "SUPPRESSION": "🗑️",
+    "CHANGEMENT_STATUT": "🔄",
+    "AJOUT_PARTIE": "👥",
+    "SUPPRESSION_PARTIE": "❌",
+    "MODIFICATION_PARTIE": "✏️",
+    "AJOUT_DOCUMENT": "📎",
+    "SUPPRESSION_DOCUMENT": "🗑️",
+    "MODIFICATION_DOCUMENT": "✏️",
+    "VALIDATION_DOCUMENT": "✅",
+    "SIGNATURE_DOCUMENT": "✍️",
+    "BLOCAGE": "🔒",
+    "DEBLOCAGE": "🔓",
+    "ALERTE_ACTIVEE": "⚠️",
+    "ASSIGNATION_NOTAIRE": "⚖️",
+    "ASSIGNATION_ASSISTANT": "👨‍💼",
+    "AVANCEMENT_ETAPE": "⏩",
+    "RETOUR_ETAPE": "⏪",
+    "COMPLETION_ETAPE": "✅",
+    "MODIFICATION_ETAPE": "✏️",
+    "COMMENTAIRE": "💬",
+  };
+  return icons[type] || "📌";
+};
+
+const getEventLabel = (type: string, fr: boolean): string => {
+  const labels: Record<string, { fr: string; en: string }> = {
+    "CREATION": { fr: "Dossier créé", en: "Case created" },
+    "MODIFICATION": { fr: "Dossier modifié", en: "Case updated" },
+    "SUPPRESSION": { fr: "Dossier supprimé", en: "Case deleted" },
+    "CHANGEMENT_STATUT": { fr: "Changement de statut", en: "Status changed" },
+    "AJOUT_PARTIE": { fr: "Partie ajoutée", en: "Stakeholder added" },
+    "SUPPRESSION_PARTIE": { fr: "Partie retirée", en: "Stakeholder removed" },
+    "MODIFICATION_PARTIE": { fr: "Partie modifiée", en: "Stakeholder updated" },
+    "AJOUT_DOCUMENT": { fr: "Document ajouté", en: "Document added" },
+    "SUPPRESSION_DOCUMENT": { fr: "Document supprimé", en: "Document deleted" },
+    "MODIFICATION_DOCUMENT": { fr: "Document modifié", en: "Document updated" },
+    "VALIDATION_DOCUMENT": { fr: "Document validé", en: "Document validated" },
+    "SIGNATURE_DOCUMENT": { fr: "Document signé", en: "Document signed" },
+    "BLOCAGE": { fr: "Dossier bloqué", en: "Case blocked" },
+    "DEBLOCAGE": { fr: "Dossier débloqué", en: "Case unblocked" },
+    "ALERTE_ACTIVEE": { fr: "Alerte activée", en: "Alert activated" },
+    "ASSIGNATION_NOTAIRE": { fr: "Notaire assigné", en: "Notary assigned" },
+    "ASSIGNATION_ASSISTANT": { fr: "Assistant assigné", en: "Assistant assigned" },
+    "AVANCEMENT_ETAPE": { fr: "Étape suivante", en: "Next step" },
+    "RETOUR_ETAPE": { fr: "Étape précédente", en: "Previous step" },
+    "COMPLETION_ETAPE": { fr: "Étape complétée", en: "Step completed" },
+    "MODIFICATION_ETAPE": { fr: "Étape modifiée", en: "Step updated" },
+    "COMMENTAIRE": { fr: "Commentaire", en: "Comment" },
+    "RELANCE": { fr: "Relance client", en: "Client follow-up" },
+    "RENDEZ_VOUS": { fr: "Rendez-vous", en: "Appointment" },
+    "NOTE_INTERNE": { fr: "Note interne", en: "Internal note" },
+  };
+  return labels[type]?.[fr ? "fr" : "en"] || type;
 };
 
 // Passer à l'étape suivante
@@ -1635,24 +1764,72 @@ const handleDelete = useCallback(async () => {
                   <input ref={factureImportRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFactureFileImport} />
                 </div>
               )}
-              {detailTab === "historique" && (
-                <div className="space-y-3">
-                  {[
-                    { action: fr ? "Dossier créé" : "Case created", date: selectedDossier.clientDate, user: selectedDossier.notaire },
-                    { action: fr ? "Pièces ajoutées" : "Documents added", date: selectedDossier.clientDate, user: "Aïssatou Conté" },
-                    { action: fr ? "Parties associées" : "Stakeholders linked", date: selectedDossier.clientDate, user: selectedDossier.notaire },
-                    { action: (fr ? "Statut modifié → " : "Status changed → ") + selectedDossier.statut, date: new Date().toLocaleDateString(fr ? "fr-FR" : "en-US"), user: selectedDossier.notaire },
-                  ].map((h, i) => (
-                    <div key={i} className="flex gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">{i + 1}</div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{h.action}</p>
-                        <p className="text-xs text-muted-foreground">{h.date} · {h.user}</p>
-                      </div>
-                    </div>
-                  ))}
+
+            {detailTab === "historique" && (
+              <div className="space-y-4">
+                {/* En-tête avec bouton */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">
+                    {historique.length} {fr ? "événement(s)" : "event(s)"}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-1"
+                    onClick={() => setShowAddHistoriqueModal(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {fr ? "Ajouter un événement" : "Add event"}
+                  </Button>
                 </div>
-              )}
+
+                {/* Liste des événements */}
+                {historiqueLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : historique.length > 0 ? (
+                  <div className="space-y-2">
+                    {historique.map((h) => (
+                      <div key={h.id} className="flex gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm shrink-0">
+                          {getEventIcon(h.typeEvenement)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-foreground">
+                              {getEventLabel(h.typeEvenement, fr)}
+                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(h.dateEvenement).toLocaleString(fr ? "fr-FR" : "en-US")}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                            {h.description}
+                            {h.userNom && ` · ${fr ? "par" : "by"} ${h.userNom}`}
+                            {h.userRole && ` (${h.userRole})`}
+                          </p>
+                          {h.ancienStatut && h.nouveauStatut && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {fr ? "Statut" : "Status"} : {h.ancienStatut} → {h.nouveauStatut}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">{fr ? "Aucun historique pour ce dossier" : "No history for this case"}</p>
+                    <p className="text-xs mt-1">
+                      {fr ? "Ajoutez un premier événement" : "Add a first event"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             </div>
           </div>
         ) : (
@@ -2430,6 +2607,84 @@ const handleDelete = useCallback(async () => {
           </>
         ) : (
           <>{fr ? "Signer" : "Sign"}</>
+        )}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+{/* Modal d'ajout d'événement à l'historique */}
+<Dialog open={showAddHistoriqueModal} onOpenChange={setShowAddHistoriqueModal}>
+  <DialogContent className="max-w-md">
+    <DialogHeader>
+      <DialogTitle className="font-heading">
+        {fr ? "Ajouter un événement" : "Add event"}
+      </DialogTitle>
+      <DialogDescription>
+        {fr 
+          ? "Ajoutez un événement manuellement à l'historique du dossier"
+          : "Add an event manually to the case history"}
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label>{fr ? "Type d'événement" : "Event type"}</Label>
+        <Select 
+          value={newHistoriqueEvent.typeEvenement} 
+          onValueChange={v => setNewHistoriqueEvent(prev => ({ ...prev, typeEvenement: v }))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={fr ? "Sélectionner" : "Select"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="COMMENTAIRE">💬 {fr ? "Commentaire" : "Comment"}</SelectItem>
+            <SelectItem value="ALERTE_ACTIVEE">⚠️ {fr ? "Alerte" : "Alert"}</SelectItem>
+            <SelectItem value="MODIFICATION">✏️ {fr ? "Modification" : "Modification"}</SelectItem>
+            <SelectItem value="RELANCE">📞 {fr ? "Relance client" : "Client follow-up"}</SelectItem>
+            <SelectItem value="RENDEZ_VOUS">📅 {fr ? "Rendez-vous" : "Appointment"}</SelectItem>
+            <SelectItem value="NOTE_INTERNE">📝 {fr ? "Note interne" : "Internal note"}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="space-y-2">
+        <Label>{fr ? "Description" : "Description"} *</Label>
+        <Textarea 
+          value={newHistoriqueEvent.description}
+          onChange={e => setNewHistoriqueEvent(prev => ({ ...prev, description: e.target.value }))}
+          rows={3}
+          placeholder={fr 
+            ? "Ex: Appel téléphonique avec le client, accord sur le compromis..."
+            : "E.g.: Phone call with client, agreement on the deed..."}
+        />
+      </div>
+      
+      <div className="rounded-lg bg-muted/30 border border-border p-3">
+        <p className="text-xs text-muted-foreground">
+          {fr 
+            ? "Cet événement sera ajouté à l'historique avec la date et l'heure actuelles."
+            : "This event will be added to the history with the current date and time."}
+        </p>
+      </div>
+    </div>
+    
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowAddHistoriqueModal(false)}>
+        {fr ? "Annuler" : "Cancel"}
+      </Button>
+      <Button 
+        className="bg-primary text-primary-foreground"
+        onClick={handleAddHistoriqueEvent}
+        disabled={isAddingHistorique || !newHistoriqueEvent.description.trim()}
+      >
+        {isAddingHistorique ? (
+          <>
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+            {fr ? "Ajout..." : "Adding..."}
+          </>
+        ) : (
+          <>{fr ? "Ajouter" : "Add"}</>
         )}
       </Button>
     </DialogFooter>
