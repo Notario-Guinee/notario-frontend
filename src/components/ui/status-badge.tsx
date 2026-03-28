@@ -11,14 +11,20 @@ type StatusType = "En cours" | "Signé" | "Archivé" | "Annulé" | "Actif" | "In
   "En signature" | "En attente pièces" | "Terminé" | "Suspendu" | "Normale" | "Urgente" | "Prospect" | string;
 
 const statusStyles: Record<string, string> = {
-  "En cours": "bg-secondary/15 text-secondary border-secondary/30",
-  "En signature": "bg-primary/15 text-primary border-primary/30",
-  "En attente pièces": "bg-warning/15 text-warning border-warning/30",
-  "Terminé": "bg-success/15 text-success border-success/30",
-  "Suspendu": "bg-muted text-muted-foreground border-border",
-  "Signé": "bg-success/15 text-success border-success/30",
-  "Archivé": "bg-muted text-muted-foreground border-border",
-  "Annulé": "bg-destructive/15 text-destructive border-destructive/30",
+  // ── Statuts dossier ──────────────────────────────────────────
+  "Brouillon":                "bg-[#9E9E9E]/15 text-[#9E9E9E] border-[#9E9E9E]/30",
+  "En Cours":                 "bg-[#2196F3]/15 text-[#2196F3] border-[#2196F3]/30",
+  "En Attente":               "bg-[#FF9800]/15 text-[#FF9800] border-[#FF9800]/30",
+  "En Attente de Signature":  "bg-[#FFC107]/15 text-[#FFC107] border-[#FFC107]/30",
+  "En Attente de Validation": "bg-[#FF5722]/15 text-[#FF5722] border-[#FF5722]/30",
+  "Prêt pour Signature":      "bg-[#00BCD4]/15 text-[#00BCD4] border-[#00BCD4]/30",
+  "Signé":                    "bg-[#009688]/15 text-[#009688] border-[#009688]/30",
+  "Enregistré":               "bg-[#8BC34A]/15 text-[#8BC34A] border-[#8BC34A]/30",
+  "Suspendu":                 "bg-[#795548]/15 text-[#795548] border-[#795548]/30",
+  "Clôturé":                  "bg-[#4CAF50]/15 text-[#4CAF50] border-[#4CAF50]/30",
+  "Annulé":                   "bg-[#F44336]/15 text-[#F44336] border-[#F44336]/30",
+  "Archivé":                  "bg-[#607D8B]/15 text-[#607D8B] border-[#607D8B]/30",
+  // ── Autres badges (factures, clients, priorités) ─────────────
   "Actif": "bg-success/15 text-success border-success/30",
   "Inactif": "bg-muted text-muted-foreground border-border",
   "Prospect": "bg-secondary/15 text-secondary border-secondary/30",

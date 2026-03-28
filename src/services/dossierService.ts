@@ -50,12 +50,37 @@ export interface UpdateTypeActeDto {
 // ── Types Dossier ─────────────────────────────────────────────────────────────
 
 export type StatutDossier =
+  | "BROUILLON"
   | "EN_COURS"
-  | "EN_SIGNATURE"
-  | "EN_ATTENTE_PIECES"
-  | "TERMINE"
+  | "EN_ATTENTE"
+  | "EN_ATTENTE_SIGNATURE"
+  | "EN_ATTENTE_VALIDATION"
+  | "PRET_SIGNATURE"
+  | "SIGNE"
+  | "ENREGISTRE"
   | "SUSPENDU"
+  | "CLOTURE"
+  | "ANNULE"
   | "ARCHIVE";
+
+/** Transitions autorisées par statut (workflow) */
+export const STATUT_TRANSITIONS: Record<StatutDossier, StatutDossier[]> = {
+  BROUILLON:              ["EN_COURS", "ANNULE"],
+  EN_COURS:               ["EN_ATTENTE", "EN_ATTENTE_VALIDATION", "PRET_SIGNATURE", "SUSPENDU", "ANNULE"],
+  EN_ATTENTE:             ["EN_COURS", "EN_ATTENTE_SIGNATURE", "ANNULE"],
+  EN_ATTENTE_SIGNATURE:   ["SIGNE", "EN_COURS", "ANNULE"],
+  EN_ATTENTE_VALIDATION:  ["PRET_SIGNATURE", "EN_COURS", "ANNULE"],
+  PRET_SIGNATURE:         ["SIGNE", "EN_COURS", "ANNULE"],
+  SIGNE:                  ["ENREGISTRE", "CLOTURE"],
+  ENREGISTRE:             ["CLOTURE"],
+  SUSPENDU:               ["EN_COURS", "ANNULE"],
+  CLOTURE:                ["ARCHIVE"],
+  ANNULE:                 [],
+  ARCHIVE:                [],
+};
+
+/** Statuts terminaux — aucune transition possible */
+export const STATUTS_TERMINAUX: StatutDossier[] = ["CLOTURE", "ANNULE", "ARCHIVE"];
 
 export type PrioriteDossier = "BASSE" | "NORMALE" | "HAUTE" | "URGENTE";
 
@@ -105,13 +130,29 @@ export interface HistoriqueEntreeDto {
   date: string;
 }
 
+// À ajouter dans les types
+
 export interface WorkflowEtapeDto {
-  key: string;
-  label: string;
+  id: number;
+  numeroEtape: number;
+  nomEtape: string;
   description?: string;
-  statut: "pending" | "active" | "completed";
-  startedAt?: string;
-  completedAt?: string;
+  statut: string;
+  obligatoire: boolean;
+  dateDebut?: string;
+  dateFin?: string;
+  dateEcheance?: string;
+  dureeEstimeeJours?: number;
+  responsableId?: number;
+  responsableNom?: string;
+  actionsRequises?: string;
+  validationRequise: boolean;
+  validee: boolean;
+  valideeParNom?: string;
+  dateValidation?: string;
+  documentsRequis?: string;
+  observations?: string;
+  enRetard: boolean;
 }
 
 export interface WorkflowDossierDto {
@@ -160,30 +201,77 @@ export interface DossierDto {
   nbDocuments?: number;
   parties?: PartiePrenanteDto[];
   deleted?: boolean;
+  // Champs détaillés
+  honorairesHT?: number;
+  honorairesTTC?: number;
+  tva?: number;
+  prixBien?: number;
+  bienDescription?: string;
+  bienAdresse?: string;
+  bienVille?: string;
+  superficie?: number;
+  referenceCadastrale?: string;
+  titreFoncier?: string;
+  numeroRepertoire?: string;
+  numeroMinute?: string;
+  lieuSignature?: string;
+  dateSignature?: string;
+  dateEnregistrement?: string;
+  notesInternes?: string;
+  observations?: string;
+  urgent?: boolean;
+  confidentiel?: boolean;
 }
 
 export interface CreateDossierDto {
-  typeActeId: number;
+  typeActe: string;
   objet: string;
-  statut?: StatutDossier;
-  priorite?: PrioriteDossier;
-  montant?: number;
+  description?: string;
   dateEcheance?: string;
-  notaireId?: number;
-  clercId?: number;
-  notes?: string;
+  notaireChargeId?: number;
+  assistantChargeId?: number;
+  honorairesHT?: number;
+  tva?: number;
+  bienDescription?: string;
+  bienAdresse?: string;
+  bienVille?: string;
+  referenceCadastrale?: string;
+  titreFoncier?: string;
+  superficie?: number;
+  prixBien?: number;
+  priorite?: number;
+  urgent?: boolean;
+  confidentiel?: boolean;
+  notesInternes?: string;
+  observations?: string;
 }
 
 export interface UpdateDossierDto {
-  typeActeId?: number;
   objet?: string;
+  description?: string;
   statut?: StatutDossier;
-  priorite?: PrioriteDossier;
-  montant?: number;
   dateEcheance?: string;
-  notaireId?: number;
-  clercId?: number;
-  notes?: string;
+  dateSignature?: string;
+  dateEnregistrement?: string;
+  notaireChargeId?: number;
+  assistantChargeId?: number;
+  honorairesHT?: number;
+  tva?: number;
+  numeroRepertoire?: string;
+  numeroMinute?: string;
+  lieuSignature?: string;
+  bienDescription?: string;
+  bienAdresse?: string;
+  bienVille?: string;
+  referenceCadastrale?: string;
+  titreFoncier?: string;
+  superficie?: number;
+  prixBien?: number;
+  priorite?: number;
+  urgent?: boolean;
+  confidentiel?: boolean;
+  notesInternes?: string;
+  observations?: string;
 }
 
 export interface DossierStatsDto {
@@ -222,12 +310,18 @@ export interface GenerateFactureDto {
 /** Statut backend → label FR affiché dans l'UI */
 export function statutLabel(s: StatutDossier): string {
   const map: Record<StatutDossier, string> = {
-    EN_COURS: "En cours",
-    EN_SIGNATURE: "En signature",
-    EN_ATTENTE_PIECES: "En attente pièces",
-    TERMINE: "Terminé",
-    SUSPENDU: "Suspendu",
-    ARCHIVE: "Archivé",
+    BROUILLON:             "Brouillon",
+    EN_COURS:              "En Cours",
+    EN_ATTENTE:            "En Attente",
+    EN_ATTENTE_SIGNATURE:  "En Attente de Signature",
+    EN_ATTENTE_VALIDATION: "En Attente de Validation",
+    PRET_SIGNATURE:        "Prêt pour Signature",
+    SIGNE:                 "Signé",
+    ENREGISTRE:            "Enregistré",
+    SUSPENDU:              "Suspendu",
+    CLOTURE:               "Clôturé",
+    ANNULE:                "Annulé",
+    ARCHIVE:               "Archivé",
   };
   return map[s] ?? s;
 }
@@ -235,14 +329,20 @@ export function statutLabel(s: StatutDossier): string {
 /** Label UI → valeur backend */
 export function statutValue(label: string): StatutDossier {
   const map: Record<string, StatutDossier> = {
-    "En cours": "EN_COURS",
-    "En signature": "EN_SIGNATURE",
-    "En attente pièces": "EN_ATTENTE_PIECES",
-    Terminé: "TERMINE",
-    Suspendu: "SUSPENDU",
-    Archivé: "ARCHIVE",
+    "Brouillon":                 "BROUILLON",
+    "En Cours":                  "EN_COURS",
+    "En Attente":                "EN_ATTENTE",
+    "En Attente de Signature":   "EN_ATTENTE_SIGNATURE",
+    "En Attente de Validation":  "EN_ATTENTE_VALIDATION",
+    "Prêt pour Signature":       "PRET_SIGNATURE",
+    "Signé":                     "SIGNE",
+    "Enregistré":                "ENREGISTRE",
+    "Suspendu":                  "SUSPENDU",
+    "Clôturé":                   "CLOTURE",
+    "Annulé":                    "ANNULE",
+    "Archivé":                   "ARCHIVE",
   };
-  return map[label] ?? "EN_COURS";
+  return map[label] ?? "BROUILLON";
 }
 
 /** Priorité backend → label FR */
@@ -521,4 +621,136 @@ changerStatut: (id: number, statut: StatutDossier) =>
   /** Statistiques globales des dossiers du cabinet */
   getStats: () =>
     apiClient.get<DossierStatsDto>("/api/dossiers/statistiques"),
+
+
+
+
+// ── Workflow avancé (selon Swagger) ──────────────────────────────────────────────
+
+/** Récupérer toutes les étapes du workflow d'un dossier */
+getWorkflowEtapes: (id: number) =>
+  apiClient.get<WorkflowEtapeDto[]>(`/api/dossiers/${id}/workflow/etapes`),
+
+/** Récupérer l'étape courante du workflow */
+getCurrentEtape: (id: number) =>
+  apiClient.get<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/current`),
+
+/** Passer à l'étape suivante */
+nextEtape: (id: number) =>
+  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/next`),
+
+/** Revenir à l'étape précédente */
+previousEtape: (id: number) =>
+  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/previous`),
+
+/** Mettre à jour une étape spécifique */
+updateEtape: (dossierId: number, etapeId: number, data: Partial<WorkflowEtapeDto>) =>
+  apiClient.put<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}`, data),
+
+/** Marquer une étape comme complétée */
+completeEtapeById: (dossierId: number, etapeId: number) =>
+  apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}/complete`),
+
+// ── Assignation (Swagger) ───────────────────────────────────────────────────────
+
+/** Assigner un notaire au dossier */
+assignerNotaire: (id: number, notaireId: number) =>
+  apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-notaire?notaireId=${notaireId}`),
+
+/** Assigner un assistant au dossier */
+assignerAssistant: (id: number, assistantId: number) =>
+  apiClient.put<DossierDto>(`/api/dossiers/${id}/assigner-assistant?assistantId=${assistantId}`),
+
+// ── Blocage / Déblocage (Swagger) ───────────────────────────────────────────────
+
+/** Bloquer un dossier (empêche toute modification) */
+bloquer: (id: number, raison: string) =>
+  apiClient.post<DossierDto>(`/api/dossiers/${id}/bloquer?raison=${encodeURIComponent(raison)}`),
+
+/** Débloquer un dossier */
+debloquer: (id: number) =>
+  apiClient.post<DossierDto>(`/api/dossiers/${id}/debloquer`),
+
+// ── Alertes (Swagger) ───────────────────────────────────────────────────────────
+
+/** Activer une alerte sur le dossier */
+activerAlerte: (id: number, message: string) =>
+  apiClient.post<void>(`/api/dossiers/${id}/activer-alerte?message=${encodeURIComponent(message)}`),
+
+/** Désactiver l'alerte du dossier */
+desactiverAlerte: (id: number) =>
+  apiClient.delete<void>(`/api/dossiers/${id}/desactiver-alerte`),
+
+// ── Calculs (Swagger) ───────────────────────────────────────────────────────────
+
+/** Calculer les honoraires automatiquement selon le barème */
+calculerHonoraires: (id: number) =>
+  apiClient.post<void>(`/api/dossiers/${id}/calculer-honoraires`),
+
+// ── Statistiques détaillées (Swagger) ──────────────────────────────────────────
+
+/** Récupérer les statistiques détaillées d'un dossier */
+getStatistiquesDetail: (id: number) =>
+  apiClient.get<{
+    dossierId: number;
+    nombreParties: number;
+    nombreDocuments: number;
+    nombreEtapes: number;
+    etapesTerminees: number;
+    pourcentageAvancement: number;
+    montantTotal: number;
+    montantPaye: number;
+    montantRestant: number;
+    tauxPaiement: number;
+    joursEcoules: number;
+    joursRestants: number;
+    dateOuverture: string;
+    dateEcheance?: string;
+    enRetard: boolean;
+    solde: boolean;
+    statutActuel: string;
+  }>(`/api/dossiers/${id}/statistiques`),
+
+// ── Recherches avancées (Swagger) ──────────────────────────────────────────────
+
+/** Dossiers en retard */
+getEnRetard: (page = 0, size = 20) =>
+  apiClient.get<Page<DossierDto>>(`/api/dossiers/en-retard?page=${page}&size=${size}`),
+
+/** Dossiers récents (N derniers jours) */
+getRecents: (days = 7) =>
+  apiClient.get<DossierDto[]>(`/api/dossiers/recent?days=${days}`),
+
+/** Dossiers d'un client */
+getByClient: (clientId: number, page = 0, size = 20) =>
+  apiClient.get<Page<DossierDto>>(`/api/dossiers/client/${clientId}?page=${page}&size=${size}`),
+
+/** Dossiers par type d'acte */
+getByTypeActe: (typeActe: string, page = 0, size = 20) =>
+  apiClient.get<Page<DossierDto>>(`/api/dossiers/by-type/${encodeURIComponent(typeActe)}?page=${page}&size=${size}`),
+
+/** Dossiers par statut */
+getByStatut: (statut: StatutDossier, page = 0, size = 20) =>
+  apiClient.get<Page<DossierDto>>(`/api/dossiers/by-statut/${statut}?page=${page}&size=${size}`),
+
+/** Recherche avancée multi-critères */
+advancedSearch: (params: {
+  typeActe?: string;
+  statut?: StatutDossier;
+  notaireId?: number;
+  urgent?: boolean;
+  query?: string;
+  page?: number;
+  size?: number;
+}) => {
+  const qs = new URLSearchParams();
+  if (params.typeActe) qs.set("typeActe", params.typeActe);
+  if (params.statut) qs.set("statut", params.statut);
+  if (params.notaireId) qs.set("notaireId", String(params.notaireId));
+  if (params.urgent !== undefined) qs.set("urgent", String(params.urgent));
+  if (params.query) qs.set("query", params.query);
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.size !== undefined) qs.set("size", String(params.size));
+  return apiClient.get<Page<DossierDto>>(`/api/dossiers/advanced-search?${qs.toString()}`);
+},
 };

@@ -40,7 +40,7 @@ export interface Dossier {
   clients: string[];
   clientDate: string;
   montant: number;
-  statut: "En cours" | "En signature" | "En attente pièces" | "Terminé" | "Suspendu" | "Archivé";
+  statut: "Brouillon" | "En Cours" | "En Attente" | "En Attente de Signature" | "En Attente de Validation" | "Prêt pour Signature" | "Signé" | "Enregistré" | "Suspendu" | "Clôturé" | "Annulé" | "Archivé";
   priorite: "Basse" | "Normale" | "Haute" | "Urgente";
   avancement: number;
   nbActes: number;
@@ -50,6 +50,28 @@ export interface Dossier {
   clerc?: string;
   parties?: PartiePrenanteEntry[];
   deleted?: boolean;
+  description?: string;
+  dateEcheance?: string;
+  dateSignature?: string;
+  dateEnregistrement?: string;
+  notaireChargeId?: number;
+  assistantChargeId?: number;
+  honorairesHT?: number;
+  tva?: number;
+  prixBien?: number;
+  bienDescription?: string;
+  bienAdresse?: string;
+  bienVille?: string;
+  superficie?: number;
+  referenceCadastrale?: string;
+  titreFoncier?: string;
+  numeroRepertoire?: string;
+  numeroMinute?: string;
+  lieuSignature?: string;
+  notesInternes?: string;
+  observations?: string;
+  urgent?: boolean;
+  confidentiel?: boolean;
 }
 
 /** Liste des notaires du cabinet */

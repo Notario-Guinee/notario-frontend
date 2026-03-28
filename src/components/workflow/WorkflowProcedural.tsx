@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,
   Stamp, Newspaper, CheckCircle2, Clock, Play, RotateCcw, Timer, MessageSquare, Send as SendIcon, X as XIcon,
+  Scale, BarChart2, Calculator, FileText, BookOpen, ClipboardList, Users, MapPin, Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkflowConfig, WorkflowStep } from "./workflow-types";
@@ -18,6 +19,7 @@ import { motion } from "framer-motion";
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,
   Stamp, Newspaper, CheckCircle2, Clock, Play,
+  Scale, BarChart2, Calculator, FileText, BookOpen, ClipboardList, Users, MapPin, Map,
 };
 
 interface StepComment {
