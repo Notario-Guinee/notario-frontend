@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   Plus, Search, CalendarDays, CheckCircle2, XCircle, Clock,
   CalendarCheck, CalendarX, Trash2, Users, BarChart3, FileText,
-  ChevronDown, ChevronUp, User,
+  ChevronDown, ChevronUp, User, Settings, Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,30 @@ type TypeConge =
   | "Congé annuel"
   | "Congé maladie"
   | "Congé sans solde"
-  | "Congé maternité/paternité"
+  | "Congé maternité"
+  | "Congé paternité"
+  | "Congé pour événement familial"
+  | "Congé de deuil"
+  | "Congé de formation"
+  | "Congé compensatoire"
+  | "Congé exceptionnel"
+  | "RTT"
   | "Autre";
+
+const TYPES_CONGE: TypeConge[] = [
+  "Congé annuel",
+  "Congé maladie",
+  "Congé sans solde",
+  "Congé maternité",
+  "Congé paternité",
+  "Congé pour événement familial",
+  "Congé de deuil",
+  "Congé de formation",
+  "Congé compensatoire",
+  "Congé exceptionnel",
+  "RTT",
+  "Autre",
+];
 
 type StatutConge = "En attente" | "Approuvé" | "Rejeté";
 
@@ -53,7 +75,7 @@ interface DemandeConge {
   employeNom: string;  // "Prénom Nom"
   employeCode: string;
   employeRole: string;
-  type: TypeConge;
+  type: string;        // TypeConge ou type personnalisé si "Autre"
   dateDebut: string;
   dateFin: string;
   nombreJours: number;
@@ -63,6 +85,23 @@ interface DemandeConge {
   dateCreation: string;
   dateDecision?: string;
 }
+
+// ─── Config solde de congés ────────────────────────────────────
+
+interface SoldeConfig {
+  defaut: number;                  // solde par défaut du cabinet
+  parRole: Record<string, number>; // override par rôle
+}
+
+const SOLDE_CONFIG_INITIAL: SoldeConfig = {
+  defaut: 25,
+  parRole: {
+    "Gérant":     30,
+    "Notaire":    25,
+    "Comptable":  25,
+    "Standard":   20,
+  },
+};
 
 // ─── Mock ─────────────────────────────────────────────────────────
 
@@ -191,6 +230,11 @@ export default function Conges() {
   // Vue active : "employe" ou "gerant"
   const [view, setView] = useState<"employe" | "gerant">("employe");
 
+  // Configuration solde de congés (gérant peut modifier)
+  const [soldeConfig, setSoldeConfig] = useState<SoldeConfig>(SOLDE_CONFIG_INITIAL);
+  const getSolde = (employe: Employe) =>
+    soldeConfig.parRole[employe.role] ?? soldeConfig.defaut;
+
   // Employé courant sélectionné (vue employé)
   const [currentEmployeId, setCurrentEmployeId] = useState("2"); // Aissata Keita par défaut
   const currentEmploye = EMPLOYES.find(e => e.id === currentEmployeId)!;
@@ -295,6 +339,7 @@ export default function Conges() {
               setDemandes={setDemandes}
               onDetail={setDetailing}
               onCancel={setCanceling}
+              getSolde={getSolde}
               fr={fr}
             />
           </motion.div>
@@ -314,6 +359,9 @@ export default function Conges() {
               onApprove={setApproving}
               onReject={(d) => { setRejecting(d); setMotifRejet(""); }}
               onDetail={setDetailing}
+              soldeConfig={soldeConfig}
+              onUpdateSoldeConfig={setSoldeConfig}
+              getSolde={getSolde}
               fr={fr}
             />
           </motion.div>
@@ -475,7 +523,7 @@ export default function Conges() {
 
 function VueEmploye({
   employes, currentEmployeId, setCurrentEmployeId, currentEmploye,
-  demandes, setDemandes, onDetail, onCancel, fr,
+  demandes, setDemandes, onDetail, onCancel, getSolde, fr,
 }: {
   employes: Employe[];
   currentEmployeId: string;
@@ -485,11 +533,12 @@ function VueEmploye({
   setDemandes: React.Dispatch<React.SetStateAction<DemandeConge[]>>;
   onDetail: (d: DemandeConge) => void;
   onCancel: (d: DemandeConge) => void;
+  getSolde: (e: Employe) => number;
   fr: boolean;
 }) {
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState<{ type: TypeConge; dateDebut: string; dateFin: string; motif: string }>({
-    type: "Congé annuel", dateDebut: "", dateFin: "", motif: "",
+  const [form, setForm] = useState<{ type: TypeConge; autreType: string; dateDebut: string; dateFin: string; motif: string }>({
+    type: "Congé annuel", autreType: "", dateDebut: "", dateFin: "", motif: "",
   });
   const formJours = useMemo(() => joursOuvres(form.dateDebut, form.dateFin), [form.dateDebut, form.dateFin]);
 
@@ -498,12 +547,19 @@ function VueEmploye({
     [demandes, currentEmployeId],
   );
 
+  const soldeAnnuel  = getSolde(currentEmploye);
   const joursPris    = mesDemandes.filter(d => d.statut === "Approuvé").reduce((s, d) => s + d.nombreJours, 0);
   const joursEnCours = mesDemandes.filter(d => d.statut === "En attente").reduce((s, d) => s + d.nombreJours, 0);
-  const joursRestants = Math.max(0, currentEmploye.soldeAnnuel - joursPris);
+  const joursRestants = Math.max(0, soldeAnnuel - joursPris);
+
+  // Type affiché : si "Autre" et autreType saisi → utilise autreType
+  const typeEffectif = form.type === "Autre" && form.autreType.trim()
+    ? form.autreType.trim()
+    : form.type;
 
   const handleSubmit = () => {
-    if (!form.dateDebut || !form.dateFin || !form.motif.trim() || formJours <= 0) return;
+    if (!form.dateDebut || !form.dateFin || formJours <= 0) return;
+    if (form.type === "Autre" && !form.autreType.trim()) return;
     const id = `D-${String(demandes.length + 1).padStart(3, "0")}`;
     setDemandes(prev => [{
       id,
@@ -511,7 +567,7 @@ function VueEmploye({
       employeNom: `${currentEmploye.prenom} ${currentEmploye.nom}`,
       employeCode: currentEmploye.code,
       employeRole: currentEmploye.role,
-      type: form.type,
+      type: typeEffectif,
       dateDebut: form.dateDebut,
       dateFin: form.dateFin,
       nombreJours: formJours,
@@ -520,7 +576,7 @@ function VueEmploye({
       dateCreation: new Date().toISOString().slice(0, 10),
     }, ...prev]);
     setShowNew(false);
-    setForm({ type: "Congé annuel", dateDebut: "", dateFin: "", motif: "" });
+    setForm({ type: "Congé annuel", autreType: "", dateDebut: "", dateFin: "", motif: "" });
     toast.success(fr ? "Demande soumise avec succès." : "Request submitted successfully.");
   };
 
@@ -554,10 +610,10 @@ function VueEmploye({
 
       {/* KPI solde */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <KpiMini label={fr ? "Solde annuel"   : "Annual balance"}  value={currentEmploye.soldeAnnuel} sub={fr ? "jours accordés" : "days granted"}   Icon={CalendarDays}  color="text-primary"      delay={0}    />
-        <KpiMini label={fr ? "Jours restants" : "Days remaining"}  value={joursRestants}              sub={fr ? "disponibles"   : "available"}        Icon={CalendarCheck} color="text-success"      delay={0.06} />
-        <KpiMini label={fr ? "Jours pris"     : "Days taken"}      value={joursPris}                  sub={fr ? "approuvés"     : "approved"}         Icon={CheckCircle2}  color="text-muted-foreground" delay={0.12} />
-        <KpiMini label={fr ? "En attente"     : "Pending"}         value={joursEnCours}               sub={fr ? "jours en cours": "days pending"}     Icon={Clock}         color="text-warning"      delay={0.18} />
+        <KpiMini label={fr ? "Solde annuel"   : "Annual balance"}  value={soldeAnnuel}   sub={fr ? "jours accordés" : "days granted"}   Icon={CalendarDays}  color="text-primary"      delay={0}    />
+        <KpiMini label={fr ? "Jours restants" : "Days remaining"}  value={joursRestants} sub={fr ? "disponibles"   : "available"}        Icon={CalendarCheck} color="text-success"      delay={0.06} />
+        <KpiMini label={fr ? "Jours pris"     : "Days taken"}      value={joursPris}     sub={fr ? "approuvés"     : "approved"}         Icon={CheckCircle2}  color="text-muted-foreground" delay={0.12} />
+        <KpiMini label={fr ? "En attente"     : "Pending"}         value={joursEnCours}  sub={fr ? "jours en cours": "days pending"}     Icon={Clock}         color="text-warning"      delay={0.18} />
       </div>
 
       {/* Barre de progression solde */}
@@ -567,17 +623,17 @@ function VueEmploye({
             {fr ? "Utilisation du solde de congés" : "Leave balance usage"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {joursPris} / {currentEmploye.soldeAnnuel} {fr ? "jours" : "days"}
+            {joursPris} / {soldeAnnuel} {fr ? "jours" : "days"}
           </p>
         </div>
         <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              joursPris / currentEmploye.soldeAnnuel > 0.8 ? "bg-destructive" :
-              joursPris / currentEmploye.soldeAnnuel > 0.5 ? "bg-warning" : "bg-success",
+              joursPris / soldeAnnuel > 0.8 ? "bg-destructive" :
+              joursPris / soldeAnnuel > 0.5 ? "bg-warning" : "bg-success",
             )}
-            style={{ width: `${Math.min(100, (joursPris / currentEmploye.soldeAnnuel) * 100)}%` }}
+            style={{ width: `${Math.min(100, (joursPris / soldeAnnuel) * 100)}%` }}
           />
         </div>
         {joursRestants <= 3 && joursRestants > 0 && (
@@ -666,18 +722,32 @@ function VueEmploye({
             <DialogTitle>{fr ? "Nouvelle demande de congé" : "New leave request"}</DialogTitle>
             <DialogDescription>
               {fr
-                ? `Solde disponible : ${joursRestants} jour(s) sur ${currentEmploye.soldeAnnuel}`
-                : `Available balance: ${joursRestants} day(s) of ${currentEmploye.soldeAnnuel}`}
+                ? `Solde disponible : ${joursRestants} jour(s) sur ${soldeAnnuel}`
+                : `Available balance: ${joursRestants} day(s) of ${soldeAnnuel}`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">{fr ? "Type de congé" : "Leave type"}</Label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as TypeConge }))}
+              <Label className="text-xs font-medium text-muted-foreground">{fr ? "Type de congé" : "Leave type"} *</Label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as TypeConge, autreType: "" }))}
                 className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                {(["Congé annuel", "Congé maladie", "Congé sans solde", "Congé maternité/paternité", "Autre"] as TypeConge[])
-                  .map(t => <option key={t} value={t}>{t}</option>)}
+                {TYPES_CONGE.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
+              {form.type === "Autre" && (
+                <div className="mt-2">
+                  <Input
+                    placeholder={fr ? "Précisez le type de congé…" : "Specify leave type…"}
+                    value={form.autreType}
+                    onChange={e => setForm(f => ({ ...f, autreType: e.target.value }))}
+                    className="text-sm"
+                  />
+                  {!form.autreType.trim() && (
+                    <p className="text-xs text-destructive mt-1">
+                      {fr ? "Veuillez préciser le type." : "Please specify the type."}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -720,9 +790,12 @@ function VueEmploye({
               </p>
             )}
             <div>
-              <Label className="text-xs font-medium text-muted-foreground">{fr ? "Motif" : "Reason"} *</Label>
+              <Label className="text-xs font-medium text-muted-foreground">
+                {fr ? "Motif" : "Reason"}
+                <span className="ml-1 text-muted-foreground/60 font-normal">({fr ? "facultatif" : "optional"})</span>
+              </Label>
               <textarea value={form.motif} onChange={e => setForm(f => ({ ...f, motif: e.target.value }))}
-                placeholder={fr ? "Décrivez brièvement le motif…" : "Briefly describe the reason…"}
+                placeholder={fr ? "Décrivez brièvement le motif (optionnel)…" : "Briefly describe the reason (optional)…"}
                 rows={3}
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
             </div>
@@ -730,7 +803,7 @@ function VueEmploye({
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>{fr ? "Annuler" : "Cancel"}</Button>
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSubmit}
-              disabled={!form.dateDebut || !form.dateFin || !form.motif.trim() || formJours <= 0}>
+              disabled={!form.dateDebut || !form.dateFin || formJours <= 0 || (form.type === "Autre" && !form.autreType.trim())}>
               {fr ? "Soumettre" : "Submit"}
             </Button>
           </DialogFooter>
@@ -745,20 +818,30 @@ function VueEmploye({
 // ═════════════════════════════════════════════════════════════════
 
 function VueGerant({
-  employes, demandes, onApprove, onReject, onDetail, fr,
+  employes, demandes, onApprove, onReject, onDetail,
+  soldeConfig, onUpdateSoldeConfig, getSolde, fr,
 }: {
   employes: Employe[];
   demandes: DemandeConge[];
   onApprove: (d: DemandeConge) => void;
   onReject: (d: DemandeConge) => void;
   onDetail: (d: DemandeConge) => void;
+  soldeConfig: SoldeConfig;
+  onUpdateSoldeConfig: (c: SoldeConfig) => void;
+  getSolde: (e: Employe) => number;
   fr: boolean;
 }) {
   const [search, setSearch]               = useState("");
   const [filterStatut, setFilterStatut]   = useState<"Tous" | StatutConge>("Tous");
-  const [filterType, setFilterType]       = useState<"Tous" | TypeConge>("Tous");
+  const [filterType, setFilterType]       = useState<string>("Tous");
   const [filterEmploye, setFilterEmploye] = useState("Tous");
   const [showRecap, setShowRecap]         = useState(false);
+
+  // ── Modal paramètres soldes ───────────────────────────────────
+  const [showSoldeSettings, setShowSoldeSettings] = useState(false);
+  const [draftConfig, setDraftConfig] = useState<SoldeConfig>(soldeConfig);
+
+  const rolesUniques = Array.from(new Set(employes.map(e => e.role)));
 
   const pending  = demandes.filter(d => d.statut === "En attente").length;
   const approved = demandes.filter(d => d.statut === "Approuvé").length;
@@ -782,17 +865,19 @@ function VueGerant({
     employes.map(e => {
       const dems = demandes.filter(d => d.employeId === e.id);
       const pris = dems.filter(d => d.statut === "Approuvé").reduce((s, d) => s + d.nombreJours, 0);
+      const solde = getSolde(e);
       return {
         employe: e,
+        solde,
         total: dems.length,
         enAttente: dems.filter(d => d.statut === "En attente").length,
         approuve: dems.filter(d => d.statut === "Approuvé").length,
         rejete: dems.filter(d => d.statut === "Rejeté").length,
         joursPris: pris,
-        joursRestants: Math.max(0, e.soldeAnnuel - pris),
+        joursRestants: Math.max(0, solde - pris),
       };
     }),
-  [employes, demandes]);
+  [employes, demandes, getSolde]);
 
   return (
     <>
@@ -823,12 +908,16 @@ function VueGerant({
           <option value="Approuvé">{fr ? "Approuvé" : "Approved"}</option>
           <option value="Rejeté">{fr ? "Rejeté" : "Rejected"}</option>
         </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value as typeof filterType)}
+        <select value={filterType} onChange={e => setFilterType(e.target.value)}
           className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
           <option value="Tous">{fr ? "Tous types" : "All types"}</option>
-          {(["Congé annuel", "Congé maladie", "Congé sans solde", "Congé maternité/paternité", "Autre"] as TypeConge[])
-            .map(t => <option key={t} value={t}>{t}</option>)}
+          {TYPES_CONGE.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+        <Button variant="outline" size="sm" className="gap-2"
+          onClick={() => { setDraftConfig(soldeConfig); setShowSoldeSettings(true); }}>
+          <Settings className="h-4 w-4" />
+          {fr ? "Soldes" : "Balances"}
+        </Button>
         <Button variant="outline" size="sm" className="ml-auto gap-2" onClick={() => setShowRecap(v => !v)}>
           <BarChart3 className="h-4 w-4" />
           {fr ? "Récapitulatif" : "Summary"}
@@ -879,7 +968,7 @@ function VueGerant({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-sm font-mono text-foreground">{r.employe.soldeAnnuel}j</td>
+                      <td className="px-4 py-2.5 text-sm font-mono text-foreground">{r.solde}j</td>
                       <td className="px-4 py-2.5 text-sm font-mono font-semibold text-foreground">{r.joursPris}j</td>
                       <td className="px-4 py-2.5">
                         <span className={cn("text-sm font-mono font-semibold",
@@ -898,6 +987,119 @@ function VueGerant({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Modal Paramètres soldes de congés ──────────────────── */}
+      <Dialog open={showSoldeSettings} onOpenChange={o => !o && setShowSoldeSettings(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              {fr ? "Paramètres des soldes de congés" : "Leave balance settings"}
+            </DialogTitle>
+            <DialogDescription>
+              {fr
+                ? "Définissez le solde annuel de congés pour le cabinet. Vous pouvez personnaliser par statut d'employé."
+                : "Set the annual leave balance for the cabinet. You can customize by employee role."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-1">
+            {/* Solde par défaut */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {fr ? "Solde par défaut du cabinet" : "Cabinet default balance"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {fr ? "Appliqué à tout rôle non configuré ci-dessous" : "Applied to any role not configured below"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={draftConfig.defaut}
+                    onChange={e => setDraftConfig(c => ({ ...c, defaut: Math.max(1, Number(e.target.value)) }))}
+                    className="w-20 text-center font-mono font-semibold"
+                  />
+                  <span className="text-sm text-muted-foreground shrink-0">{fr ? "jours" : "days"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Soldes par rôle */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                {fr ? "Par statut / rôle d'employé" : "By employee role / status"}
+              </p>
+              {rolesUniques.map(role => (
+                <div key={role} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary shrink-0">
+                      {role.slice(0, 2).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{role}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={draftConfig.parRole[role] ?? draftConfig.defaut}
+                      onChange={e => setDraftConfig(c => ({
+                        ...c,
+                        parRole: { ...c.parRole, [role]: Math.max(1, Number(e.target.value)) },
+                      }))}
+                      className="w-20 text-center font-mono font-semibold"
+                    />
+                    <span className="text-sm text-muted-foreground shrink-0">{fr ? "jours" : "days"}</span>
+                    {draftConfig.parRole[role] !== undefined && draftConfig.parRole[role] !== draftConfig.defaut && (
+                      <button
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        title={fr ? "Réinitialiser au défaut" : "Reset to default"}
+                        onClick={() => setDraftConfig(c => {
+                          const { [role]: _, ...rest } = c.parRole;
+                          return { ...c, parRole: rest };
+                        })}
+                      >✕</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Aperçu */}
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-3">
+              <p className="text-xs font-semibold text-primary mb-2">{fr ? "Aperçu des soldes" : "Balance preview"}</p>
+              <div className="flex flex-wrap gap-2">
+                {employes.map(e => {
+                  const s = draftConfig.parRole[e.role] ?? draftConfig.defaut;
+                  return (
+                    <div key={e.id} className="flex items-center gap-1.5 bg-background rounded-md border border-border px-2.5 py-1">
+                      <span className="text-xs text-muted-foreground">{e.prenom}</span>
+                      <span className="text-xs font-bold text-primary font-mono">{s}j</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSoldeSettings(false)}>
+              {fr ? "Annuler" : "Cancel"}
+            </Button>
+            <Button onClick={() => {
+              onUpdateSoldeConfig(draftConfig);
+              setShowSoldeSettings(false);
+              toast.success(fr ? "Soldes de congés mis à jour." : "Leave balances updated.");
+            }}>
+              <Save className="h-4 w-4 mr-2" />
+              {fr ? "Enregistrer" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Tableau principal */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
