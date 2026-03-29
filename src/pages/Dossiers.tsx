@@ -1760,251 +1760,246 @@ const saveParties = async () => {
                 </div>
               )}
 
-{detailTab === "actes" && (
-  <div className="space-y-4">
-    <div className="flex items-center justify-between">
-      <p className="text-sm font-medium text-foreground">
-        {actes.length} {fr ? "acte(s)" : "deed(s)"}
-      </p>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={() => {
-          setUploadContext("actes");
-          fileInputRef.current?.click();
-        }}
-      >
-        <Plus className="h-4 w-4 mr-1" />
-        {fr ? "Ajouter un acte" : "Add deed"}
-      </Button>
-    </div>
-    
-    {documentsLoading ? (
-      <div className="flex justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+{/* ✅ Input file global — toujours monté, avant le switch de tabs */}
+<input 
+  ref={fileInputRef} 
+  type="file" 
+  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
+  className="hidden" 
+  onChange={handleFileSelect} 
+/>
+
+{/* Sub-tab Content */}
+<div key={detailTab}>
+
+  {detailTab === "actes" && (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-foreground">
+          {actes.length} {fr ? "acte(s)" : "deed(s)"}
+        </p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => {
+            setUploadContext("actes");
+            fileInputRef.current?.click();
+          }}
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          {fr ? "Ajouter un acte" : "Add deed"}
+        </Button>
       </div>
-    ) : actes.length > 0 ? (
-      <div className="space-y-2">
-        {actes.map((acte) => (
-          <div key={acte.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-            <FileText className="h-5 w-5 text-primary shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-medium text-foreground truncate">{acte.nomDocument}</p>
-                <StatusBadge 
-                  status={
-                    acte.signe ? "Signé" : 
-                    acte.valideParNom ? "Validé" : 
-                    "Brouillon"
-                  } 
-                />
-                {acte.version > 1 && (
-                  <span className="text-xs text-muted-foreground">v{acte.version}</span>
-                )}
+      
+      {documentsLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : actes.length > 0 ? (
+        <div className="space-y-2">
+          {actes.map((acte) => (
+            <div key={acte.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+              <FileText className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground truncate">{acte.nomDocument}</p>
+                  <StatusBadge 
+                    status={
+                      acte.signe ? "Signé" : 
+                      acte.valideParNom ? "Validé" : 
+                      "Brouillon"
+                    } 
+                  />
+                  {acte.version > 1 && (
+                    <span className="text-xs text-muted-foreground">v{acte.version}</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {fr ? "Créé le" : "Created on"} {new Date(acte.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
+                  {acte.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${acte.valideParNom}`}
+                  {acte.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${acte.signeParNom}`}
+                  {acte.dateSignature && ` · ${new Date(acte.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {fr ? "Créé le" : "Created on"} {new Date(acte.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
-                {acte.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${acte.valideParNom}`}
-                {acte.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${acte.signeParNom}`}
-                {acte.dateSignature && ` · ${new Date(acte.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {/* Validation (notaire) - visible si non validé et non signé */}
-              {!acte.valideParNom && acte.statut !== "VALIDE" && !acte.signe && (
+              <div className="flex items-center gap-1 shrink-0">
+                {!acte.valideParNom && acte.statut !== "VALIDE" && !acte.signe && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => handleValiderDocument(acte.id)}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    {fr ? "Valider" : "Validate"}
+                  </Button>
+                )}
+                {acte.valideParNom && acte.signatureRequise && !acte.signe && (
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="h-7 text-xs bg-primary"
+                    onClick={() => openSignatureModal(acte)}
+                  >
+                    <FileSignature className="h-3.5 w-3.5 mr-1" />
+                    {fr ? "Signer" : "Sign"}
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 text-xs"
-                  onClick={() => handleValiderDocument(acte.id)}
+                  onClick={() => handleDownloadDocument(acte.id, acte.nomDocument)}
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  {fr ? "Valider" : "Validate"}
+                  <FileDown className="h-3.5 w-3.5" />
                 </Button>
-              )}
-              
-              {/* Signature électronique - visible si validé, signature requise, et non signé */}
-              {acte.valideParNom && acte.signatureRequise && !acte.signe && (
+                {!acte.signe && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteDocument(acte.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={FileText}
+          title={fr ? "Aucun acte" : "No deeds"}
+          description={fr ? "Ajoutez un acte notarial au dossier" : "Add a notarial deed to the case"}
+          action={
+            <Button variant="outline" size="sm" onClick={() => {
+              setUploadContext("actes");
+              fileInputRef.current?.click();
+            }}>
+              <Plus className="h-4 w-4 mr-1" />
+              {fr ? "Ajouter un acte" : "Add a deed"}
+            </Button>
+          }
+        />
+      )}
+    </div>
+  )}
+
+  {detailTab === "pieces" && (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-foreground">
+          {documents.length} {fr ? "document(s)" : "document(s)"}
+        </p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => {
+            setUploadContext("pieces");
+            fileInputRef.current?.click();
+          }}
+        >
+          <Upload className="h-4 w-4 mr-1" />
+          {fr ? "Ajouter" : "Add"}
+        </Button>
+      </div>
+
+      {/* ✅ Input supprimé d'ici */}
+
+      {documentsLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : documents.length > 0 ? (
+        <div className="space-y-2">
+          {documents.map((doc) => (
+            <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+              <FileText className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-foreground truncate">{doc.nomDocument}</p>
+                  {doc.tailleFichierFormatee && (
+                    <span className="text-xs text-muted-foreground">({doc.tailleFichierFormatee})</span>
+                  )}
+                  <StatusBadge 
+                    status={
+                      doc.signe ? "Signé" : 
+                      doc.valideParNom ? "Validé" : 
+                      "Brouillon"
+                    } 
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {fr ? "Ajouté le" : "Added on"} {new Date(doc.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
+                  {doc.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${doc.valideParNom}`}
+                  {doc.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${doc.signeParNom}`}
+                  {doc.dateSignature && ` · ${new Date(doc.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {!doc.valideParNom && doc.statut !== "VALIDE" && !doc.signe && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => handleValiderDocument(doc.id)}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    {fr ? "Valider" : "Validate"}
+                  </Button>
+                )}
+                {doc.valideParNom && doc.signatureRequise && !doc.signe && (
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="h-7 text-xs bg-primary"
+                    onClick={() => openSignatureModal(doc)}
+                  >
+                    <FileSignature className="h-3.5 w-3.5 mr-1" />
+                    {fr ? "Signer" : "Sign"}
+                  </Button>
+                )}
                 <Button 
-                  variant="default" 
+                  variant="ghost" 
                   size="sm" 
-                  className="h-7 text-xs bg-primary"
-                  onClick={() => openSignatureModal(acte)}
+                  className="h-7 text-xs"
+                  onClick={() => handleDownloadDocument(doc.id, doc.nomDocument)}
                 >
-                  <FileSignature className="h-3.5 w-3.5 mr-1" />
-                  {fr ? "Signer" : "Sign"}
+                  <FileDown className="h-3.5 w-3.5" />
                 </Button>
-              )}
-              
-              {/* Télécharger */}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 text-xs"
-                onClick={() => handleDownloadDocument(acte.id, acte.nomDocument)}
-              >
-                <FileDown className="h-3.5 w-3.5" />
-              </Button>
-              
-              {/* Supprimer - seulement si non signé */}
-              {!acte.signe && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 text-xs text-destructive hover:text-destructive"
-                  onClick={() => handleDeleteDocument(acte.id)}
+                  onClick={() => handleDeleteDocument(doc.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <EmptyState
-        icon={FileText}
-        title={fr ? "Aucun acte" : "No deeds"}
-        description={fr ? "Ajoutez un acte notarial au dossier" : "Add a notarial deed to the case"}
-        action={
-          <Button variant="outline" size="sm" onClick={() => {
-            setUploadContext("actes");
-            fileInputRef.current?.click();
-          }}>
-            <Plus className="h-4 w-4 mr-1" />
-            {fr ? "Ajouter un acte" : "Add a deed"}
-          </Button>
-        }
-      />
-    )}
-  </div>
-)}
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={FileDown}
+          title={fr ? "Aucun document" : "No documents"}
+          description={fr ? "Commencez par ajouter un document" : "Start by adding a document"}
+          action={
+            <Button variant="outline" size="sm" onClick={() => {
+              setUploadContext("pieces");
+              fileInputRef.current?.click();
+            }}>
+              <Upload className="h-4 w-4 mr-1" />
+              {fr ? "Ajouter un document" : "Add a document"}
+            </Button>
+          }
+        />
+      )}
+    </div>
+  )}
 
-              {detailTab === "pieces" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-foreground">
-                      {documents.length} {fr ? "document(s)" : "document(s)"}
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => {
-                        setUploadContext("pieces");
-                        fileInputRef.current?.click();
-                      }}
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      {fr ? "Ajouter" : "Add"}
-                    </Button>
-                  </div>
-                  
-                  <input 
-                    ref={fileInputRef} 
-                    type="file" 
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
-                    className="hidden" 
-                    onChange={handleFileSelect} 
-                  />
-                  
-                  {documentsLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    </div>
-                  ) : documents.length > 0 ? (
-                    <div className="space-y-2">
-                      {documents.map((doc) => (
-                        <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-                          <FileText className="h-5 w-5 text-primary shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium text-foreground truncate">{doc.nomDocument}</p>
-                              {doc.tailleFichierFormatee && (
-                                <span className="text-xs text-muted-foreground">({doc.tailleFichierFormatee})</span>
-                              )}
-                              <StatusBadge 
-                                status={
-                                  doc.signe ? "Signé" : 
-                                  doc.valideParNom ? "Validé" : 
-                                  "Brouillon"
-                                } 
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {fr ? "Ajouté le" : "Added on"} {new Date(doc.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
-                              {doc.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${doc.valideParNom}`}
-                              {doc.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${doc.signeParNom}`}
-                              {doc.dateSignature && ` · ${new Date(doc.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {/* Bouton Valider - visible si non validé et non signé */}
-                            {!doc.valideParNom && doc.statut !== "VALIDE" && !doc.signe && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 text-xs"
-                                onClick={() => handleValiderDocument(doc.id)}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                {fr ? "Valider" : "Validate"}
-                              </Button>
-                            )}
-                            
-                            {/* Bouton Signer - visible si validé, signature requise, et non signé */}
-                            {doc.valideParNom && doc.signatureRequise && !doc.signe && (
-                              <Button 
-                                variant="default" 
-                                size="sm" 
-                                className="h-7 text-xs bg-primary"
-                                onClick={() => openSignatureModal(doc)}
-                              >
-                                <FileSignature className="h-3.5 w-3.5 mr-1" />
-                                {fr ? "Signer" : "Sign"}
-                              </Button>
-                            )}
-                            
-                            {/* Bouton Télécharger */}
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 text-xs"
-                              onClick={() => handleDownloadDocument(doc.id, doc.nomDocument)}
-                            >
-                              <FileDown className="h-3.5 w-3.5" />
-                            </Button>
-                            
-                            {/* Bouton Supprimer */}
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 text-xs text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteDocument(doc.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      icon={FileDown}
-                      title={fr ? "Aucun document" : "No documents"}
-                      description={fr ? "Commencez par ajouter un document" : "Start by adding a document"}
-                      action={
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setUploadContext("pieces");
-                          fileInputRef.current?.click();
-                        }}>
-                          <Upload className="h-4 w-4 mr-1" />
-                          {fr ? "Ajouter un document" : "Add a document"}
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              )}
+</div>
+              
               {detailTab === "finances" && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
