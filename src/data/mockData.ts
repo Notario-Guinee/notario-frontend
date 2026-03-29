@@ -28,6 +28,7 @@ export const mockClients = [
 
 export interface PartiePrenanteEntry {
   clientCode: string;
+  id?: number; 
   nom: string;
   clientId?: number;
   telephone?: string;

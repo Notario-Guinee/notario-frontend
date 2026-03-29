@@ -48,6 +48,7 @@ import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
 import { WORKFLOW_PALETTE } from "@/components/workflow/workflow-types";
 import { useDossierTabs } from "@/context/DossierTabsContext";
 import { useAuth } from "@/context/AuthContext";
+import { getTypeActeCode } from "@/constants/typeActeMapping";
 
 // categoriesActes est défini dans le composant pour pouvoir accéder à typeActes
 // La constante statique reste disponible comme fallback
@@ -84,6 +85,7 @@ function mapDtoToLocal(dto: DossierDto): Dossier {
 
   // ✅ Mapper les parties correctement
   const partiesMappees = dto.parties?.map(p => ({
+    id: p.id,
     clientCode: p.clientCode ?? "",
     nom: p.nomComplet ?? p.clientNom ?? 
         ([p.prenom, p.nom].filter(Boolean).join(" ") || "?"),
@@ -220,6 +222,7 @@ export default function Dossiers() {
   // ═══ Clients pour le select ═══
   const [clientsList, setClientsList] = useState<ClientDto[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
+  const [uploadContext, setUploadContext] = useState<"pieces" | "actes">("pieces");
   
 
 
@@ -391,6 +394,8 @@ useEffect(() => {
     }
   };
 
+  
+
   /** Helper: convertir base64 en Blob */
   const base64ToBlob = (base64: string, mimeType: string): Blob => {
     const byteCharacters = atob(base64);
@@ -405,14 +410,19 @@ useEffect(() => {
 // ═══ Gestion des documents ═══
 
 /** Sélection d'un fichier pour upload */
+/** Sélection d'un fichier pour upload */
 const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
   if (e.target.files && e.target.files[0]) {
     setUploadFile(e.target.files[0]);
+    
+    // ✅ Configurer les métadonnées selon le contexte
+    const isActe = uploadContext === "actes";
+    
     setUploadMetadata({
       nomDocument: e.target.files[0].name,
-      typeDocument: "AUTRE",
+      typeDocument: isActe ? "ACTE" : "AUTRE",
       description: "",
-      signatureRequise: false,
+      signatureRequise: isActe ? true : false,
       obligatoire: false,
       confidentiel: false,
     });
@@ -669,6 +679,7 @@ useEffect(() => {
 
   const pieceInputRef = useRef<HTMLInputElement>(null);
   const factureImportRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ═══ Commentaires par étape de workflow (dossierId → stepKey → []) ═══
   const [stepComments, setStepComments] = useState<Record<string, Record<string, { user: string; text: string; date: string }[]>>>({});
@@ -764,67 +775,87 @@ useEffect(() => {
   const visibleDossiers = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
 
-  const stats = useMemo(() => ({
-    total: dossiers.length,
-    enCours: dossiers.filter(d => d.statut === "En cours").length,
-    enSignature: dossiers.filter(d => d.statut === "En signature").length,
-    enAttente: dossiers.filter(d => d.statut === "En attente pièces").length,
-    termines: dossiers.filter(d => d.statut === "Terminé").length,
-    totalMontant: dossiers.reduce((s, d) => s + d.montant, 0),
-  }), [dossiers]);
+const stats = useMemo(() => ({
+  total: dossiers.length,
+  // ✅ Correction : utiliser les bons libellés
+  enCours: dossiers.filter(d => d.statut === "En Cours").length,        // "En Cours" (avec C majuscule)
+  enSignature: dossiers.filter(d => d.statut === "En Attente de Signature").length,  // "En Attente de Signature"
+  enAttente: dossiers.filter(d => d.statut === "En Attente").length,    // "En Attente"
+  termines: dossiers.filter(d => d.statut === "Clôturé").length,        // "Clôturé"
+  totalMontant: dossiers.reduce((s, d) => s + d.montant, 0),
+}), [dossiers]);
 
-  const handleCreate = useCallback(async () => {
-    if (!form.typeActe?.trim()) {
-      toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
-      return;
-    }
-    if (!form.objet?.trim()) {
-      toast.error(fr ? "L'objet du dossier est obligatoire." : "Case subject is required.");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      // Résout le code enum backend depuis le nom affiché dans l'UI
-      const typeActeCode = typeActes.find(
-        t => (t.nom ?? t.libelle ?? t.code) === form.typeActe
-      )?.code ?? form.typeActe;
+// ═══ Filtrage des actes (documents de type acte) ═══
+const actes = useMemo(() => {
+  return documents.filter(doc => 
+    doc.typeDocument === "ACTE" || 
+    doc.typeDocument === "ACTE_NOTARIAL" ||
+    doc.typeDocument === "PROCURATION" ||
+    doc.typeDocument === "CONTRAT"
+  );
+}, [documents]);
 
-      const prioriteOrdinal: Record<string, number> = { Basse: 0, Normale: 1, Haute: 2, Urgente: 3 };
-      const payload: import("@/services/dossierService").CreateDossierDto = {
-        typeActe: typeActeCode,
-        objet: form.objet,
-        ...(form.description && { description: form.description }),
-        ...(form.dateEcheance && { dateEcheance: form.dateEcheance }),
-        ...(form.notaireChargeId && { notaireChargeId: Number(form.notaireChargeId) }),
-        ...(form.assistantChargeId && { assistantChargeId: Number(form.assistantChargeId) }),
-        ...(form.honorairesHT && { honorairesHT: Number(form.honorairesHT) }),
-        ...(form.tva && { tva: Number(form.tva) }),
-        ...(form.bienDescription && { bienDescription: form.bienDescription }),
-        ...(form.bienAdresse && { bienAdresse: form.bienAdresse }),
-        ...(form.bienVille && { bienVille: form.bienVille }),
-        ...(form.referenceCadastrale && { referenceCadastrale: form.referenceCadastrale }),
-        ...(form.titreFoncier && { titreFoncier: form.titreFoncier }),
-        ...(form.superficie && { superficie: Number(form.superficie) }),
-        ...(form.prixBien && { prixBien: Number(form.prixBien) }),
-        priorite: prioriteOrdinal[form.priorite] ?? 1,
-        urgent: form.urgent,
-        confidentiel: form.confidentiel,
-        ...(form.notesInternes && { notesInternes: form.notesInternes }),
-        ...(form.observations && { observations: form.observations }),
-      };
-      const created = await dossierService.create(payload);
-      setDossiers(prev => [mapDtoToLocal(created), ...prev]);
-      setShowCreateModal(false);
-      resetForm();
-      toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
-      announce(fr ? "Dossier créé" : "Case created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la création" : "Error creating case"));
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [form, fr, announce, resetForm, typeActes]);
+// Optionnel : filtrer les pièces (tout sauf les actes)
+const pieces = useMemo(() => {
+  return documents.filter(doc => 
+    doc.typeDocument !== "ACTE" && 
+    doc.typeDocument !== "ACTE_NOTARIAL" &&
+    doc.typeDocument !== "PROCURATION" &&
+    doc.typeDocument !== "CONTRAT"
+  );
+}, [documents]);
+
+const handleCreate = useCallback(async () => {
+  if (!form.typeActe?.trim()) {
+    toast.error(fr ? "Le type d'acte est obligatoire." : "Deed type is required.");
+    return;
+  }
+  if (!form.objet?.trim()) {
+    toast.error(fr ? "L'objet du dossier est obligatoire." : "Case subject is required.");
+    return;
+  }
+  setIsSubmitting(true);
+  try {
+    // ✅ Convertir le libellé UI en code backend
+    const typeActeCode = getTypeActeCode(form.typeActe);
+    
+    const prioriteOrdinal: Record<string, number> = { Basse: 0, Normale: 1, Haute: 2, Urgente: 3 };
+    const payload: CreateDossierDto = {
+      typeActe: typeActeCode,  // ← Utiliser le code converti
+      objet: form.objet,
+      ...(form.description && { description: form.description }),
+      ...(form.dateEcheance && { dateEcheance: form.dateEcheance }),
+      ...(form.notaireChargeId && { notaireChargeId: Number(form.notaireChargeId) }),
+      ...(form.assistantChargeId && { assistantChargeId: Number(form.assistantChargeId) }),
+      ...(form.honorairesHT && { honorairesHT: Number(form.honorairesHT) }),
+      ...(form.tva && { tva: Number(form.tva) }),
+      ...(form.bienDescription && { bienDescription: form.bienDescription }),
+      ...(form.bienAdresse && { bienAdresse: form.bienAdresse }),
+      ...(form.bienVille && { bienVille: form.bienVille }),
+      ...(form.referenceCadastrale && { referenceCadastrale: form.referenceCadastrale }),
+      ...(form.titreFoncier && { titreFoncier: form.titreFoncier }),
+      ...(form.superficie && { superficie: Number(form.superficie) }),
+      ...(form.prixBien && { prixBien: Number(form.prixBien) }),
+      priorite: prioriteOrdinal[form.priorite] ?? 1,
+      urgent: form.urgent,
+      confidentiel: form.confidentiel,
+      ...(form.notesInternes && { notesInternes: form.notesInternes }),
+      ...(form.observations && { observations: form.observations }),
+    };
+    
+    const created = await dossierService.create(payload);
+    setDossiers(prev => [mapDtoToLocal(created), ...prev]);
+    setShowCreateModal(false);
+    resetForm();
+    toast.success(fr ? "Dossier créé avec succès" : "Case created successfully");
+    announce(fr ? "Dossier créé" : "Case created");
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la création" : "Error creating case"));
+    console.error(err);
+  } finally {
+    setIsSubmitting(false);
+  }
+}, [form, fr, announce, resetForm]);
 
 const handleEdit = useCallback(async () => {
   if (!editingDossier) return;
@@ -967,11 +998,17 @@ const handleDelete = useCallback(async () => {
   // Parties prenantes
   const openPartiesModal = async (d: Dossier) => {
     setPartiesDossier(d);
-    setPartiesList(d.parties || []);
+    // ✅ S'assurer que l'ID est bien présent
+    setPartiesList(d.parties?.map(p => ({
+      ...p,
+      id: p.id,  // L'ID est déjà dans p
+      clientCode: p.clientCode,
+      nom: p.nom,
+      role: p.role,
+      clientId: p.clientId,
+    })) || []);
     setNewPartie({ clientId: "", clientCode: "", clientNom: "", role: "Acheteur" });
     setShowPartiesModal(true);
-    
-    // ✅ Charger les clients disponibles
     await loadClients();
   };
 
@@ -1004,8 +1041,8 @@ const handleDelete = useCallback(async () => {
     setNewPartie({ clientId: "", clientCode: "", clientNom: "", role: "Acheteur" });
   };
 
-  const removePartie = (code: string) => {
-    setPartiesList(prev => prev.filter(p => p.clientCode !== code));
+  const removePartie = (partieId: number) => {
+    setPartiesList(prev => prev.filter(p => p.id !== partieId));
   };
 
 const saveParties = async () => {
@@ -1590,32 +1627,68 @@ const saveParties = async () => {
                   </div>
                 </div>
               )}
+
               {detailTab === "parties" && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-foreground">{(selectedDossier.parties || []).length} {fr ? "partie(s) prenante(s)" : "stakeholder(s)"}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {(selectedDossier.parties || []).length} {fr ? "partie(s) prenante(s)" : "stakeholder(s)"}
+                    </p>
                     <Button variant="outline" size="sm" className="text-xs gap-1" onClick={() => openPartiesModal(selectedDossier)}>
-                      <UserPlus className="h-3.5 w-3.5" /> {fr ? "Associer parties" : "Link stakeholders"}
+                      <UserPlus className="h-3.5 w-3.5" /> 
+                      {fr ? "Associer parties" : "Link stakeholders"}
                     </Button>
                   </div>
-                  {(selectedDossier.parties || []).length > 0 ? (selectedDossier.parties || []).map((p, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">{(p.nom ?? "?").charAt(0)}</div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{p.nom}</p>
-                       <p className="text-xs text-muted-foreground">
-                          {p.clientCode} · {p.role}
-                          {p.telephone && ` · ${p.telephone}`}
-                        </p>
-                      </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">{p.role}</span>
+                  
+                  {(selectedDossier.parties || []).length > 0 ? (
+                    <div className="space-y-2">
+                      {(selectedDossier.parties || []).map((p) => (
+                        <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+                            {(p.nom ?? "?").charAt(0)}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">{p.nom}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {p.clientCode} · {p.role}
+                              {p.telephone && ` · ${p.telephone}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                              {p.role}
+                            </span>
+                            {/* ✅ Bouton de suppression directe */}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={async () => {
+                                if (p.id && confirm(fr ? "Supprimer cette partie ?" : "Delete this stakeholder?")) {
+                                  try {
+                                    await dossierService.removePartie(Number(selectedDossier.id), p.id);
+                                    await loadDossiers(); // Recharger les dossiers
+                                    toast.success(fr ? "Partie supprimée" : "Stakeholder removed");
+                                  } catch (error) {
+                                    console.error("Erreur suppression:", error);
+                                    toast.error(fr ? "Erreur lors de la suppression" : "Error removing stakeholder");
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )) : (
+                  ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">{fr ? "Aucune partie prenante associée" : "No stakeholders linked"}</p>
                       <Button variant="outline" size="sm" className="mt-3 gap-1" onClick={() => openPartiesModal(selectedDossier)}>
-                        <UserPlus className="h-4 w-4" /> {fr ? "Associer des parties" : "Link stakeholders"}
+                        <UserPlus className="h-4 w-4" /> 
+                        {fr ? "Associer des parties" : "Link stakeholders"}
                       </Button>
                     </div>
                   )}
@@ -1686,38 +1759,148 @@ const saveParties = async () => {
                   )}
                 </div>
               )}
-              {detailTab === "actes" && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-foreground">{selectedDossier.nbActes} {fr ? "acte(s)" : "deed(s)"}</p>
-                    <Button variant="outline" size="sm" className="text-xs gap-1"><Plus className="h-3.5 w-3.5" />{fr ? "Ajouter un acte" : "Add deed"}</Button>
-                  </div>
-                  {selectedDossier.nbActes > 0 ? Array.from({ length: selectedDossier.nbActes }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <FileText className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{fr ? "Acte" : "Deed"} {i + 1} — {selectedDossier.typeActe}</p>
-                        <p className="text-xs text-muted-foreground">{fr ? "Créé le" : "Created on"} {selectedDossier.clientDate}</p>
-                      </div>
-                      <StatusBadge status={i === 0 ? (fr ? "En cours" : "In progress") : (fr ? "Terminé" : "Completed")} />
-                    </div>
-                  )) : <div className="text-center py-8 text-muted-foreground text-sm">{fr ? "Aucun acte créé" : "No deeds created"}</div>}
-                </div>
+
+{detailTab === "actes" && (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <p className="text-sm font-medium text-foreground">
+        {actes.length} {fr ? "acte(s)" : "deed(s)"}
+      </p>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={() => {
+          setUploadContext("actes");
+          fileInputRef.current?.click();
+        }}
+      >
+        <Plus className="h-4 w-4 mr-1" />
+        {fr ? "Ajouter un acte" : "Add deed"}
+      </Button>
+    </div>
+    
+    {documentsLoading ? (
+      <div className="flex justify-center py-8">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    ) : actes.length > 0 ? (
+      <div className="space-y-2">
+        {actes.map((acte) => (
+          <div key={acte.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+            <FileText className="h-5 w-5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-medium text-foreground truncate">{acte.nomDocument}</p>
+                <StatusBadge 
+                  status={
+                    acte.signe ? "Signé" : 
+                    acte.valideParNom ? "Validé" : 
+                    "Brouillon"
+                  } 
+                />
+                {acte.version > 1 && (
+                  <span className="text-xs text-muted-foreground">v{acte.version}</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {fr ? "Créé le" : "Created on"} {new Date(acte.dateAjout).toLocaleDateString(fr ? "fr-FR" : "en-US")}
+                {acte.valideParNom && ` · ${fr ? "Validé par" : "Validated by"} ${acte.valideParNom}`}
+                {acte.signeParNom && ` · ${fr ? "Signé par" : "Signed by"} ${acte.signeParNom}`}
+                {acte.dateSignature && ` · ${new Date(acte.dateSignature).toLocaleDateString(fr ? "fr-FR" : "en-US")}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Validation (notaire) - visible si non validé et non signé */}
+              {!acte.valideParNom && acte.statut !== "VALIDE" && !acte.signe && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 text-xs"
+                  onClick={() => handleValiderDocument(acte.id)}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                  {fr ? "Valider" : "Validate"}
+                </Button>
               )}
+              
+              {/* Signature électronique - visible si validé, signature requise, et non signé */}
+              {acte.valideParNom && acte.signatureRequise && !acte.signe && (
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="h-7 text-xs bg-primary"
+                  onClick={() => openSignatureModal(acte)}
+                >
+                  <FileSignature className="h-3.5 w-3.5 mr-1" />
+                  {fr ? "Signer" : "Sign"}
+                </Button>
+              )}
+              
+              {/* Télécharger */}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-xs"
+                onClick={() => handleDownloadDocument(acte.id, acte.nomDocument)}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+              </Button>
+              
+              {/* Supprimer - seulement si non signé */}
+              {!acte.signe && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => handleDeleteDocument(acte.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <EmptyState
+        icon={FileText}
+        title={fr ? "Aucun acte" : "No deeds"}
+        description={fr ? "Ajoutez un acte notarial au dossier" : "Add a notarial deed to the case"}
+        action={
+          <Button variant="outline" size="sm" onClick={() => {
+            setUploadContext("actes");
+            fileInputRef.current?.click();
+          }}>
+            <Plus className="h-4 w-4 mr-1" />
+            {fr ? "Ajouter un acte" : "Add a deed"}
+          </Button>
+        }
+      />
+    )}
+  </div>
+)}
+
               {detailTab === "pieces" && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-foreground">
                       {documents.length} {fr ? "document(s)" : "document(s)"}
                     </p>
-                    <Button variant="outline" size="sm" onClick={() => pieceInputRef.current?.click()}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        setUploadContext("pieces");
+                        fileInputRef.current?.click();
+                      }}
+                    >
                       <Upload className="h-4 w-4 mr-1" />
                       {fr ? "Ajouter" : "Add"}
                     </Button>
                   </div>
                   
                   <input 
-                    ref={pieceInputRef} 
+                    ref={fileInputRef} 
                     type="file" 
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" 
                     className="hidden" 
@@ -1768,7 +1951,7 @@ const saveParties = async () => {
                               </Button>
                             )}
                             
-                            {/* ✅ Bouton Signer - visible si validé, signature requise, et non signé */}
+                            {/* Bouton Signer - visible si validé, signature requise, et non signé */}
                             {doc.valideParNom && doc.signatureRequise && !doc.signe && (
                               <Button 
                                 variant="default" 
@@ -1810,7 +1993,10 @@ const saveParties = async () => {
                       title={fr ? "Aucun document" : "No documents"}
                       description={fr ? "Commencez par ajouter un document" : "Start by adding a document"}
                       action={
-                        <Button variant="outline" size="sm" onClick={() => pieceInputRef.current?.click()}>
+                        <Button variant="outline" size="sm" onClick={() => {
+                          setUploadContext("pieces");
+                          fileInputRef.current?.click();
+                        }}>
                           <Upload className="h-4 w-4 mr-1" />
                           {fr ? "Ajouter un document" : "Add a document"}
                         </Button>
@@ -2437,12 +2623,16 @@ const saveParties = async () => {
                   <p className="text-sm font-medium text-foreground truncate">{p.nom}</p>
                   <p className="text-xs text-muted-foreground">{p.clientCode} · {p.role}</p>
                 </div>
-                <button 
-                  onClick={() => removePartie(p.clientCode)} 
-                  className="text-destructive hover:text-destructive/80 p-1 shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <button 
+                onClick={() => {
+                  if (p.id) {
+                    removePartie(p.id);
+                  }
+                }} 
+                className="text-destructive hover:text-destructive/80 p-1 shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
               </div>
             ))}
           </div>
