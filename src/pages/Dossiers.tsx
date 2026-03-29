@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
@@ -56,6 +57,7 @@ export default function Dossiers() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
+  const navigate = useNavigate();
   const [dossiers, setDossiers] = useState<Dossier[]>(mockDossiers);
   const [search, setSearch] = useState("");
   const [filterStatut, setFilterStatut] = useState<string>("all");
@@ -620,6 +622,7 @@ export default function Dossiers() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openDossierTab(d, "details")}><FileText className="mr-2 h-4 w-4" /> {fr ? "Voir détail" : "View detail"}</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openDossierTab(d, "workflow")}><GitBranch className="mr-2 h-4 w-4" /> {fr ? "Voir workflow" : "View workflow"}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/documents/dossier/${d.id}`)}><FolderOpen className="mr-2 h-4 w-4" /> {fr ? "Documents" : "Documents"}</DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => openEdit(d)}><Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openPartiesModal(d)}><UserPlus className="mr-2 h-4 w-4" /> {fr ? "Associer parties" : "Link stakeholders"}</DropdownMenuItem>
@@ -688,6 +691,7 @@ export default function Dossiers() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openDossierTab(d, "details"); }}><FileText className="mr-2 h-4 w-4" /> {fr ? "Voir détail" : "View detail"}</DropdownMenuItem>
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openDossierTab(d, "workflow"); }}><GitBranch className="mr-2 h-4 w-4" /> {fr ? "Voir workflow" : "View workflow"}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(`/documents/dossier/${d.id}`); }}><FolderOpen className="mr-2 h-4 w-4" /> {fr ? "Documents" : "Documents"}</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openEdit(d); }}><Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}</DropdownMenuItem>
                     <DropdownMenuItem onClick={e => { e.stopPropagation(); openPartiesModal(d); }}><UserPlus className="mr-2 h-4 w-4" /> {fr ? "Associer parties" : "Link stakeholders"}</DropdownMenuItem>

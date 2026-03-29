@@ -35,6 +35,11 @@ const PortailClient     = lazy(() => import("./pages/PortailClient"));
 const Dashboard         = lazy(() => import("./pages/Dashboard"));
 const Clients           = lazy(() => import("./pages/Clients"));
 const Dossiers          = lazy(() => import("./pages/Dossiers"));
+const DocumentsPage     = lazy(() => import("./pages/DocumentsPage"));
+const DocumentEditorPage       = lazy(() => import("./pages/DocumentEditorPage"));
+const DocumentVersionsPage     = lazy(() => import("./pages/DocumentVersionsPage"));
+const DocumentCollaboratorsPage = lazy(() => import("./pages/DocumentCollaboratorsPage"));
+const DossierDocumentsPage      = lazy(() => import("./pages/DossierDocumentsPage"));
 const TypesActions      = lazy(() => import("./pages/TypesActions"));
 const ActesSignatures   = lazy(() => import("./pages/ActesSignatures"));
 const Factures          = lazy(() => import("./pages/Factures"));
@@ -150,6 +155,11 @@ const App = () => (
                 <Route path="/dashboard"          element={<Dashboard />} />
                 <Route path="/clients"            element={<Clients />} />
                 <Route path="/dossiers"           element={<Dossiers />} />
+                <Route path="/documents"          element={<DocumentsPage />} />
+                <Route path="/documents/:documentId" element={<DocumentEditorPage />} />
+                <Route path="/documents/:documentId/versions" element={<DocumentVersionsPage />} />
+                <Route path="/documents/:documentId/collaborateurs" element={<DocumentCollaboratorsPage />} />
+                <Route path="/documents/dossier/:dossierId" element={<DossierDocumentsPage />} />
                 <Route path="/types-actions"      element={<TypesActions />} />
                 <Route path="/actes"              element={<ActesSignatures />} />
                 <Route path="/factures"           element={<Factures />} />
