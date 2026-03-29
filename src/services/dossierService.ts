@@ -148,6 +148,24 @@ export interface SignatureResponse {
   message?: string;
 }
 
+//Clients
+
+export interface ClientDto {
+  id: number;
+  codeClient: string;
+  typeClient: "Personne Physique" | "Personne Morale";
+  nom?: string;
+  prenom?: string;
+  denominationSociale?: string;
+  email?: string;
+  telephone?: string;
+  adresse?: string;
+  ville?: string;
+  actif: boolean;
+  nomComplet?: string;
+  nomAffichage?: string;
+}
+
 // ── Types Workflow ────────────────────────────────────────────────────────────
 
 export interface WorkflowEtapeDto {
@@ -196,8 +214,12 @@ export type RolePartie =
 export interface PartiePrenanteDto {
   id: number;
   clientId: number;
-  clientCode: string;
-  clientNom: string;
+  clientCode?: string;
+  clientNom?: string;   
+  nom?: string;         
+  prenom?: string;     
+  nomComplet?: string;  
+  telephone?: string;
   role: RolePartie;
 }
 
@@ -325,7 +347,7 @@ export interface DossierStatsDto {
 
 export interface AddPartieDto {
   clientId: number;
-  role: RolePartie;
+  rolePartie: RolePartie;
 }
 
 export interface UpdatePartieDto {
@@ -435,6 +457,26 @@ export function roleValue(label: string): RolePartie {
   return map[label] ?? "AUTRE";
 }
 
+// ── Service Client ──────────────────────────────────────────────────────────
+
+export const clientService = {
+  /** Récupérer tous les clients du cabinet (paginé) */
+  getAll: (params?: { page?: number; size?: number; search?: string; actif?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.page !== undefined) qs.set("page", String(params.page));
+    if (params?.size !== undefined) qs.set("size", String(params.size));
+    if (params?.search) qs.set("search", params.search);
+    if (params?.actif !== undefined) qs.set("actif", String(params.actif));
+    return apiClient.get<Page<ClientDto>>(`/api/clients?${qs.toString()}`);
+  },
+
+  /** Récupérer tous les clients actifs (pour les selects) - utilise l'endpoint paginé */
+  getAllActifs: async () => {
+    const response = await clientService.getAll({ size: 100, actif: true });
+    // La réponse est une Page<ClientDto>, on extrait le contenu
+    return response.content || response.data || response;
+  },
+};
 
 // ── Service TypeActe ──────────────────────────────────────────────────────────
 

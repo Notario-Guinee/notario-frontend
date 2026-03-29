@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import { mockClients, formatGNF, rolesParties, currentUser, type Dossier, type PartiePrenanteEntry } from "@/data/mockData";
 import {
-  dossierService, typeActeService,
-  statutLabel, statutValue, prioriteLabel, roleLabel,
+  dossierService, typeActeService, clientService,
+  statutLabel, statutValue, prioriteLabel, roleLabel, roleValue,
   STATUT_TRANSITIONS, STATUTS_TERMINAUX,
   type DossierDto, 
   type TypeActeDto, 
@@ -27,6 +27,8 @@ import {
   type WorkflowEtapeDto,  
   type UpdateDossierDto,    
   type HistoriqueEntreeDto,  
+  type ClientDto,
+  
 } from "@/services/dossierService";
 import { TYPES_ACTE } from "@/data/constants";
 import { motion } from "framer-motion";
@@ -80,12 +82,22 @@ function mapDtoToLocal(dto: DossierDto): Dossier {
   const notaire: string = dto.notaireChargeNom ?? dto.notaireNom ?? "";
   const clerc: string | undefined = dto.assistantChargeNom ?? dto.clercNom;
 
+  // ✅ Mapper les parties correctement
+  const partiesMappees = dto.parties?.map(p => ({
+    clientCode: p.clientCode ?? "",
+    nom: p.nomComplet ?? p.clientNom ?? 
+        ([p.prenom, p.nom].filter(Boolean).join(" ") || "?"),
+    role: roleLabel(p.role) as PartiePrenanteEntry["role"],
+    clientId: p.clientId,
+    telephone: p.telephone,  // ✅
+  })) ?? [];
+
   return {
     id: String(dto.id),
     code,
     typeActe: typeActeLibelle,
     objet: dto.objet ?? dto.description ?? "",
-    clients: dto.parties?.map(p => p.clientNom) ?? [],
+    clients: partiesMappees.map(p => p.nom),
     clientDate: dateLocale,
     montant,
     statut: statutLabel(dto.statut) as Dossier["statut"],
@@ -96,11 +108,7 @@ function mapDtoToLocal(dto: DossierDto): Dossier {
     date: dateRaw,
     notaire,
     clerc,
-    parties: dto.parties?.map(p => ({
-      clientCode: p.clientCode,
-      nom: p.clientNom,
-      role: roleLabel(p.role) as PartiePrenanteEntry["role"],
-    })),
+    parties: partiesMappees,  // ✅
     deleted: dto.deleted ?? false,
     description: dto.description,
     dateEcheance: dto.dateEcheance,
@@ -209,6 +217,11 @@ export default function Dossiers() {
   });
   const [isAddingHistorique, setIsAddingHistorique] = useState(false);
 
+  // ═══ Clients pour le select ═══
+  const [clientsList, setClientsList] = useState<ClientDto[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  
+
 
     // ═══ Chargement initial depuis l'API ═══
   const loadDossiers = useCallback(async () => {
@@ -239,43 +252,43 @@ export default function Dossiers() {
     }
   }, []);
 
-// ═══ Chargement du workflow depuis l'API ═══
-const loadWorkflow = useCallback(async (dossierId: number) => {
-  try {
-    setWorkflowLoading(true);
-    // Réinitialise après activation du spinner
-    setWorkflowEtapes([]);
-    setCurrentEtape(null);
-    const etapes = await dossierService.getWorkflowEtapes(dossierId);
-    setWorkflowEtapes(etapes);
-    // getCurrentEtape peut renvoyer 404 si aucune étape active — on l'ignore
+  // ═══ Chargement du workflow depuis l'API ═══
+  const loadWorkflow = useCallback(async (dossierId: number) => {
     try {
-      const current = await dossierService.getCurrentEtape(dossierId);
-      setCurrentEtape(current);
-    } catch {
-      // Pas d'étape active (workflow pas encore démarré ou toutes complétées)
+      setWorkflowLoading(true);
+      // Réinitialise après activation du spinner
+      setWorkflowEtapes([]);
       setCurrentEtape(null);
+      const etapes = await dossierService.getWorkflowEtapes(dossierId);
+      setWorkflowEtapes(etapes);
+      // getCurrentEtape peut renvoyer 404 si aucune étape active — on l'ignore
+      try {
+        const current = await dossierService.getCurrentEtape(dossierId);
+        setCurrentEtape(current);
+      } catch {
+        // Pas d'étape active (workflow pas encore démarré ou toutes complétées)
+        setCurrentEtape(null);
+      }
+    } catch (error) {
+      console.error("Erreur chargement workflow:", error);
+      // Pas de toast — certains dossiers n'ont pas encore d'étapes initialisées
+    } finally {
+      setWorkflowLoading(false);
     }
-  } catch (error) {
-    console.error("Erreur chargement workflow:", error);
-    // Pas de toast — certains dossiers n'ont pas encore d'étapes initialisées
-  } finally {
-    setWorkflowLoading(false);
-  }
-}, []);
+  }, []);
 
-// ═══ Chargement des documents ═══
-const loadDocuments = useCallback(async (dossierId: number) => {
-  try {
-    setDocumentsLoading(true);
-    const docs = await dossierService.getDocuments(dossierId);
-    setDocuments(docs);
-  } catch (error) {
-    console.error("Erreur chargement documents:", error);
-  } finally {
-    setDocumentsLoading(false);
-  }
-}, []);
+  // ═══ Chargement des documents ═══
+  const loadDocuments = useCallback(async (dossierId: number) => {
+    try {
+      setDocumentsLoading(true);
+      const docs = await dossierService.getDocuments(dossierId);
+      setDocuments(docs);
+    } catch (error) {
+      console.error("Erreur chargement documents:", error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, []);
 
   // ═══ Chargement de l'historique ═══
   const loadHistorique = useCallback(async (dossierId: number) => {
@@ -289,6 +302,24 @@ const loadDocuments = useCallback(async (dossierId: number) => {
       setHistoriqueLoading(false);
     }
   }, []);
+
+  // ═══ Chargement des clients ═══
+// ═══ Chargement des clients ═══
+// ═══ Chargement des clients ═══
+const loadClients = useCallback(async () => {
+  try {
+    setClientsLoading(true);
+    // Utiliser getAllActifs qui retourne un tableau de clients
+    const clients = await clientService.getAllActifs();
+    setClientsList(clients);
+  } catch (error) {
+    console.error("Erreur chargement clients:", error);
+    toast.error(fr ? "Erreur chargement des clients" : "Error loading clients");
+    setClientsList([]);
+  } finally {
+    setClientsLoading(false);
+  }
+}, [fr]);
 
 // Charger les documents quand on est sur l'onglet "pieces" ou "signataires"
 useEffect(() => {
@@ -619,7 +650,12 @@ useEffect(() => {
   const [showPartiesModal, setShowPartiesModal] = useState(false);
   const [partiesDossier, setPartiesDossier] = useState<Dossier | null>(null);
   const [partiesList, setPartiesList] = useState<PartiePrenanteEntry[]>([]);
-  const [newPartie, setNewPartie] = useState({ clientSearch: "", role: "Acheteur" as PartiePrenanteEntry["role"] });
+  const [newPartie, setNewPartie] = useState({ 
+    clientId: "",
+    clientCode: "",
+    clientNom: "",
+    role: "Acheteur" as PartiePrenanteEntry["role"] 
+  });
   const [clientSuggestions, setClientSuggestions] = useState<typeof mockClients>([]);
 
   // Generate facture modal
@@ -929,12 +965,14 @@ const handleDelete = useCallback(async () => {
   }, []);
 
   // Parties prenantes
-  const openPartiesModal = (d: Dossier) => {
+  const openPartiesModal = async (d: Dossier) => {
     setPartiesDossier(d);
     setPartiesList(d.parties || []);
-    setNewPartie({ clientSearch: "", role: "Acheteur" });
-    setClientSuggestions([]);
+    setNewPartie({ clientId: "", clientCode: "", clientNom: "", role: "Acheteur" });
     setShowPartiesModal(true);
+    
+    // ✅ Charger les clients disponibles
+    await loadClients();
   };
 
   const searchClients = (query: string) => {
@@ -946,37 +984,78 @@ const handleDelete = useCallback(async () => {
     ).slice(0, 5));
   };
 
-  const addPartie = (client: typeof mockClients[0]) => {
-    if (partiesList.some(p => p.clientCode === client.code)) {
+  const addPartie = (client: ClientDto) => {
+    const clientCode = client.codeClient;
+    const clientNom = client.nomComplet || client.denominationSociale || `${client.prenom} ${client.nom}`.trim();
+    
+    if (partiesList.some(p => p.clientCode === clientCode)) {
       toast.error(fr ? "Ce client est déjà associé" : "This client is already linked");
       return;
     }
+    
     setPartiesList(prev => [...prev, {
-      clientCode: client.code,
-      nom: `${client.nom} ${client.prenom}`.trim(),
+      clientCode: clientCode,
+      nom: clientNom,
       role: newPartie.role,
+      clientId: client.id,  
     }]);
-    setNewPartie({ clientSearch: "", role: "Acheteur" });
-    setClientSuggestions([]);
+    
+    // Réinitialiser la sélection
+    setNewPartie({ clientId: "", clientCode: "", clientNom: "", role: "Acheteur" });
   };
 
   const removePartie = (code: string) => {
     setPartiesList(prev => prev.filter(p => p.clientCode !== code));
   };
 
-  const saveParties = () => {
-    if (!partiesDossier) return;
-    setDossiers(prev => prev.map(d => d.id === partiesDossier.id ? {
-      ...d,
-      parties: partiesList,
-      clients: partiesList.map(p => p.nom),
-    } : d));
-    if (selectedDossier?.id === partiesDossier.id) {
-      // selectedDossier is derived from dossiers state; updating dossiers above is sufficient
+const saveParties = async () => {
+  if (!partiesDossier) return;
+  
+  try {
+    const existingParties = partiesDossier.parties || [];
+    const newParties = partiesList.filter(
+      p => !existingParties.some(e => e.clientCode === p.clientCode)
+    );
+    
+    for (const partie of newParties) {
+      if (!partie.clientId) {
+        toast.error(fr ? "Erreur: client non identifié" : "Error: client not identified");
+        return;
+      }
+      await dossierService.addPartie(Number(partiesDossier.id), {
+        clientId: partie.clientId,
+        rolePartie: roleValue(partie.role),
+      });
     }
+
+    // Charger les parties fraîches depuis l'API
+    const partiesFraîches = await dossierService.getParties(Number(partiesDossier.id));
+    
+    // Mettre à jour le dossier dans le state local directement
+    setDossiers(prev => prev.map(d => {
+      if (d.id !== partiesDossier.id) return d;
+      return {
+        ...d,
+        parties: partiesFraîches.map(p => ({
+          clientCode: p.clientCode ?? "",
+          nom: p.nomComplet ?? p.clientNom ?? ([p.prenom, p.nom].filter(Boolean).join(" ") || "?"),
+          role: roleLabel(p.role) as PartiePrenanteEntry["role"],
+          clientId: p.clientId,
+        })),
+        clients: partiesFraîches.map(p =>
+          p.nomComplet ?? p.clientNom ?? ([p.prenom, p.nom].filter(Boolean).join(" ") || "?")
+        ),
+      };
+    }));
+
     setShowPartiesModal(false);
-    toast.success(fr ? "Parties prenantes mises à jour" : "Stakeholders updated");
-  };
+    toast.success(fr ? "Parties prenantes enregistrées" : "Stakeholders saved successfully");
+
+  } catch (error) {
+    console.error("Erreur sauvegarde parties:", error);
+    toast.error(fr ? "Erreur lors de l'enregistrement" : "Error saving stakeholders");
+  }
+};
 
   // Generate facture from dossier
   const openFactureModal = (d: Dossier) => {
@@ -1521,10 +1600,13 @@ const handleDelete = useCallback(async () => {
                   </div>
                   {(selectedDossier.parties || []).length > 0 ? (selectedDossier.parties || []).map((p, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">{p.nom.charAt(0)}</div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">{(p.nom ?? "?").charAt(0)}</div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-foreground">{p.nom}</p>
-                        <p className="text-xs text-muted-foreground">{p.clientCode} · {p.role}</p>
+                       <p className="text-xs text-muted-foreground">
+                          {p.clientCode} · {p.role}
+                          {p.telephone && ` · ${p.telephone}`}
+                        </p>
                       </div>
                       <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">{p.role}</span>
                     </div>
@@ -1556,7 +1638,7 @@ const handleDelete = useCallback(async () => {
                         return (
                           <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
-                              {p.nom.charAt(0)}
+                              {(p.nom ?? "?").charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-foreground">{p.nom}</p>
@@ -1581,7 +1663,7 @@ const handleDelete = useCallback(async () => {
                       })}
                       <div className="p-3 rounded-lg bg-muted/30 border border-border flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 font-bold text-sm shrink-0">
-                          {selectedDossier.notaire.charAt(0)}
+                          {(selectedDossier.notaire ?? "?").charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground">{selectedDossier.notaire}</p>
@@ -2328,77 +2410,145 @@ const handleDelete = useCallback(async () => {
       </AlertDialog>
 
       {/* Associer Parties Modal */}
-      <Dialog open={showPartiesModal} onOpenChange={setShowPartiesModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-heading">{fr ? "Associer des parties prenantes" : "Link Stakeholders"}</DialogTitle>
-            <DialogDescription>{fr ? "Dossier" : "Case"} <strong>{partiesDossier?.code}</strong> — {partiesDossier?.objet}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Current parties */}
-            {partiesList.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">{fr ? `Parties associées (${partiesList.length})` : `Linked stakeholders (${partiesList.length})`}</Label>
-                {partiesList.map((p, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
-                      {p.nom.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{p.nom}</p>
-                      <p className="text-xs text-muted-foreground">{p.clientCode} · {p.role}</p>
-                    </div>
-                    <button onClick={() => removePartie(p.clientCode)} className="text-destructive hover:text-destructive/80 p-1">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add new party */}
-            <div className="space-y-3 p-4 rounded-lg border border-dashed border-border">
-              <Label className="text-sm font-medium">{fr ? "Ajouter une partie" : "Add a stakeholder"}</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs">{fr ? "Rechercher client" : "Search client"}</Label>
-                  <Input
-                    value={newPartie.clientSearch}
-                    onChange={e => searchClients(e.target.value)}
-                    placeholder={fr ? "Code ou nom du client..." : "Client code or name..."}
-                  />
-                  {clientSuggestions.length > 0 && (
-                    <div className="border border-border rounded-lg bg-card shadow-lg max-h-40 overflow-y-auto">
-                      {clientSuggestions.map(c => (
-                        <button key={c.id} onClick={() => addPartie(c)}
-                          className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors flex items-center gap-2 border-b border-border last:border-0">
-                          <span className="text-xs font-mono text-primary">{c.code}</span>
-                          <span className="text-sm text-foreground">{c.nom} {c.prenom}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+{/* Associer Parties Modal */}
+<Dialog open={showPartiesModal} onOpenChange={setShowPartiesModal}>
+  <DialogContent className="max-w-lg">
+    <DialogHeader>
+      <DialogTitle className="font-heading">{fr ? "Associer des parties prenantes" : "Link Stakeholders"}</DialogTitle>
+      <DialogDescription>
+        {fr ? "Dossier" : "Case"} <strong>{partiesDossier?.code}</strong> — {partiesDossier?.objet}
+      </DialogDescription>
+    </DialogHeader>
+    
+    <div className="space-y-4 py-2">
+      {/* Liste des parties déjà associées */}
+      {partiesList.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">
+            {fr ? `Parties associées (${partiesList.length})` : `Linked stakeholders (${partiesList.length})`}
+          </Label>
+          <div className="max-h-48 overflow-y-auto space-y-2">
+            {partiesList.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 border border-border">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                  {(p.nom ?? "?").charAt(0)}
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">{fr ? "Rôle" : "Role"}</Label>
-                  <Select value={newPartie.role} onValueChange={v => setNewPartie(p => ({ ...p, role: v as PartiePrenanteEntry["role"] }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {rolesParties.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{p.nom}</p>
+                  <p className="text-xs text-muted-foreground">{p.clientCode} · {p.role}</p>
                 </div>
+                <button 
+                  onClick={() => removePartie(p.clientCode)} 
+                  className="text-destructive hover:text-destructive/80 p-1 shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </div>
+            ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPartiesModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={saveParties}>
-              {fr ? "Enregistrer les parties" : "Save stakeholders"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+      {/* Ajout d'une nouvelle partie */}
+      <div className="space-y-3 p-4 rounded-lg border border-dashed border-border">
+        <Label className="text-sm font-medium">{fr ? "Ajouter une partie" : "Add a stakeholder"}</Label>
+        
+        <div className="space-y-3">
+          {/* Select client */}
+          <div className="space-y-2">
+            <Label className="text-xs">{fr ? "Client" : "Client"} *</Label>
+            <Select 
+              value={newPartie.clientId} 
+              onValueChange={(value) => {
+                const client = clientsList.find(c => String(c.id) === value);
+                if (client) {
+                  setNewPartie({ 
+                    clientId: String(client.id), 
+                    clientCode: client.codeClient,
+                    clientNom: client.nomComplet || client.denominationSociale || `${client.prenom} ${client.nom}`.trim(),
+                    role: newPartie.role
+                  });
+                }
+              }}
+              disabled={clientsLoading}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={fr ? "Sélectionner un client" : "Select a client"} />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {clientsLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                ) : clientsList.length > 0 ? (
+                  clientsList.map((client) => (
+                    <SelectItem key={client.id} value={String(client.id)}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {client.nomComplet || client.denominationSociale || `${client.prenom} ${client.nom}`.trim()}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {client.codeClient} · {client.typeClient === "Personne Physique" ? "Personne physique" : "Personne morale"}
+                          {client.email && ` · ${client.email}`}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-client" disabled>
+                    {fr ? "Aucun client trouvé" : "No client found"}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sélection du rôle */}
+          <div className="space-y-2">
+            <Label className="text-xs">{fr ? "Rôle" : "Role"} *</Label>
+            <Select 
+              value={newPartie.role} 
+              onValueChange={v => setNewPartie(p => ({ ...p, role: v as PartiePrenanteEntry["role"] }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={fr ? "Sélectionner un rôle" : "Select a role"} />
+              </SelectTrigger>
+              <SelectContent>
+                {rolesParties.map(r => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Bouton ajouter */}
+          <Button 
+            className="w-full mt-2"
+            onClick={() => {
+              const client = clientsList.find(c => String(c.id) === newPartie.clientId);
+              if (client) {
+                addPartie(client);
+              }
+            }}
+            disabled={!newPartie.clientId || !newPartie.role}
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            {fr ? "Ajouter cette partie" : "Add this stakeholder"}
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowPartiesModal(false)}>
+        {fr ? "Annuler" : "Cancel"}
+      </Button>
+      <Button className="bg-primary text-primary-foreground" onClick={saveParties}>
+        {fr ? "Enregistrer les parties" : "Save stakeholders"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 
       {/* Generate Facture Modal */}
       <Dialog open={showFactureModal} onOpenChange={setShowFactureModal}>

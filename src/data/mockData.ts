@@ -29,6 +29,8 @@ export const mockClients = [
 export interface PartiePrenanteEntry {
   clientCode: string;
   nom: string;
+  clientId?: number;
+  telephone?: string;
   role: "Acheteur" | "Vendeur" | "Bénéficiaire" | "Mandant" | "Mandataire" | "Preneur" | "Bailleur" | "Donateur" | "Donataire" | "Héritier" | "Autre";
 }
 
