@@ -18,8 +18,8 @@ export default function LoginTenant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const cabinetName = "Cabinet Maître Sylla";
-  const subdomain = "sylla.notariale.com";
+  const cabinetName = "Portail Cabinet Notarial";
+  const subdomain = window.location.host;
 
   // Appel réel au backend — remplace l'ancien navigate("/dashboard") direct
   const handleLogin = async () => {
@@ -58,7 +58,6 @@ export default function LoginTenant() {
               <div className="w-10 h-10 rounded-xl bg-[#2AA3D6] flex items-center justify-center text-white font-bold text-lg shadow-lg">N</div>
               <div>
                 <p className="text-white font-medium text-[15px]">{cabinetName}</p>
-                <p className="text-[#8ba5be] text-[11px]">{subdomain}</p>
               </div>
             </div>
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">{t("login.tenantWelcome")}</h2>
@@ -125,20 +124,15 @@ export default function LoginTenant() {
             <span className="text-[11px] text-muted-foreground">{t("login.tenantOr")}</span>
             <div className="flex-1 h-px bg-border" />
           </div>
-          <p className="text-center text-xs text-muted-foreground">
+          <div className="text-center text-xs text-muted-foreground">
             {t("login.tenantClientLink")}{" "}
             <button onClick={() => navigate("/client/login")} className="text-primary hover:underline font-medium">{t("login.tenantClientAccess")}</button>
           <p className="text-center text-xs text-muted-foreground mt-2">
             Pas encore de compte ?{" "}
             <button onClick={() => navigate("/register")} className="text-primary hover:underline font-medium">Créer un compte</button>
           </p>
-          </p>
-          <div className="mt-6 rounded-lg bg-muted/50 px-3.5 py-2.5 flex items-center gap-2.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-[11px] text-muted-foreground">
-              {t("login.tenantSpace")} : <strong className="text-foreground">{subdomain}</strong>
-            </span>
           </div>
+
         </div>
       </motion.div>
     </div>

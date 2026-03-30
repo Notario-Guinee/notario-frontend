@@ -63,7 +63,6 @@ export default function LoginAdmin() {
               </div>
               <div>
                 <p className="text-[#e8f0f8] font-medium text-[15px]">Notariale SaaS</p>
-                <p className="text-[#5a7a96] text-[11px]">admin.notariale.com</p>
               </div>
             </div>
             <div className="inline-flex items-center gap-2 bg-[#1a3a58] border border-[#2a5070] px-3 py-1.5 rounded-full mb-7">
@@ -87,7 +86,7 @@ export default function LoginAdmin() {
             </div>
             <div className="rounded-lg bg-[#1a3a58] border border-[#2a5070] px-3.5 py-2.5">
               <p className="text-[11px] text-[#5a7a96] mb-1">{t("login.adminEnv")}</p>
-              <p className="text-[12px] text-[#9ab0c8] font-mono">https://admin.notariale.com</p>
+              <p className="text-[12px] text-[#9ab0c8] font-mono">Production</p>
             </div>
           </div>
         </div>

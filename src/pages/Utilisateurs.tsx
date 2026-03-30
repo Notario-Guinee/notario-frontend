@@ -16,6 +16,8 @@ import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { getUsers, searchUsers, createUser, updateUser, deactivateUser, activateUser, type User as BackendUser, type UserRole as BackendRole } from "@/services/usersService";
+import { useEffect } from "react";
 
 // Interface utilisateur avec champs facultatifs
 interface User {
@@ -50,13 +52,67 @@ export default function Utilisateurs() {
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [archiving, setArchiving] = useState<User | null>(null);
-  // Formulaire avec champs facultatifs
+  // Formulaire avec champs facultatifs + mot de passe pour le backend
   const [form, setForm] = useState({
     nom: "", prenom: "", email: "", telephone: "", role: "Standard",
     dateNaissance: "", lieuNaissance: "", adresse: "",
+    password: "", confirmPassword: ""
   });
-  const [page, setPage] = useState(1);
-  const perPage = 20;
+  const [loading, setLoading] = useState(true);
+
+  // Fonction de mapping Backend -> Frontend
+  const mapUser = (u: BackendUser): User => ({
+    id: String(u.id),
+    code: `USR-${String(u.id).padStart(3, "0")}`, // Généré car le backend ne semble pas avoir de champ 'code' dans UserDto
+    nom: u.nom,
+    prenom: u.prenom,
+    email: u.email,
+    telephone: u.telephone || "",
+    role: u.role === "GERANT" ? "Gérant" : "Standard",
+    statut: u.actif ? "Actif" : "Archivé",
+    dateNaissance: u.dateNaissance,
+    lieuNaissance: u.lieuNaissance,
+    adresse: u.adresse,
+    permissions: []
+  });
+
+  // Chargement des données au montage
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const res = await getUsers(0, 50);
+        setUsers(res.content.map(mapUser));
+      } catch (err) {
+        console.error("Erreur chargement utilisateurs:", err);
+        toast.error(fr ? "Erreur de connexion" : "Connection error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [fr]);
+
+  // Recherche backend avec debounce
+  useEffect(() => {
+    if (!search && !loading) {
+      getUsers(0, 50).then(res => setUsers(res.content.map(mapUser)));
+      return;
+    }
+
+    const handler = setTimeout(async () => {
+      if (search) {
+        try {
+          const res = await searchUsers(search);
+          setUsers(res.content.map(mapUser));
+        } catch (err) {
+          console.error("Erreur recherche:", err);
+        }
+      }
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [search]);
 
   // Filtrage des utilisateurs
   const filtered = users.filter(u => {
@@ -67,35 +123,80 @@ export default function Utilisateurs() {
   });
 
   // Création d'un nouvel utilisateur
-  const handleCreate = () => {
-    const code = `USR-${String(users.length + 1).padStart(3, "0")}`;
-    setUsers(prev => [...prev, {
-      id: String(Date.now()), code, nom: form.nom, prenom: form.prenom,
-      telephone: form.telephone, email: form.email, role: form.role,
-      statut: "Actif", permissions: [],
-      dateNaissance: form.dateNaissance || undefined,
-      lieuNaissance: form.lieuNaissance || undefined,
-      adresse: form.adresse || undefined,
-    }]);
-    setShowNew(false);
-    setForm({ nom: "", prenom: "", email: "", telephone: "", role: "Standard", dateNaissance: "", lieuNaissance: "", adresse: "" });
-    toast.success(fr ? "Utilisateur ajouté" : "User added");
+  const handleCreate = async () => {
+    try {
+      const payload = {
+        nom: form.nom,
+        prenom: form.prenom,
+        email: form.email,
+        telephone: form.telephone,
+        role: form.role === "Gérant" ? "GERANT" : "STANDARD",
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        dateNaissance: form.dateNaissance || null,
+        lieuNaissance: form.lieuNaissance || null,
+        adresse: form.adresse || null,
+        actif: true
+      };
+      const newUser = await createUser(payload);
+      setUsers(prev => [mapUser(newUser), ...prev]);
+      setShowNew(false);
+      setForm({
+        nom: "", prenom: "", email: "", telephone: "", role: "Standard",
+        dateNaissance: "", lieuNaissance: "", adresse: "",
+        password: "", confirmPassword: ""
+      });
+      toast.success(fr ? "Utilisateur ajouté" : "User added");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   // Mise à jour d'un utilisateur
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editing) return;
-    setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
-    setEditing(null);
-    toast.success(fr ? "Utilisateur mis à jour" : "User updated");
+    try {
+      const payload = {
+        nom: editing.nom,
+        prenom: editing.prenom,
+        email: editing.email,
+        telephone: editing.telephone,
+        role: editing.role === "Gérant" ? "GERANT" : "STANDARD",
+        dateNaissance: editing.dateNaissance || null,
+        lieuNaissance: editing.lieuNaissance || null,
+        adresse: editing.adresse || null,
+        actif: editing.statut === "Actif"
+      };
+      const updated = await updateUser(Number(editing.id), payload);
+      setUsers(prev => prev.map(u => u.id === editing.id ? mapUser(updated) : u));
+      setEditing(null);
+      toast.success(fr ? "Utilisateur mis à jour" : "User updated");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
-  // Archivage d'un utilisateur
-  const handleArchive = () => {
+  // Archivage/Désactivation d'un utilisateur
+  const handleArchive = async () => {
     if (!archiving) return;
-    setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
-    setArchiving(null);
-    toast.success(fr ? "Utilisateur archivé" : "User archived");
+    try {
+      await deactivateUser(Number(archiving.id));
+      setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
+      setArchiving(null);
+      toast.success(fr ? "Utilisateur archivé" : "User archived");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleActivate = async (user: User) => {
+    try {
+      await activateUser(Number(user.id));
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, statut: "Actif" } : u));
+      toast.success(fr ? "Utilisateur activé" : "User activated");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   return (
@@ -118,7 +219,7 @@ export default function Utilisateurs() {
         </div>
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
           <option value="Tous">{fr ? "Tous les rôles" : "All roles"}</option>
-          {["Gérant", "Notaire", "Comptable", "Standard"].map(r => <option key={r}>{r}</option>)}
+          {["Gérant", "Standard"].map(r => <option key={r}>{r}</option>)}
         </select>
         <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
           <option value="Tous">{fr ? "Tous les statuts" : "All statuses"}</option>
@@ -154,21 +255,39 @@ export default function Utilisateurs() {
                 <td className="px-4 py-3">
                   <span className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
                     u.role === "Gérant" ? "bg-primary/15 text-primary border-primary/30" :
-                    u.role === "Notaire" ? "bg-secondary/15 text-secondary border-secondary/30" :
                     "bg-muted text-muted-foreground border-border"
                   )}>{u.role}</span>
                 </td>
                 <td className="px-4 py-3"><StatusBadge status={u.statut} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditing({ ...u })}><Edit className="h-4 w-4" /></Button>
-                    {u.statut !== "Archivé" && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning" onClick={() => setArchiving(u)}><Archive className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title={fr ? "Modifier" : "Edit"} onClick={() => setEditing({ ...u })}><Edit className="h-4 w-4" /></Button>
+                    {u.statut !== "Archivé" ? (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning" title={fr ? "Archiver" : "Archive"} onClick={() => setArchiving(u)}><Archive className="h-4 w-4" /></Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary/80" title={fr ? "Activer" : "Activate"} onClick={() => handleActivate(u)}><Search className="h-4 w-4 rotate-45" /></Button>
                     )}
                   </div>
                 </td>
               </motion.tr>
             ))}
+            {loading && (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span>{fr ? "Chargement..." : "Loading..."}</span>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                  {fr ? "Aucun utilisateur trouvé" : "No users found"}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -188,6 +307,19 @@ export default function Utilisateurs() {
             </div>
             <div><label className="text-xs font-medium text-muted-foreground">Email *</label><Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="mt-1" /></div>
             <div><label className="text-xs font-medium text-muted-foreground">{fr ? "Téléphone" : "Phone"} *</label><Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} className="mt-1" /></div>
+            
+            {/* Champs Mot de passe pour la création */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">{fr ? "Mot de passe" : "Password"} *</label>
+                <Input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">{fr ? "Confirmation" : "Confirmation"} *</label>
+                <Input type="password" value={form.confirmPassword} onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))} className="mt-1" />
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-medium text-muted-foreground">{fr ? "Rôle" : "Role"}</label>
               <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
@@ -229,7 +361,7 @@ export default function Utilisateurs() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.nom || !form.prenom || !form.email}>
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.nom || !form.prenom || !form.email || !form.password}>
               {fr ? "Ajouter" : "Add"}
             </Button>
           </DialogFooter>

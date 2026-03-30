@@ -5,7 +5,7 @@
 // depuis un client, export CSV/PDF, recherche et filtres
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { searchMatch, cn } from "@/lib/utils";
 import { Plus, Download, X, User, Building2, Search, Users, CheckCircle2, Phone, Edit, Trash2, MoreHorizontal, Eye, FileText, Archive, UserPlus, FolderPlus, Receipt, Calendar, BarChart3, MessageSquare, FileDown, Filter, Mail, Smartphone, Copy, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { mockClients, mockDossiers, mockFactures, formatGNF, type Dossier } from
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
+import { getClients, getStatistiquesGlobales, searchClients, createClient, updateClient, deleteClient, toggleClientStatus, getClientHistorique, getClientContacts, exportClientsCsv, exportClientsExcel, type Client, type ClientStatistiques, type ClientContact } from "@/services/clientsService";
 
 type ClientType = (typeof mockClients)[0] & { adresse?: string; description?: string };
 
@@ -63,7 +65,25 @@ const mockDocumentsClient = [
 export default function Clients() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
-  const [clients, setClients] = useState<ClientType[]>(mockClients);
+  const { user } = useAuth();
+
+  // Fonction de mapping Backend -> Frontend
+  const mapClient = (c: Client): ClientType => ({
+    ...c as any,
+    id: String(c.id),
+    code: c.codeClient,
+    type: c.typeClient === ("Personne Morale" as any) ? "Morale" : "Physique",
+    nom: c.typeClient === ("Personne Morale" as any) ? c.denominationSociale || "" : c.nom || "",
+    prenom: c.typeClient === ("Personne Morale" as any) ? "" : c.prenom || "",
+    statut: c.actif ? "Actif" : "Inactif",
+    dateInscription: c.createdAt?.split("T")[0] || "",
+    adresse: c.adresse || "",
+    description: c.descriptionActivites || "",
+  });
+
+  const [clients, setClients] = useState<ClientType[]>([]);
+  const [statsGlobales, setStatsGlobales] = useState<ClientStatistiques | null>(null);
+  const [loadingClients, setLoadingClients] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
@@ -72,9 +92,39 @@ export default function Clients() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientType | null>(null);
   const [drawerTab, setDrawerTab] = useState("infos");
-  const [customProfession, setCustomProfession] = useState(false);
   const [customRaison, setCustomRaison] = useState(false);
+  const [customProfession, setCustomProfession] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [clientHistorique, setClientHistorique] = useState<any[]>([]);
+  const [clientContacts, setClientContacts] = useState<ClientContact[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Charge les clients et les statistiques depuis le backend au montage
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Chargement d'un grand nombre de clients pour permettre la recherche locale
+        const clientsData = await getClients(0, 1000);
+        setClients(clientsData.content.map(mapClient));
+      } catch (err) {
+        console.error("Erreur chargement liste clients:", err);
+        toast.error(fr ? "Erreur de connexion au serveur" : "Server connection error");
+      }
+
+      try {
+        const statsData = await getStatistiquesGlobales();
+        setStatsGlobales(statsData);
+      } catch (err) {
+        // Ne bloque pas l'affichage si l'utilisateur n'a pas les permissions (403)
+        console.warn("Impossible de charger les statistiques:", err);
+      } finally {
+        setLoadingClients(false);
+      }
+    };
+    loadData();
+  }, [fr]);
+
+  // La recherche se fait désormais localement via le useMemo `filtered` ci-dessous
 
   // Création de dossier depuis une action client
   const [showCreateDossierModal, setShowCreateDossierModal] = useState(false);
@@ -100,6 +150,31 @@ export default function Clients() {
   const [inviteMethod, setInviteMethod] = useState<"email" | "sms" | null>(null);
 
   const inscriptionLink = `${window.location.origin}/inscription-client?cabinet=${encodeURIComponent("Cabinet Maître Sylla")}`;
+
+  // Chargement des détails (Historique & Contacts) quand un client est sélectionné
+  useEffect(() => {
+    if (selectedClient && selectedClient.id) {
+      const fetchDetails = async () => {
+        setLoadingDetails(true);
+        try {
+          const [hist, cont] = await Promise.all([
+            getClientHistorique(Number(selectedClient.id)),
+            getClientContacts(Number(selectedClient.id)),
+          ]);
+          setClientHistorique(hist);
+          setClientContacts(cont);
+        } catch (err) {
+          console.error("Erreur chargement détails:", err);
+        } finally {
+          setLoadingDetails(false);
+        }
+      };
+      fetchDetails();
+    } else {
+      setClientHistorique([]);
+      setClientContacts([]);
+    }
+  }, [selectedClient]);
 
   const handleSendInvite = (method: "email" | "sms") => {
     setInviteMethod(method);
@@ -127,14 +202,24 @@ export default function Clients() {
     setCustomRaison(false);
   };
 
-  // Filtrage des clients par type et recherche
+  // Filtrage des clients par type et recherche textuelle (incluant téléphone)
   const filtered = useMemo(() => clients.filter((c) => {
     if (filter === "Physique" && c.type !== "Physique") return false;
     if (filter === "Morale" && c.type !== "Morale") return false;
+    
     if (search) {
-      const fields = [c.nom, c.prenom, c.email, c.code, c.telephone, c.profession || ""];
-      return fields.some(f => searchMatch(f, search));
+      const q = search.toLowerCase();
+      const matchNom = c.nom?.toLowerCase().includes(q);
+      const matchPrenom = c.prenom?.toLowerCase().includes(q);
+      const matchEmail = c.email?.toLowerCase().includes(q);
+      const matchPhone = c.telephone?.toLowerCase().includes(q);
+      const matchCode = c.code?.toLowerCase().includes(q);
+      
+      if (!matchNom && !matchPrenom && !matchEmail && !matchPhone && !matchCode) {
+        return false;
+      }
     }
+    
     return true;
   }), [clients, filter, search]);
 
@@ -143,58 +228,115 @@ export default function Clients() {
 
   // Statistiques globales
   const stats = {
-    total: clients.length,
-    physiques: clients.filter(c => c.type === "Physique").length,
-    morales: clients.filter(c => c.type === "Morale").length,
-    actifs: clients.filter(c => c.statut === "Actif").length,
+    total: statsGlobales?.totalClients ?? clients.length,
+    physiques: statsGlobales?.personnesPhysiques ?? clients.filter(c => c.type === "Physique").length,
+    morales: statsGlobales?.personnesMorales ?? clients.filter(c => c.type === "Morale").length,
+    actifs: statsGlobales?.clientsActifs ?? clients.filter(c => c.statut === "Actif").length,
   };
 
   // Création d'un nouveau client
-  const handleCreate = () => {
-    const newClient: ClientType = {
-      id: String(Date.now()),
-      code: `C-${1209 + clients.length - mockClients.length}`,
-      nom: form.nom, prenom: form.prenom, type: form.type,
-      telephone: form.telephone, email: form.email,
-      profession: form.profession, statut: form.statut as any,
-      adresse: form.adresse,
-      description: form.description,
-      dateInscription: new Date().toISOString().slice(0, 10),
-    };
-    setClients(prev => [newClient, ...prev]);
-    setShowCreateModal(false);
-    resetForm();
-    toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
+  const handleCreate = async () => {
+    try {
+      // Normalisation du téléphone pour correspondre au regex backend ^\+224[0-9]{9}$
+      let normalizedPhone = form.telephone.replace(/[^\d+]/g, "");
+      if (normalizedPhone.length === 9 && (normalizedPhone.startsWith("6") || normalizedPhone.startsWith("5"))) {
+        normalizedPhone = "+224" + normalizedPhone;
+      }
+      
+      const payload: Partial<Client> = {
+        // Aligné sur les noms exacts de l'enum TypeClient du backend
+        typeClient: (form.type === "Morale" ? "MORALE" : "PHYSIQUE") as any,
+        email: form.email || undefined,
+        telephone: normalizedPhone || undefined,
+        adresse: form.adresse || undefined,
+        profession: form.profession || undefined,
+        actif: form.statut === "Actif",
+        descriptionActivites: form.description || undefined,
+      };
+
+      if (form.type === "Morale") {
+        payload.denominationSociale = form.nom;
+      } else {
+        payload.nom = form.nom;
+        payload.prenom = form.prenom;
+      }
+
+      const createdBy = user?.nomComplet || "Admin";
+      const newClient = await createClient(payload, createdBy);
+      
+      setClients(prev => [mapClient(newClient), ...prev]);
+      setShowCreateModal(false);
+      resetForm();
+      toast.success(fr ? "Client créé avec succès" : "Client created successfully");
+    } catch (err: any) {
+      console.error("Erreur création client:", err);
+      toast.error(err.message || (fr ? "Erreur de création" : "Creation error"));
+    }
   };
 
   // Modification d'un client existant
-  const handleEdit = () => {
-    if (!editingClient) return;
-    setClients(prev => prev.map(c => c.id === editingClient.id ? {
-      ...editingClient,
-      nom: form.nom || editingClient.nom,
-      prenom: form.prenom ?? editingClient.prenom,
-      type: form.type,
-      telephone: form.telephone || editingClient.telephone,
-      email: form.email || editingClient.email,
-      profession: form.profession || editingClient.profession,
-      statut: form.statut as any,
-      adresse: form.adresse,
-      description: form.description,
-    } : c));
-    setShowEditModal(false);
-    setSelectedClient(null);
-    toast.success(fr ? "Client modifié" : "Client updated");
+  const handleEdit = async () => {
+    if (!editingClient || !editingClient.id) return;
+    try {
+      let normalizedPhone = form.telephone.replace(/[^\d+]/g, "");
+      if (normalizedPhone.length === 9 && (normalizedPhone.startsWith("6") || normalizedPhone.startsWith("5"))) {
+        normalizedPhone = "+224" + normalizedPhone;
+      }
+      
+      const payload: Partial<Client> = {
+        typeClient: (form.type === "Morale" ? "MORALE" : "PHYSIQUE") as any,
+        email: form.email || undefined,
+        telephone: normalizedPhone || undefined,
+        adresse: form.adresse || undefined,
+        profession: form.profession || undefined,
+        actif: form.statut === "Actif",
+        descriptionActivites: form.description || undefined,
+      };
+
+      if (form.type === "Morale") {
+        payload.denominationSociale = form.nom;
+      } else {
+        payload.nom = form.nom;
+        payload.prenom = form.prenom;
+      }
+
+      const updatedBy = user?.nomComplet || "Admin";
+      const updated = await updateClient(Number(editingClient.id), payload, updatedBy);
+      
+      setClients(prev => prev.map(c => c.id === editingClient.id ? mapClient(updated) : c));
+      setShowEditModal(false);
+      setEditingClient(null);
+      toast.success(fr ? "Client mis à jour" : "Client updated");
+    } catch (err: any) {
+      console.error("Erreur modification client:", err);
+      toast.error(err.message || (fr ? "Erreur de modification" : "Update error"));
+    }
   };
 
   // Suppression d'un client
-  const handleDelete = () => {
-    if (!editingClient) return;
-    setClients(prev => prev.filter(c => c.id !== editingClient.id));
-    setShowDeleteDialog(false);
-    setSelectedClient(null);
-    setEditingClient(null);
-    toast.success(fr ? "Client supprimé" : "Client deleted");
+  const handleDelete = async () => {
+    if (!editingClient || !editingClient.id) return;
+    try {
+      await deleteClient(Number(editingClient.id));
+      setClients(prev => prev.filter(c => c.id !== editingClient.id));
+      setShowDeleteDialog(false);
+      setSelectedClient(null);
+      setEditingClient(null);
+      toast.success(fr ? "Client supprimé" : "Client deleted");
+    } catch (err: any) {
+      toast.error(err.message || (fr ? "Erreur lors de la suppression" : "Deletion error"));
+    }
+  };
+
+  // Toggle statut client
+  const handleToggleStatus = async (c: ClientType) => {
+    try {
+      const updated = await toggleClientStatus(Number(c.id));
+      setClients(prev => prev.map(item => item.id === c.id ? mapClient(updated) : item));
+      toast.success(fr ? "Statut mis à jour" : "Status updated");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const openEdit = (c: ClientType) => {
@@ -233,17 +375,23 @@ export default function Clients() {
     setShowCreateFactureModal(false);
   };
 
-  // Export CSV de la liste filtrée
-  const exportCSV = () => {
-    const headers = ["Code", fr ? "Nom" : "Name", fr ? "Prénom" : "First name", "Type", fr ? "Téléphone" : "Phone", "Email", "Profession", fr ? "Statut" : "Status", fr ? "Date inscription" : "Registration date"];
-    const rows = filtered.map(c => [c.code, c.nom, c.prenom, c.type, c.telephone, c.email, c.profession, c.statut, c.dateInscription]);
-    const csv = [headers, ...rows].map(r => r.join(";")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "clients.csv"; a.click();
-    URL.revokeObjectURL(url);
-    toast.success(fr ? "Export CSV téléchargé" : "CSV export downloaded");
+  // Exports depuis le backend
+  const exportCSV = async () => {
+    try {
+      await exportClientsCsv();
+      toast.success(fr ? "Export CSV téléchargé" : "CSV export downloaded");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const exportExcel = async () => {
+    try {
+      await exportClientsExcel();
+      toast.success(fr ? "Export Excel téléchargé" : "Excel export downloaded");
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const exportPDF = () => {
@@ -279,6 +427,7 @@ export default function Clients() {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={exportCSV}><FileDown className="mr-2 h-4 w-4" /> {fr ? "Exporter CSV" : "Export CSV"}</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportExcel}><Download className="mr-2 h-4 w-4" /> {fr ? "Exporter Excel" : "Export Excel"}</DropdownMenuItem>
               <DropdownMenuItem onClick={exportPDF}><FileText className="mr-2 h-4 w-4" /> {fr ? "Exporter PDF" : "Export PDF"}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -386,6 +535,9 @@ export default function Clients() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(client)}>
                           <Edit className="mr-2 h-4 w-4" /> {fr ? "Modifier" : "Edit"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleToggleStatus(client)}>
+                          <CheckCircle2 className="mr-2 h-4 w-4" /> {client.statut === "Actif" ? (fr ? "Désactiver" : "Deactivate") : (fr ? "Activer" : "Activate")}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => openCreateDossier(client)}>
@@ -501,6 +653,42 @@ export default function Clients() {
                             <p className="text-sm text-foreground whitespace-pre-line">{selectedClient.description}</p>
                           </div>
                         )}
+
+                        {/* Affichage des contacts dans l'onglet Infos comme demandé */}
+                        <div className="pt-4 mt-2 border-t border-border">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" /> {fr ? "Personnes de contact" : "Contacts"}
+                            </h4>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toast.info(fr ? "Bientôt disponible" : "Coming soon")}>
+                              <Plus className="h-3 w-3 mr-1" /> {fr ? "Ajouter" : "Add"}
+                            </Button>
+                          </div>
+                          
+                          {loadingDetails ? (
+                            <div className="animate-pulse space-y-2">
+                              <div className="h-12 bg-muted rounded-lg" />
+                              <div className="h-12 bg-muted rounded-lg" />
+                            </div>
+                          ) : clientContacts.length > 0 ? (
+                            <div className="space-y-2">
+                              {clientContacts.map(contact => (
+                                <div key={contact.id} className="p-3 rounded-lg bg-muted/30 border border-border flex items-center justify-between">
+                                  <div>
+                                    <p className="text-sm font-medium">{contact.prenom} {contact.nom} {contact.principal && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">Principal</span>}</p>
+                                    <p className="text-xs text-muted-foreground">{contact.fonction} · {contact.telephone || contact.email || (fr ? "Pas d'infos" : "No info")}</p>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Mail className="h-3.5 w-3.5" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Phone className="h-3.5 w-3.5" /></Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">{fr ? "Aucun contact enregistré." : "No contacts registered."}</p>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -531,38 +719,63 @@ export default function Clients() {
                             </Button>
                           </div>
 
-                          {clientDossiers.length > 0 ? (
+                          {loadingDetails ? (
+                            <div className="animate-pulse space-y-4">
+                              <div className="h-20 bg-muted rounded-lg" />
+                              <div className="h-20 bg-muted rounded-lg" />
+                            </div>
+                          ) : clientHistorique.length > 0 ? (
                             <div className="relative pl-4 border-l-2 border-primary/20 space-y-4">
-                              {clientDossiers.map((d) => (
-                                <div key={d.id} className="relative">
+                              {clientHistorique.map((h, idx) => (
+                                <div key={idx} className="relative">
                                   <div className="absolute -left-[1.35rem] top-2 h-3 w-3 rounded-full bg-primary border-2 border-card" />
                                   <div className="p-4 rounded-lg bg-muted/30 border border-border">
                                     <div className="flex items-start justify-between mb-2">
                                       <div>
-                                        <span className="text-xs font-mono text-primary">{d.code}</span>
-                                        <h4 className="text-sm font-medium text-foreground">{d.objet}</h4>
+                                        <h4 className="text-sm font-medium text-foreground">{h.titre || h.description}</h4>
                                       </div>
-                                      <StatusBadge status={d.statut} />
+                                      <span className="text-[10px] text-muted-foreground">{new Date(h.date).toLocaleDateString()}</span>
                                     </div>
-                                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                      <span>📅 {d.clientDate}</span>
-                                      <span>📄 {d.typeActe}</span>
-                                      <span>💰 {formatGNF(d.montant)}</span>
-                                      <span>📊 {d.avancement}%</span>
-                                    </div>
+                                    <p className="text-xs text-muted-foreground">{h.type}</p>
                                   </div>
                                 </div>
                               ))}
                             </div>
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <FolderPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                              <p className="text-sm">{fr ? "Aucun dossier pour ce client" : "No cases for this client"}</p>
-                              <Button variant="outline" size="sm" className="mt-3" onClick={() => openCreateDossier(selectedClient)}>
-                                <FolderPlus className="mr-2 h-4 w-4" /> {fr ? "Créer un dossier" : "Create case"}
-                              </Button>
-                            </div>
-                          )}
+                          ) : (() => {
+                            const clientDossiers = getClientDossiers(selectedClient);
+                            return clientDossiers.length > 0 ? (
+                              <div className="relative pl-4 border-l-2 border-primary/20 space-y-4">
+                                {clientDossiers.map((d) => (
+                                  <div key={d.id} className="relative">
+                                    <div className="absolute -left-[1.35rem] top-2 h-3 w-3 rounded-full bg-primary border-2 border-card" />
+                                    <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div>
+                                          <span className="text-xs font-mono text-primary">{d.code}</span>
+                                          <h4 className="text-sm font-medium text-foreground">{d.objet}</h4>
+                                        </div>
+                                        <StatusBadge status={d.statut} />
+                                      </div>
+                                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                        <span>📅 {d.clientDate}</span>
+                                        <span>📄 {d.typeActe}</span>
+                                        <span>💰 {formatGNF(d.montant)}</span>
+                                        <span>📊 {d.avancement}%</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <FolderPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p className="text-sm">{fr ? "Aucun dossier pour ce client" : "No cases for this client"}</p>
+                                <Button variant="outline" size="sm" className="mt-3" onClick={() => openCreateDossier(selectedClient)}>
+                                  <FolderPlus className="mr-2 h-4 w-4" /> {fr ? "Créer un dossier" : "Create case"}
+                                </Button>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })()}
@@ -789,7 +1002,7 @@ export default function Clients() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.nom}>{fr ? "Créer le client" : "Create client"}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={!form.nom || (form.type === "Physique" && !form.prenom)}>{fr ? "Créer le client" : "Create client"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

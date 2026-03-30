@@ -18,7 +18,7 @@ export default function InscriptionClient() {
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
   const [searchParams] = useSearchParams();
-  const cabinetName = searchParams.get("cabinet") || "Cabinet Maître Sylla";
+  const cabinetName = searchParams.get("cabinet") || "Portail Cabinet Notarial";
   const fr = lang === "FR";
 
   const [form, setForm] = useState({

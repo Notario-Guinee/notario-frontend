@@ -14,8 +14,8 @@ export default function LoginPortailClient() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const cabinetName = "Cabinet Maître Sylla";
-  const subdomain = "sylla.notariale.com";
+  const cabinetName = "Portail Client Notarial";
+  const subdomain = window.location.host;
 
   const features = [
     { icon: FolderOpen, label: t("login.clientFeature1") },
@@ -45,7 +45,7 @@ export default function LoginPortailClient() {
               </div>
               <div>
                 <p className="text-white font-medium text-[15px]">{cabinetName}</p>
-                <p className="text-white/50 text-[11px]">{t("login.clientPortal")} — {subdomain}</p>
+                <p className="text-white/50 text-[11px]">{t("login.clientPortal")}</p>
               </div>
             </div>
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">{t("login.clientTitle")}</h2>
