@@ -12,6 +12,7 @@ import {
   LayoutGrid, FolderPlus, Check, Eye, RefreshCw, History,
   AlertTriangle, HardDrive, Edit3, SlidersHorizontal, Tag,
   RotateCcw, Flame, Lock, Clock, Bookmark, BarChart2,
+  Video, Music, FileSpreadsheet, FileCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,7 @@ import { useLanguage } from '@/context/LanguageContext';
 // ─── Types ──────────────────────────────────────────────────────
 
 type DocStatus = 'Indexé' | 'En traitement' | 'Erreur';
-type DocType   = 'PDF' | 'Image' | 'Texte' | 'Tableur' | 'Autre';
+type DocType   = 'PDF' | 'Image' | 'Vidéo' | 'Audio' | 'Texte' | 'Tableur' | 'Code' | 'Autre';
 type DriveTag  = 'Urgent' | 'À signer' | 'Confidentiel' | 'Archivé' | 'Important';
 
 interface DriveItem {
@@ -125,7 +126,11 @@ const INITIAL_ITEMS: DriveItem[] = [
 function fileIconComp(item: DriveItem) {
   const t = item.docType?.toLowerCase() ?? '';
   if (t === 'pdf') return FileText;
-  if (t === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(item.name)) return Image;
+  if (t === 'image' || /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(item.name)) return Image;
+  if (t === 'vidéo' || /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(item.name)) return Video;
+  if (t === 'audio' || /\.(mp3|wav|aac|flac|ogg|m4a|wma)$/i.test(item.name)) return Music;
+  if (t === 'tableur' || /\.(xlsx?|csv|ods)$/i.test(item.name)) return FileSpreadsheet;
+  if (t === 'code' || /\.(js|ts|jsx|tsx|py|java|cpp|c|html|css|json|xml)$/i.test(item.name)) return FileCode;
   return File;
 }
 
@@ -431,7 +436,14 @@ export default function ArchivesNumeriques() {
       const item: DriveItem = {
         id: `d-${Date.now()}`, name: file.name, type: 'file',
         parentId: currentFolderId,
-        docType: /\.pdf$/i.test(file.name) ? 'PDF' : /\.(png|jpe?g|gif|webp)$/i.test(file.name) ? 'Image' : 'Autre',
+        docType: /\.pdf$/i.test(file.name) ? 'PDF'
+          : /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(file.name) ? 'Image'
+          : /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(file.name) ? 'Vidéo'
+          : /\.(mp3|wav|aac|flac|ogg|m4a|wma)$/i.test(file.name) ? 'Audio'
+          : /\.(xlsx?|csv|ods)$/i.test(file.name) ? 'Tableur'
+          : /\.(docx?|odt|rtf|txt)$/i.test(file.name) ? 'Texte'
+          : /\.(js|ts|jsx|tsx|py|java|cpp|c|html|css|json|xml)$/i.test(file.name) ? 'Code'
+          : 'Autre',
         sizeLabel: `${(file.size / 1_000_000).toFixed(1)} Mo`,
         statut: 'En traitement', modifiedAt: nowLabel(), owner: 'Me Diallo', version: 1,
       };
@@ -1011,7 +1023,7 @@ export default function ArchivesNumeriques() {
       })()}
 
       {/* Inputs cachés */}
-      <input ref={fileInputRef}    type="file"          className="hidden" onChange={handleImportFile} />
+      <input ref={fileInputRef}    type="file"          className="hidden" onChange={handleImportFile} accept="*/*" />
       <input ref={folderInputRef}  type="file" multiple className="hidden" onChange={handleImportFolder} />
       <input ref={replaceInputRef} type="file"          className="hidden" onChange={handleReplaceFile} />
 
@@ -1151,7 +1163,7 @@ export default function ArchivesNumeriques() {
               <Select value={editDocType} onValueChange={v => setEditDocType(v as DocType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(['PDF', 'Image', 'Texte', 'Tableur', 'Autre'] as DocType[]).map(t => (
+                  {(['PDF', 'Image', 'Vidéo', 'Audio', 'Texte', 'Tableur', 'Code', 'Autre'] as DocType[]).map(t => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>

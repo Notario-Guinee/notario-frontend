@@ -51,6 +51,7 @@ const ComptesBancaires  = lazy(() => import("./pages/ComptesBancaires"));
 const Caisse            = lazy(() => import("./pages/Caisse"));
 const Tarifs            = lazy(() => import("./pages/Tarifs"));
 const Messagerie        = lazy(() => import("./pages/Messagerie"));
+const Emails            = lazy(() => import("./pages/Emails"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const Formation         = lazy(() => import("./pages/Formation"));
 const Administration    = lazy(() => import("./pages/Administration"));
@@ -174,6 +175,7 @@ const App = () => (
                 <Route path="/archives-physiques"  element={<ArchivesPhysiques />} />
                 <Route path="/modeles"            element={<ModelesDocuments />} />
                 <Route path="/messagerie"         element={<Messagerie />} />
+                <Route path="/emails"             element={<Emails />} />
                 <Route path="/notifications"      element={<NotificationsPage />} />
                 <Route path="/formation"          element={<Formation />} />
                 <Route path="/portail"            element={<PortailClient />} />

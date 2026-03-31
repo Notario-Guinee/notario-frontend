@@ -233,11 +233,11 @@ export default function Dossiers() {
 
   // Form state
   const [form, setForm] = useState({
-    categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", statut: "En cours" as Dossier["statut"],
+    categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", montantVerse: "", statut: "En cours" as Dossier["statut"],
     priorite: "Normale" as Dossier["priorite"], notaire: mockNotaires[0], clerc: "", notes: "",
   });
 
-  const resetForm = useCallback(() => setForm({ categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", statut: "En cours", priorite: "Normale", notaire: mockNotaires[0], clerc: "", notes: "" }), []);
+  const resetForm = useCallback(() => setForm({ categorieActe: "", typeActe: "", objet: "", clients: "", montant: "", montantVerse: "", statut: "En cours", priorite: "Normale", notaire: mockNotaires[0], clerc: "", notes: "" }), []);
 
   const filtered = useMemo(() => dossiers.filter((d) => {
     if (filterStatut !== "all" && d.statut !== filterStatut) return false;
@@ -283,6 +283,7 @@ export default function Dossiers() {
         clients: clientNames,
         clientDate: new Date().toLocaleDateString("fr-FR"),
         montant: Number(form.montant) || 0,
+        montantVerse: Number(form.montantVerse) || 0,
         statut: form.statut,
         priorite: form.priorite,
         avancement: 0,
@@ -314,6 +315,7 @@ export default function Dossiers() {
       objet: form.objet || editingDossier.objet,
       clients: form.clients ? form.clients.split(",").map(c => c.trim()).filter(Boolean) : editingDossier.clients,
       montant: form.montant ? Number(form.montant) : editingDossier.montant,
+      montantVerse: form.montantVerse !== "" ? Number(form.montantVerse) : (editingDossier.montantVerse ?? 0),
       statut: form.statut,
       priorite: form.priorite,
       notaire: form.notaire || editingDossier.notaire,
@@ -348,7 +350,7 @@ export default function Dossiers() {
     const cat = categoriesActes.find(c => c.actes.includes(d.typeActe));
     setForm({
       categorieActe: cat?.label || "", typeActe: d.typeActe, objet: d.objet, clients: d.clients.join(", "),
-      montant: String(d.montant), statut: d.statut, priorite: d.priorite,
+      montant: String(d.montant), montantVerse: String(d.montantVerse ?? 0), statut: d.statut, priorite: d.priorite,
       notaire: d.notaire, clerc: d.clerc || "", notes: "",
     });
     setShowEditModal(true);
@@ -1111,18 +1113,48 @@ export default function Dossiers() {
               <Label>{fr ? "Client(s) *" : "Client(s) *"} <span className="text-xs text-muted-foreground">({fr ? "codes ou noms séparés par des virgules" : "codes or names separated by commas"})</span></Label>
               <Input value={form.clients} onChange={e => setForm(f => ({ ...f, clients: e.target.value }))} placeholder={fr ? "C-1201, C-1203 ou Bah Oumar, Diallo" : "C-1201, C-1203 or Bah Oumar, Diallo"} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>{fr ? "Montant total (GNF)" : "Total amount (GNF)"}</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.montant ? new Intl.NumberFormat("fr-FR").format(Number(form.montant)) : ""}
+                onChange={e => setForm(f => ({ ...f, montant: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="0"
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{fr ? "Montant versé (GNF)" : "Paid amount (GNF)"}</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.montantVerse ? new Intl.NumberFormat("fr-FR").format(Number(form.montantVerse)) : ""}
+                onChange={e => setForm(f => ({ ...f, montantVerse: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="0"
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            {form.montant !== "" && form.montantVerse !== "" && (
               <div className="space-y-2">
-                <Label>{fr ? "Montant (GNF)" : "Amount (GNF)"}</Label>
-                <Input type="number" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} placeholder="0" />
+                <Label>{fr ? "Reste à payer (GNF)" : "Remaining (GNF)"}</Label>
+                <div className={`flex items-center h-9 px-3 rounded-md border text-sm font-mono font-semibold bg-muted/40 ${
+                  Number(form.montant) - Number(form.montantVerse) < 0
+                    ? "border-destructive text-destructive"
+                    : Number(form.montant) - Number(form.montantVerse) === 0
+                      ? "border-green-400 text-green-600 dark:text-green-400"
+                      : "border-border text-foreground"
+                }`}>
+                  {new Intl.NumberFormat("fr-FR").format(Math.max(0, Number(form.montant) - Number(form.montantVerse)))} GNF
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{fr ? "Notaire responsable *" : "Responsible notary *"}</Label>
-                <Select value={form.notaire} onValueChange={v => setForm(f => ({ ...f, notaire: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{mockNotaires.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label>{fr ? "Notaire responsable *" : "Responsible notary *"}</Label>
+              <Select value={form.notaire} onValueChange={v => setForm(f => ({ ...f, notaire: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{mockNotaires.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>{fr ? "Clerc en charge" : "Clerk in charge"}</Label>
@@ -1193,18 +1225,48 @@ export default function Dossiers() {
               <Label>{fr ? "Client(s)" : "Client(s)"} <span className="text-xs text-muted-foreground">({fr ? "codes ou noms séparés par des virgules" : "codes or names separated by commas"})</span></Label>
               <Input value={form.clients} onChange={e => setForm(f => ({ ...f, clients: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>{fr ? "Montant total (GNF)" : "Total amount (GNF)"}</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.montant ? new Intl.NumberFormat("fr-FR").format(Number(form.montant)) : ""}
+                onChange={e => setForm(f => ({ ...f, montant: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="0"
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{fr ? "Montant versé (GNF)" : "Paid amount (GNF)"}</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.montantVerse ? new Intl.NumberFormat("fr-FR").format(Number(form.montantVerse)) : ""}
+                onChange={e => setForm(f => ({ ...f, montantVerse: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="0"
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            {form.montant !== "" && form.montantVerse !== "" && (
               <div className="space-y-2">
-                <Label>{fr ? "Montant (GNF)" : "Amount (GNF)"}</Label>
-                <Input type="number" value={form.montant} onChange={e => setForm(f => ({ ...f, montant: e.target.value }))} />
+                <Label>{fr ? "Reste à payer (GNF)" : "Remaining (GNF)"}</Label>
+                <div className={`flex items-center h-9 px-3 rounded-md border text-sm font-mono font-semibold bg-muted/40 ${
+                  Number(form.montant) - Number(form.montantVerse) < 0
+                    ? "border-destructive text-destructive"
+                    : Number(form.montant) - Number(form.montantVerse) === 0
+                      ? "border-green-400 text-green-600 dark:text-green-400"
+                      : "border-border text-foreground"
+                }`}>
+                  {new Intl.NumberFormat("fr-FR").format(Math.max(0, Number(form.montant) - Number(form.montantVerse)))} GNF
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>{fr ? "Priorité" : "Priority"}</Label>
-                <Select value={form.priorite} onValueChange={v => setForm(f => ({ ...f, priorite: v as Dossier["priorite"] }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{priorites.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label>{fr ? "Priorité" : "Priority"}</Label>
+              <Select value={form.priorite} onValueChange={v => setForm(f => ({ ...f, priorite: v as Dossier["priorite"] }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{priorites.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

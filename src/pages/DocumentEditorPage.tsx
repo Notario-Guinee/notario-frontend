@@ -48,6 +48,8 @@ import {
   Subscript,
   Type,
   MoreVertical,
+  Stamp,
+  AlignVerticalSpaceAround,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -353,6 +355,17 @@ export default function DocumentEditorPage() {
 
   // ─── Aperçu impression ───────────────────────────────────
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+
+  // ─── Filigrane ───────────────────────────────────────────
+  const [showWatermarkModal, setShowWatermarkModal] = useState(false);
+  const [watermark, setWatermark] = useState({
+    enabled: false,
+    text: "CONFIDENTIEL",
+    color: "#cccccc",
+    opacity: 30,
+    rotation: -45,
+    fontSize: 72,
+  });
 
   // ─── Règle — marges et retraits ──────────────────────────
   const [leftIndent, setLeftIndent] = useState(0);
@@ -1202,13 +1215,21 @@ export default function DocumentEditorPage() {
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               title="Espacement des lignes"
             >
-              <Type className="h-3.5 w-3.5" />
+              <AlignVerticalSpaceAround className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {["1", "1.15", "1.5", "2"].map((lh) => (
-              <DropdownMenuItem key={lh} onSelect={() => applyLineHeight(lh)}>
-                {lh}
+            <div className="px-2 pt-1.5 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Interligne</div>
+            {[
+              { value: "1", label: "Simple (1)" },
+              { value: "1.15", label: "1.15" },
+              { value: "1.5", label: "1.5" },
+              { value: "2", label: "Double (2)" },
+              { value: "2.5", label: "2.5" },
+              { value: "3", label: "Triple (3)" },
+            ].map(({ value, label }) => (
+              <DropdownMenuItem key={value} onSelect={() => applyLineHeight(value)}>
+                {label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -1311,6 +1332,15 @@ export default function DocumentEditorPage() {
           <Printer className="h-3.5 w-3.5" />
         </ToolbarBtn>
 
+        {/* Filigrane */}
+        <ToolbarBtn
+          onClick={() => setShowWatermarkModal(true)}
+          title="Filigrane"
+          active={watermark.enabled}
+        >
+          <Stamp className="h-3.5 w-3.5" />
+        </ToolbarBtn>
+
         <ToolbarDivider />
         {/* More options */}
         <DropdownMenu>
@@ -1347,6 +1377,11 @@ export default function DocumentEditorPage() {
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setShowPrintPreview(true)}>
               <Printer className="mr-2 h-4 w-4" /> Aperçu avant impression
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setShowWatermarkModal(true)}>
+              <Stamp className="mr-2 h-4 w-4" />
+              {watermark.enabled ? "Modifier le filigrane" : "Ajouter un filigrane"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1565,6 +1600,29 @@ export default function DocumentEditorPage() {
               className="bg-white dark:bg-gray-900 shadow-lg min-h-[1122px] px-[96px] rounded-sm relative"
               style={{ paddingTop: topMargin, paddingBottom: bottomMargin }}
             >
+              {/* ─── Filigrane ─────────────────────────────── */}
+              {watermark.enabled && watermark.text && (
+                <div
+                  className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center"
+                  style={{ zIndex: 5 }}
+                >
+                  <div
+                    style={{
+                      transform: `rotate(${watermark.rotation}deg)`,
+                      fontSize: `${watermark.fontSize}px`,
+                      fontWeight: 700,
+                      color: watermark.color,
+                      opacity: watermark.opacity / 100,
+                      whiteSpace: "nowrap",
+                      userSelect: "none",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    {watermark.text}
+                  </div>
+                </div>
+              )}
+
               {/* Curseurs collaborateurs simulés */}
               {collaborators
                 .filter((c) => c.isOnline && c.role !== "proprietaire")
@@ -2255,6 +2313,155 @@ export default function DocumentEditorPage() {
           </div>
         </div>
       )}
+
+      {/* ═══ Modal Filigrane ═══════════════════════════════════ */}
+      <Dialog open={showWatermarkModal} onOpenChange={setShowWatermarkModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Stamp className="h-4 w-4" />
+              Filigrane du document
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Toggle activer */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div>
+                <p className="text-sm font-medium">Activer le filigrane</p>
+                <p className="text-xs text-muted-foreground">Afficher en superposition sur le document</p>
+              </div>
+              <button
+                onClick={() => setWatermark((w) => ({ ...w, enabled: !w.enabled }))}
+                className={cn(
+                  "relative w-11 h-6 rounded-full transition-colors shrink-0",
+                  watermark.enabled ? "bg-primary" : "bg-muted-foreground/30"
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                    watermark.enabled ? "translate-x-5" : "translate-x-0.5"
+                  )}
+                />
+              </button>
+            </div>
+
+            {/* Texte */}
+            <div className="space-y-1.5">
+              <Label>Texte du filigrane</Label>
+              <Input
+                value={watermark.text}
+                onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
+                placeholder="CONFIDENTIEL"
+                maxLength={40}
+              />
+            </div>
+
+            {/* Couleur + Taille */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Couleur</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={watermark.color}
+                    onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
+                    className="h-8 w-8 rounded border border-border cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground font-mono">{watermark.color.toUpperCase()}</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Taille — {watermark.fontSize}px</Label>
+                <input
+                  type="range" min="24" max="120" step="4"
+                  value={watermark.fontSize}
+                  onChange={(e) => setWatermark((w) => ({ ...w, fontSize: Number(e.target.value) }))}
+                  className="w-full accent-primary"
+                />
+              </div>
+            </div>
+
+            {/* Opacité */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>Opacité</Label>
+                <span className="text-xs text-muted-foreground">{watermark.opacity}%</span>
+              </div>
+              <input
+                type="range" min="5" max="100" step="5"
+                value={watermark.opacity}
+                onChange={(e) => setWatermark((w) => ({ ...w, opacity: Number(e.target.value) }))}
+                className="w-full accent-primary"
+              />
+            </div>
+
+            {/* Rotation */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>Rotation</Label>
+                <span className="text-xs text-muted-foreground">{watermark.rotation}°</span>
+              </div>
+              <input
+                type="range" min="-90" max="90" step="5"
+                value={watermark.rotation}
+                onChange={(e) => setWatermark((w) => ({ ...w, rotation: Number(e.target.value) }))}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>-90°</span>
+                <span>0°</span>
+                <span>+90°</span>
+              </div>
+            </div>
+
+            {/* Aperçu */}
+            <div className="space-y-1.5">
+              <Label>Aperçu</Label>
+              <div className="border border-border rounded-lg h-24 bg-white dark:bg-gray-900 overflow-hidden flex items-center justify-center relative">
+                <div
+                  style={{
+                    transform: `rotate(${watermark.rotation}deg)`,
+                    fontSize: `${Math.max(12, watermark.fontSize / 3)}px`,
+                    fontWeight: 700,
+                    color: watermark.color,
+                    opacity: watermark.opacity / 100,
+                    whiteSpace: "nowrap",
+                    userSelect: "none",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {watermark.text || "FILIGRANE"}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            {watermark.enabled && (
+              <Button
+                variant="outline"
+                onClick={() => setWatermark((w) => ({ ...w, enabled: false }))}
+                className="text-destructive border-destructive/30 hover:bg-destructive/5 mr-auto"
+              >
+                Supprimer
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setShowWatermarkModal(false)}>
+              Fermer
+            </Button>
+            <Button
+              onClick={() => {
+                setWatermark((w) => ({ ...w, enabled: true }));
+                setShowWatermarkModal(false);
+                toast.success("Filigrane appliqué");
+              }}
+              disabled={!watermark.text.trim()}
+            >
+              Appliquer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ═══ Modal Trouver & Remplacer ═════════════════════════ */}
       <Dialog open={showFindReplace} onOpenChange={setShowFindReplace}>

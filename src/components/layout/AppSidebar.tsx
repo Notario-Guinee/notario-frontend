@@ -15,7 +15,7 @@ import {
   Receipt, CreditCard, Landmark, Wallet, BarChart3, Settings,
   Search, Package, FileText, MessageSquare, Bell,
   GraduationCap, Globe, Building2, UserCog, Shield,
-  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive, CalendarCheck,
+  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive, CalendarCheck, Mail,
 } from "lucide-react";
 
 /** Structure d'un élément de navigation */
@@ -66,6 +66,7 @@ export function AppSidebar() {
       label: t("navGroup.communication"),
       items: [
         { title: t("nav.messagerie"), path: "/messagerie", icon: MessageSquare, badge: 3 },
+        { title: "E-mails", path: "/emails", icon: Mail },
         { title: t("nav.notifications"), path: "/notifications", icon: Bell, badge: 5 },
         { title: t("nav.formation"), path: "/formation", icon: GraduationCap },
       ],

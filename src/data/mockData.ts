@@ -40,6 +40,7 @@ export interface Dossier {
   clients: string[];
   clientDate: string;
   montant: number;
+  montantVerse?: number;
   statut: "En cours" | "En signature" | "En attente pièces" | "Terminé" | "Suspendu" | "Archivé";
   priorite: "Basse" | "Normale" | "Haute" | "Urgente";
   avancement: number;
