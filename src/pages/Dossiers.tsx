@@ -326,7 +326,7 @@ const loadClients = useCallback(async () => {
 
 // Charger les documents quand on est sur l'onglet "pieces" ou "signataires"
 useEffect(() => {
-  if (selectedDossier && (detailTab === "pieces" || detailTab === "signataires")) {
+  if (selectedDossier && (detailTab === "pieces" || detailTab === "signataires" || detailTab === "actes")) {
     loadDocuments(Number(selectedDossier.id));
   }
 }, [selectedDossier, detailTab, loadDocuments]);
@@ -640,7 +640,19 @@ const handlePreviousStep = useCallback(async (dossierId: number) => {
   }
 }, [fr, loadWorkflow]);
 
-
+const handleUpdateEtapeDescription = useCallback(async (stepKey: string, newDescription: string) => {
+  if (!selectedDossier) return;
+  const dossierId = Number(selectedDossier.id);
+  // stepKey est "step_{etapeId}" — on extrait l'id
+  const etapeId = Number(stepKey.replace("step_", ""));
+  if (!etapeId) return;
+  try {
+    const updated = await dossierService.updateEtape(dossierId, etapeId, { description: newDescription });
+    setWorkflowEtapes(prev => prev.map(e => e.id === etapeId ? { ...e, description: updated.description ?? newDescription } : e));
+  } catch {
+    toast.error(fr ? "Impossible de modifier la description" : "Cannot update description");
+  }
+}, [selectedDossier, fr]);
 
 useEffect(() => {
   loadDossiers();
@@ -1727,7 +1739,7 @@ const saveParties = async () => {
                                   <Clock className="h-3.5 w-3.5" /> {fr ? "En attente" : "Pending"}
                                 </span>
                               )}
-                              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setDetailTab("actes"); }}>
+                              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => { setDetailTab("pieces"); }}>
                                 <FileSignature className="h-3.5 w-3.5" /> {fr ? "Signer" : "Sign"}
                               </Button>
                             </div>
@@ -2140,17 +2152,20 @@ const saveParties = async () => {
               <div className="space-y-3">
                 {/* Barre de progression calculée depuis les étapes réelles */}
                 <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-foreground">
-                      {fr ? "Avancement du workflow" : "Workflow progress"} —{" "}
-                      {workflowEtapes.filter(e => e.validee || (currentEtape && e.numeroEtape < currentEtape.numeroEtape)).length}
-                      /{workflowEtapes.length} {fr ? "étape(s)" : "step(s)"}
-                    </span>
-                    <span className="text-sm font-bold text-foreground">
-                      {Math.round(workflowEtapes.filter(e => e.validee || (currentEtape && e.numeroEtape < currentEtape.numeroEtape)).length / workflowEtapes.length * 100)}%
-                    </span>
-                  </div>
-                  <ProgressBar value={Math.round(workflowEtapes.filter(e => e.validee || (currentEtape && e.numeroEtape < currentEtape.numeroEtape)).length / workflowEtapes.length * 100)} />
+                  {(() => {
+                    const completed = workflowEtapes.filter(e => e.validee || (currentEtape && e.numeroEtape < currentEtape.numeroEtape)).length;
+                    const pct = workflowEtapes.length > 0 ? Math.round(completed / workflowEtapes.length * 100) : 0;
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-foreground">
+                            {fr ? "Avancement du workflow" : "Workflow progress"} — {completed}/{workflowEtapes.length} {fr ? "étape(s)" : "step(s)"}
+                          </span>
+                        </div>
+                        <ProgressBar value={pct} />
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="rounded-xl bg-muted/10 border border-border overflow-x-auto p-4">
                   <WorkflowProcedural
@@ -2180,6 +2195,7 @@ const saveParties = async () => {
                     onComplete={(_stepKey) => { handleNextStep(Number(selectedDossier!.id)); }}
                     stepComments={stepComments[selectedDossier.id] ?? {}}
                     onAddComment={(stepKey, text) => handleAddStepComment(selectedDossier.id, stepKey, text)}
+                    onEditDescription={handleUpdateEtapeDescription}
                   />
                 </div>
               </div>

@@ -109,7 +109,7 @@ export default function ActesSignatures() {
   const toggleActeSteps = (key: string) => {
     setExpandedActeSteps(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
       return next;
     });
   };
@@ -292,7 +292,7 @@ export default function ActesSignatures() {
   const toggleCat = (idx: number) => {
     setExpandedCats(prev => {
       const next = new Set(prev);
-      next.has(idx) ? next.delete(idx) : next.add(idx);
+      if (next.has(idx)) { next.delete(idx); } else { next.add(idx); }
       return next;
     });
   };
@@ -381,14 +381,14 @@ export default function ActesSignatures() {
               { label: t("actes.kpi.enSignature"), value: String(stats.enSignature), icon: PenLine, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
               { label: t("actes.kpi.signes"), value: String(stats.signes), icon: CheckCircle2, bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
               { label: t("actes.kpi.totalMontant"), value: formatGNF(stats.totalMontant), icon: DollarSign, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
-            ].map((kpi) => (
-              <div key={kpi.label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4", kpi.bg)}>
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white", kpi.iconBg)}>
-                  <kpi.icon className="h-6 w-6" />
+            ].map(({ label, value, icon: Icon, bg, iconBg }) => (
+              <div key={label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4", bg)}>
+                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white", iconBg)}>
+                  <Icon className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="font-heading text-2xl font-bold text-foreground">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                  <p className="font-heading text-2xl font-bold text-foreground">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
                 </div>
               </div>
             ))}

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Search, FolderOpen, PenLine, FileSignature, CreditCard, Send, Archive,
   Stamp, Newspaper, CheckCircle2, Clock, Play, RotateCcw, Timer, MessageSquare, Send as SendIcon, X as XIcon,
-  Scale, BarChart2, Calculator, FileText, BookOpen, ClipboardList, Users, MapPin, Map,
+  Scale, BarChart2, Calculator, FileText, BookOpen, ClipboardList, Users, MapPin, Map, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WorkflowConfig, WorkflowStep } from "./workflow-types";
@@ -35,13 +35,16 @@ interface WorkflowProceduralProps {
   onComplete?: (stepKey: string) => void;
   stepComments?: Record<string, StepComment[]>;
   onAddComment?: (stepKey: string, text: string) => void;
+  onEditDescription?: (stepKey: string, newDescription: string) => void;
   className?: string;
 }
 
-export default function WorkflowProcedural({ config, onStart, onRevert, onComplete, stepComments = {}, onAddComment, className }: WorkflowProceduralProps) {
+export default function WorkflowProcedural({ config, onStart, onRevert, onComplete, stepComments = {}, onAddComment, onEditDescription, className }: WorkflowProceduralProps) {
   const { steps } = config;
   const palette = config.palette?.length ? config.palette : WORKFLOW_PALETTE;
   const [now, setNow] = useState(Date.now());
+  const [editingDescKey, setEditingDescKey] = useState<string | null>(null);
+  const [editingDescText, setEditingDescText] = useState("");
   const [openCommentKey, setOpenCommentKey] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
@@ -450,7 +453,39 @@ export default function WorkflowProcedural({ config, onStart, onRevert, onComple
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground">TERMINÉ</span>
                   )}
                 </div>
-                <p className="text-xs mt-1 text-muted-foreground">{step.description}</p>
+                {editingDescKey === step.key ? (
+                  <div className="mt-1 flex items-center gap-1">
+                    <input
+                      autoFocus
+                      className="text-xs flex-1 border border-border rounded px-2 py-0.5 bg-background text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={editingDescText}
+                      onChange={e => setEditingDescText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") {
+                          onEditDescription?.(step.key, editingDescText);
+                          setEditingDescKey(null);
+                        } else if (e.key === "Escape") {
+                          setEditingDescKey(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (editingDescText !== step.description) {
+                          onEditDescription?.(step.key, editingDescText);
+                        }
+                        setEditingDescKey(null);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p
+                    className="text-xs mt-1 text-muted-foreground cursor-pointer hover:text-foreground group flex items-center gap-1"
+                    onClick={() => { if (onEditDescription) { setEditingDescKey(step.key); setEditingDescText(step.description ?? ""); } }}
+                    title={onEditDescription ? "Cliquer pour modifier" : undefined}
+                  >
+                    {step.description || <span className="italic opacity-50">Ajouter une description…</span>}
+                    {onEditDescription && <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 shrink-0" />}
+                  </p>
+                )}
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {canStart && (
                     <button

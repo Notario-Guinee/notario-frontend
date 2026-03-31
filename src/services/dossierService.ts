@@ -17,15 +17,33 @@ export interface Page<T> {
 // ── Types TypeActe ────────────────────────────────────────────────────────────
 
 export interface TypeActeDto {
-  id: number;
-  code: string;
-  nom: string;
-  categorieReference?: string;
+  id?: number;
+  code?: string;
+  nom?: string;
   libelle?: string;
   categorie?: string;
+  categorieReference?: string;
   description?: string;
-  actif: boolean;
+  actif?: boolean;
   ordreAffichage?: number;
+  // ✅ Champs ajoutés
+  dureeEstimeeJours?: number;
+  niveauComplexite?: number;
+  prioriteDefaut?: "TRES_BASSE" | "BASSE" | "NORMALE" | "HAUTE" | "TRES_HAUTE" | "URGENTE";
+  necessiteSignatureElectronique?: boolean;
+  necessitePublication?: boolean;
+  nombreDossiersTotal?: number;
+  nombreDossiersActifs?: number;
+  workflowConfigJson?: string | object; // peut être un objet déjà parsé selon le backend
+  workflow_config_json?: string | object;
+  partiesRequisesJson?: string;
+  parties_requises_json?: string;
+  documentsObligatoiresJson?: string;
+  documents_obligatoires_json?: string;
+  facturationConfigJson?: string;
+  aworkflowValide?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateTypeActeDto {
@@ -474,23 +492,76 @@ export const clientService = {
   getAllActifs: async () => {
     const response = await clientService.getAll({ size: 100, actif: true });
     // La réponse est une Page<ClientDto>, on extrait le contenu
-    return response.content || response.data || response;
+    return response.content || (response as unknown as { data?: ClientDto[] }).data || [];
   },
 };
 
 // ── Service TypeActe ──────────────────────────────────────────────────────────
 
 export const typeActeService = {
-  getAll: (page = 0, size = 100) =>
-    apiClient.get<Page<TypeActeDto>>(`/api/types-actes?page=${page}&size=${size}`),
+  // ✅ Retourne un tableau directement
+  getAll: async (page = 0, size = 100): Promise<TypeActeDto[]> => {
+    const result = await apiClient.get<Page<TypeActeDto>>(
+      `/api/types-actes?page=${page}&size=${size}`
+    );
+    const raw = result as unknown as { content?: TypeActeDto[]; data?: TypeActeDto[] } | TypeActeDto[];
+    return Array.isArray(raw)
+      ? raw
+      : (raw as { content?: TypeActeDto[] }).content
+        ?? (raw as { data?: TypeActeDto[] }).data
+        ?? [];
+  },
+
   getActifs: () => apiClient.get<TypeActeDto[]>("/api/types-actes/actifs"),
   getCategories: () => apiClient.get<string[]>("/api/types-actes/categories"),
-  search: (q: string) => apiClient.get<TypeActeDto[]>(`/api/types-actes/search?q=${encodeURIComponent(q)}`),
+  search: (q: string) =>
+    apiClient.get<TypeActeDto[]>(`/api/types-actes/search?q=${encodeURIComponent(q)}`),
   getById: (id: number) => apiClient.get<TypeActeDto>(`/api/types-actes/${id}`),
-  create: (dto: CreateTypeActeDto) => apiClient.post<TypeActeDto>("/api/types-actes", dto),
-  update: (id: number, dto: UpdateTypeActeDto) => apiClient.put<TypeActeDto>(`/api/types-actes/${id}`, dto),
-  activer: (id: number) => apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/activer`),
-  desactiver: (id: number) => apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/desactiver`),
+
+  create: (dto: TypeActeDto) =>
+    apiClient.post<TypeActeDto>("/api/types-actes", dto),
+
+  update: (id: number, dto: TypeActeDto) =>
+    apiClient.put<TypeActeDto>(`/api/types-actes/${id}`, dto),
+
+  // ✅ Configure le workflow JSON — envoie un string brut
+  configureWorkflow: async (id: number, workflowJson: string): Promise<TypeActeDto> => {
+    const token = localStorage.getItem("accessToken");
+    const tenantId = localStorage.getItem("tenantId") ?? "";
+    const res = await fetch(`/api/types-actes/${id}/workflow`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+      },
+      body: workflowJson,
+    });
+    const json = await res.json();
+    return json.data ?? json;
+  },
+
+  // ✅ Initialise les types par défaut du cabinet
+  initialiserDefauts: async (): Promise<TypeActeDto[]> => {
+    const token = localStorage.getItem("accessToken");
+    const tenantId = localStorage.getItem("tenantId") ?? "";
+    const res = await fetch("/api/types-actes/initialiser-defauts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+      },
+    });
+    const json = await res.json();
+    const items = json.data ?? json;
+    return Array.isArray(items) ? items : [];
+  },
+
+  activer: (id: number) =>
+    apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/activer`),
+  desactiver: (id: number) =>
+    apiClient.patch<TypeActeDto>(`/api/types-actes/${id}/desactiver`),
   delete: (id: number) => apiClient.delete<void>(`/api/types-actes/${id}`),
 };
 
@@ -568,6 +639,7 @@ export const dossierService = {
   nextEtape: (id: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/next`),
   previousEtape: (id: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${id}/workflow/previous`),
   completeEtapeById: (dossierId: number, etapeId: number) => apiClient.post<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}/complete`),
+  updateEtape: (dossierId: number, etapeId: number, dto: Partial<WorkflowEtapeDto>) => apiClient.patch<WorkflowEtapeDto>(`/api/dossiers/${dossierId}/workflow/etapes/${etapeId}`, dto),
 
   // Commentaires
   getCommentaires: (id: number) => apiClient.get<CommentaireDto[]>(`/api/dossiers/${id}/commentaires`),
