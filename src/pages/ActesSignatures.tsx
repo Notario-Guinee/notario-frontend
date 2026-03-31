@@ -1,978 +1,1031 @@
 // ═══════════════════════════════════════════════════════════════
-// Page Actes notariés — Gestion des actes et catalogue personnalisable
-// Inclut : liste avec workflow procédural, et catalogue des types
-// d'actes personnalisables par catégorie (ajout/renommage/suppression)
+// Page Actes notariés — CRUD complet branché API
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from "react";
-import { Plus, Search, FileText, PenLine, CheckCircle2, DollarSign, Eye, X, MoreHorizontal, Receipt, Settings2, Trash2, GripVertical, Save, FolderPlus, ChevronDown, ChevronRight, Edit2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Plus, Search, FileText, PenLine, CheckCircle2, DollarSign,
+  MoreHorizontal, Trash2, GripVertical, Save,
+  ChevronDown, ChevronRight, Edit2, RefreshCw, Loader2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn, searchMatch } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { motion } from "framer-motion";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogFooter, DialogDescription
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { formatGNF, mockDossiers } from "@/data/mockData";
-import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
-import { workflowTemplates, type WorkflowConfig } from "@/components/workflow/workflow-types";
 import { useLanguage } from "@/context/LanguageContext";
-import { CATEGORIES_ACTES, type CategorieActe } from "@/data/constants";
-import { useActeSteps } from "@/context/ActeStepsContext";
+import { typeActeService, type TypeActeDto } from "@/services/dossierService";
 
-interface Acte {
-  id: string;
-  ref: string;
-  dossier: string;
-  dateDossier: string;
-  type: string;
-  etat: "Brouillon" | "En signature" | "Signé" | "Annulé";
-  signataires: { nom: string; signe: boolean }[];
-  montant: number;
-  workflow?: WorkflowConfig;
+// ── Types locaux ─────────────────────────────────────────────────
+
+interface WorkflowStep {
+  key: string;
+  label: string;
+  description?: string;
+  dureeEstimeeJours?: number;
+  obligatoire?: boolean;
+  // Champs requis par le WorkflowEngine backend
+  icon?: string;
+  time?: string;
+  button?: { label: string; actionId: string };
 }
 
-const initialActes: Acte[] = [
-  {
-    id: "1", ref: "A-8842", dossier: "N-2025-101", dateDossier: "15/08/2024", type: "Vente immobilière", etat: "En signature",
-    signataires: [{ nom: "Bah Oumar", signe: true }, { nom: "Fam. Diallo", signe: false }], montant: 3200000,
-    workflow: {
-      ...workflowTemplates["Vente immobilière"],
-      steps: workflowTemplates["Vente immobilière"].steps.map((s, i) =>
-        i < 2
-          ? { ...s, status: "completed" as const, startedAt: new Date(Date.now() - (12 - i * 5) * 86400000).toISOString(), completedAt: new Date(Date.now() - (7 - i * 5) * 86400000).toISOString() }
-          : i === 2
-            ? { ...s, status: "active" as const, startedAt: new Date(Date.now() - 2 * 86400000).toISOString() }
-            : s
-      ),
+// Extrait le JSON workflow d'un TypeActeDto (camelCase ou snake_case)
+function getWorkflowJson(t: TypeActeDto): string | object | undefined {
+  return t.workflowConfigJson ?? t.workflow_config_json;
+}
+
+// Parse le workflowConfigJson du backend (string JSON ou objet déjà parsé)
+function parseWorkflowSteps(json?: string | object | null): WorkflowStep[] {
+  if (!json) return [];
+  try {
+    const parsed = typeof json === "string" ? JSON.parse(json) : json;
+    // Supporte { steps: [...] } ou [...] directement
+    const steps = Array.isArray(parsed) ? parsed : (parsed as { steps?: WorkflowStep[] }).steps ?? [];
+    return steps.map((s: WorkflowStep | string, i: number) =>
+      typeof s === "string"
+        ? { key: `step_${i}`, label: s }
+        : { key: s.key ?? `step_${i}`, label: s.label ?? String(s), description: s.description, dureeEstimeeJours: s.dureeEstimeeJours, icon: s.icon, time: s.time, button: s.button }
+    );
+  } catch {
+    return [];
+  }
+}
+
+// Sérialise les étapes en JSON complet pour le backend (WorkflowEngine valide layout + button)
+function serializeWorkflowSteps(steps: WorkflowStep[]): string {
+  const enriched = steps.map((s, i) => ({
+    key: s.key,
+    label: s.label.toUpperCase(),
+    icon: s.icon ?? "file",
+    time: s.time ?? (s.dureeEstimeeJours ? `${s.dureeEstimeeJours} j` : "1 j"),
+    description: s.description ?? s.label,
+    button: s.button ?? {
+      label: i === 0 ? "DÉMARRER" : "VALIDER",
+      actionId: `action_${s.key.toLowerCase()}`,
     },
-  },
-  {
-    id: "2", ref: "A-8843", dossier: "N-2025-103", dateDossier: "12/08/2024", type: "Création de société (statuts)", etat: "En signature",
-    signataires: [{ nom: "SARL Nimba", signe: true }, { nom: "Diallo M.", signe: false }], montant: 200000,
-    workflow: workflowTemplates["Constitution société"] ? {
-      ...workflowTemplates["Constitution société"],
-      steps: workflowTemplates["Constitution société"].steps.map((s, i) =>
-        i < 3
-          ? { ...s, status: "completed" as const, startedAt: new Date(Date.now() - (15 - i * 4) * 86400000).toISOString(), completedAt: new Date(Date.now() - (11 - i * 4) * 86400000).toISOString() }
-          : i === 3
-            ? { ...s, status: "active" as const, startedAt: new Date(Date.now() - 1 * 86400000).toISOString() }
-            : s
-      ),
-    } : undefined,
-  },
-  {
-    id: "3", ref: "A-8844", dossier: "N-2025-105", dateDossier: "10/08/2024", type: "Donation entre époux", etat: "Signé",
-    signataires: [{ nom: "Camara Aïssatou", signe: true }, { nom: "Bah Oumar", signe: true }], montant: 800000,
-    workflow: workflowTemplates["Donation"] ? {
-      ...workflowTemplates["Donation"],
-      steps: workflowTemplates["Donation"].steps.map((s, i) => ({
-        ...s, status: "completed" as const,
-        startedAt: new Date(Date.now() - (30 - i * 5) * 86400000).toISOString(),
-        completedAt: new Date(Date.now() - (25 - i * 5) * 86400000).toISOString(),
-      })),
-    } : undefined,
-  },
+    ...(i > 0 ? { conditions: { required: [steps[i - 1].key] } } : {}),
+  }));
+  return JSON.stringify({
+    steps: enriched,
+    layout: { type: "horizontal", width: Math.max(800, steps.length * 200), height: 300 },
+    palette: ["#2E4057", "#2AA3D6", "#F4A300", "#28A89E", "#87BF3C", "#E74C3C"],
+    version: "1.0",
+  });
+}
+
+const PRIORITES = ["TRES_BASSE", "BASSE", "NORMALE", "HAUTE", "TRES_HAUTE", "URGENTE"] as const;
+
+// Libellé affiché → code enum TypeActe attendu par le backend
+const CATEGORIES: { label: string; value: string }[] = [
+  { label: "Vente Immobilière",              value: "VENTE_IMMOBILIERE" },
+  { label: "Bail Immobilier",                value: "BAIL_IMMOBILIER" },
+  { label: "Donation Immobilière",           value: "DONATION_IMMOBILIERE" },
+  { label: "Hypothèque",                     value: "HYPOTHEQUE" },
+  { label: "Mainlevée d'Hypothèque",         value: "MAINLEVEE_HYPOTHEQUE" },
+  { label: "Création de Société",            value: "CREATION_SOCIETE" },
+  { label: "Modification de Statuts",        value: "MODIFICATION_STATUTS" },
+  { label: "Dissolution de Société",         value: "DISSOLUTION_SOCIETE" },
+  { label: "Cession de Parts Sociales",      value: "CESSION_PARTS_SOCIALES" },
+  { label: "Augmentation de Capital",        value: "AUGMENTATION_CAPITAL" },
+  { label: "Testament",                      value: "TESTAMENT" },
+  { label: "Donation-Partage",               value: "DONATION_PARTAGE" },
+  { label: "Contrat de Mariage",             value: "CONTRAT_MARIAGE" },
+  { label: "Liquidation de Régime Matrimonial", value: "LIQUIDATION_REGIME" },
+  { label: "Procuration",                    value: "PROCURATION" },
+  { label: "Authentification de Signature",  value: "AUTHENTIFICATION" },
+  { label: "Certification Conforme",         value: "CERTIFICATION_CONFORME" },
+  { label: "Prêt / Reconnaissance de Dette", value: "PRET" },
+  { label: "Inventaire",                     value: "INVENTAIRE" },
+  { label: "Dépôt d'Acte",                  value: "DEPOT" },
+  { label: "Contrat Divers",                 value: "CONTRAT_DIVERS" },
 ];
 
-const etatColors: Record<string, string> = {
-  Brouillon: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "En signature": "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  Signé: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  Annulé: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-};
+// ── Composant principal ───────────────────────────────────────────
 
 export default function ActesSignatures() {
-  const { t, lang } = useLanguage();
+  const { lang } = useLanguage();
   const fr = lang === "FR";
 
-  // ── Actes state ──────────────────────────────────────────────
-  const [actes, setActes] = useState<Acte[]>(initialActes);
+  // ── State types d'actes ──────────────────────────────────────
+  const [typeActes, setTypeActes] = useState<TypeActeDto[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterEtat, setFilterEtat] = useState("all");
+  const [filterCategorie, setFilterCategorie] = useState("all");
+
+  // ── State modals ─────────────────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedActeId, setSelectedActeId] = useState<string | null>(null);
-  const [form, setForm] = useState({ categorieActe: "", type: "" });
+  const [showEdit, setShowEdit] = useState(false);
+  const [showWorkflow, setShowWorkflow] = useState(false);
+  const [editingType, setEditingType] = useState<TypeActeDto | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<TypeActeDto | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Steps per act (catalogue) ─────────────────────────────────
-  const { acteSteps, setActeSteps, getSteps: getStepsFromContext } = useActeSteps();
-  const [expandedActeSteps, setExpandedActeSteps] = useState<Set<string>>(new Set());
-  const [editingStep, setEditingStep] = useState<{ key: string; idx: number; label: string } | null>(null);
-  const [addStepFor, setAddStepFor] = useState<string | null>(null);
+  // ── Form création/édition ────────────────────────────────────
+  const [form, setForm] = useState({
+    nom: "",
+    code: "",
+    description: "",
+    categorieReference: "",
+    dureeEstimeeJours: "",
+    niveauComplexite: "1",
+    prioriteDefaut: "NORMALE" as typeof PRIORITES[number],
+    necessiteSignatureElectronique: false,
+    necessitePublication: false,
+    actif: true,
+  });
+
+  // ── State workflow steps ─────────────────────────────────────
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [expandedTypes, setExpandedTypes] = useState<Set<number>>(new Set());
+  const [editingStep, setEditingStep] = useState<{ typeId: number; idx: number; label: string; description: string } | null>(null);
+  const [addingStepFor, setAddingStepFor] = useState<number | null>(null);
   const [newStepLabel, setNewStepLabel] = useState("");
+  const [newStepDescription, setNewStepDescription] = useState("");
+  const [savingWorkflow, setSavingWorkflow] = useState(false);
 
-  const getSteps = (acteLabel: string) => getStepsFromContext(acteLabel);
+  // ── Chargement ───────────────────────────────────────────────
+  const loadTypeActes = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await typeActeService.getAll();
+      setTypeActes(data);
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur chargement des types d'actes" : "Error loading act types");
+    } finally {
+      setLoading(false);
+    }
+  }, [fr]);
 
-  const toggleActeSteps = (key: string) => {
-    setExpandedActeSteps(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) { next.delete(key); } else { next.add(key); }
-      return next;
-    });
-  };
+  useEffect(() => { loadTypeActes(); }, [loadTypeActes]);
 
-  const moveStep = (acteLabel: string, idx: number, dir: -1 | 1) => {
-    const steps = [...getSteps(acteLabel)];
-    const target = idx + dir;
-    if (target < 0 || target >= steps.length) return;
-    [steps[idx], steps[target]] = [steps[target], steps[idx]];
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-  };
-
-  const renameStep = (acteLabel: string, idx: number, label: string) => {
-    if (!label.trim()) return;
-    const steps = [...getSteps(acteLabel)];
-    steps[idx] = label.trim().toUpperCase();
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-    setEditingStep(null);
-  };
-
-  const [confirmDeleteStep, setConfirmDeleteStep] = useState<{ acteLabel: string; idx: number; label: string } | null>(null);
-
-  const deleteStep = (acteLabel: string, idx: number) => {
-    const steps = getSteps(acteLabel).filter((_, i) => i !== idx);
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-    setConfirmDeleteStep(null);
-  };
-
-  const addStep = (acteLabel: string) => {
-    if (!newStepLabel.trim()) return;
-    const steps = [...getSteps(acteLabel), newStepLabel.trim().toUpperCase()];
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-    setNewStepLabel("");
-    setAddStepFor(null);
-  };
-
-  // ── Catalogue state ───────────────────────────────────────────
-  const [activeTab] = useState<"catalogue">("catalogue");
-  const [catalogue, setCatalogue] = useState<CategorieActe[]>(
-    CATEGORIES_ACTES.map(c => ({ ...c, actes: [...c.actes] }))
-  );
-  const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set([0]));
-  const [editingCat, setEditingCat] = useState<{ idx: number; label: string } | null>(null);
-  const [editingActe, setEditingActe] = useState<{ catIdx: number; acteIdx: number; label: string } | null>(null);
-  const [newCatLabel, setNewCatLabel] = useState("");
-  const [showAddCat, setShowAddCat] = useState(false);
-  const [newActeLabel, setNewActeLabel] = useState("");
-  const [addActeForCat, setAddActeForCat] = useState<number | null>(null);
-
-  const selectedActe = selectedActeId ? actes.find(a => a.id === selectedActeId) || null : null;
-  const setSelectedActe = (a: Acte | null) => setSelectedActeId(a?.id || null);
-
-  // All types from current catalogue (flat)
-  const allTypes = catalogue.flatMap(c => c.actes);
-
-  const filtered = actes.filter((a) => {
-    if (filterType !== "all" && a.type !== filterType) return false;
-    if (filterEtat !== "all" && a.etat !== filterEtat) return false;
-    if (search) return [a.ref, a.dossier, a.type].some(f => searchMatch(f, search));
+  // ── Filtrage ─────────────────────────────────────────────────
+  const filtered = typeActes.filter(t => {
+    if (filterCategorie !== "all" && t.categorieReference !== filterCategorie) return false;
+    if (search) return searchMatch(t.nom ?? "", search) || searchMatch(t.code ?? "", search) || searchMatch(t.description ?? "", search);
     return true;
   });
 
-  const stats = {
-    total: actes.length,
-    brouillons: actes.filter(a => a.etat === "Brouillon").length,
-    enSignature: actes.filter(a => a.etat === "En signature").length,
-    signes: actes.filter(a => a.etat === "Signé").length,
-    totalMontant: actes.reduce((s, a) => s + a.montant, 0),
-  };
-
-  // ── Acte handlers ────────────────────────────────────────────
-  const handleCreate = () => {
-    if (!form.type) return;
-    const steps = getSteps(form.type);
-    const template = workflowTemplates[form.type] ?? workflowTemplates["Vente immobilière"];
-    const workflow: WorkflowConfig = {
-      ...(template ?? { name: form.type, description: "" }),
-      name: form.type,
-      steps: steps.map((label, i) => {
-        const existing = template?.steps[i];
-        return {
-          key: label.toLowerCase().replace(/\s+/g, "_"),
-          label,
-          description: existing?.description ?? "",
-          icon: existing?.icon ?? "FileText",
-          time: existing?.time ?? "1 j",
-          status: "pending" as const,
-          button: { actionId: `start_${label.toLowerCase()}` },
-        };
-      }),
-    };
-    const newActe: Acte = {
-      id: String(Date.now()),
-      ref: `A-${8844 + actes.length}`,
-      dossier: "N-2025-XXX",
-      dateDossier: new Date().toLocaleDateString("fr-FR"),
-      type: form.type,
-      etat: "Brouillon",
-      signataires: [],
-      montant: 0,
-      workflow,
-    };
-    setActes(prev => [newActe, ...prev]);
-    setShowCreate(false);
-    setForm({ categorieActe: "", type: "" });
-    toast.success(t("actes.toast.created"));
-  };
-
-  const handleWorkflowStart = (acte: Acte, _actionId: string, stepKey: string) => {
-    const now = new Date().toISOString();
-    setActes(prev => prev.map(a => {
-      if (a.id !== acte.id || !a.workflow) return a;
-      const stepIndex = a.workflow.steps.findIndex(s => s.key === stepKey);
-      if (stepIndex > 0 && a.workflow.steps[stepIndex - 1].status !== "completed") return a;
-      if (a.workflow.steps.some(s => s.status === "active")) return a;
-      const updated = a.workflow.steps.map((s, i) =>
-        i === stepIndex ? { ...s, status: "active" as const, startedAt: now } : s
-      );
-      return { ...a, workflow: { ...a.workflow, steps: updated } };
-    }));
-    toast.success(`${t("actes.toast.stepStarted")} "${stepKey}" ${acte.ref}`);
-  };
-
-  const handleWorkflowRevert = (acte: Acte, stepKey: string) => {
-    const now = new Date().toISOString();
-    setActes(prev => prev.map(a => {
-      if (a.id !== acte.id || !a.workflow) return a;
-      const stepIndex = a.workflow.steps.findIndex(s => s.key === stepKey);
-      const updated = a.workflow.steps.map((s, i) => {
-        if (i < stepIndex) return s;
-        if (i === stepIndex) return { ...s, status: "active" as const, startedAt: now, completedAt: undefined };
-        return { ...s, status: "pending" as const, startedAt: undefined, completedAt: undefined };
-      });
-      return { ...a, workflow: { ...a.workflow, steps: updated } };
-    }));
-    toast.info(`${t("actes.toast.stepReverted")} "${stepKey}" ${acte.ref}`);
-  };
-
-  const handleWorkflowComplete = (acte: Acte, stepKey: string) => {
-    const now = new Date().toISOString();
-    setActes(prev => prev.map(a => {
-      if (a.id !== acte.id || !a.workflow) return a;
-      const updated = a.workflow.steps.map(s =>
-        s.key === stepKey && s.status === "active" ? { ...s, status: "completed" as const, completedAt: now } : s
-      );
-      return { ...a, workflow: { ...a.workflow, steps: updated } };
-    }));
-    const isLast = acte.workflow?.steps[acte.workflow.steps.length - 1]?.key === stepKey;
-    toast.success(isLast ? `${t("actes.toast.workflowDone")} ${acte.ref} ! 🎉` : `${t("actes.toast.stepCompleted")} "${stepKey}" ${acte.ref}`);
-  };
-
-  const handleAction = (acte: Acte) => {
-    if (acte.etat === "Brouillon") {
-      setActes(prev => prev.map(a => a.id === acte.id ? { ...a, etat: "En signature" as const } : a));
-      toast.success(`${acte.ref} ${t("actes.toast.sentSignature")}`);
-    } else if (acte.etat === "En signature") {
-      setActes(prev => prev.map(a => a.id === acte.id ? { ...a, etat: "Signé" as const, signataires: a.signataires.map(s => ({ ...s, signe: true })) } : a));
-      toast.success(`${acte.ref} ${t("actes.toast.signed")}`);
-    } else if (acte.etat === "Signé") {
-      toast.success(`${t("actes.toast.downloading")} ${acte.ref}...`);
+  // ── Initialiser défauts ──────────────────────────────────────
+  const handleInitDefauts = async () => {
+    try {
+      setLoading(true);
+      const items = await typeActeService.initialiserDefauts();
+      setTypeActes(items);
+      toast.success(fr ? "Types par défaut initialisés" : "Default act types initialized");
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur lors de l'initialisation" : "Error initializing defaults");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const actionLabel = (etat: Acte["etat"]) => {
-    if (etat === "Brouillon") return t("actes.action.sendSignature");
-    if (etat === "En signature") return t("actes.action.sign");
-    if (etat === "Signé") return t("actes.action.download");
-    return "";
+  // ── CRUD Handlers ────────────────────────────────────────────
+
+  const resetForm = () => setForm({
+    nom: "", code: "", description: "", categorieReference: "",
+    dureeEstimeeJours: "", niveauComplexite: "1",
+    prioriteDefaut: "NORMALE", necessiteSignatureElectronique: false,
+    necessitePublication: false, actif: true,
+  });
+
+  const handleCreate = async () => {
+    if (!form.nom.trim()) {
+      toast.error(fr ? "Le nom est obligatoire" : "Name is required");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const payload: TypeActeDto = {
+        nom: form.nom.trim(),
+        code: form.code.trim() || form.nom.trim().toUpperCase().replace(/\s+/g, "_"),
+        description: form.description || undefined,
+        categorieReference: form.categorieReference as TypeActeDto["categorieReference"] || undefined,
+        dureeEstimeeJours: form.dureeEstimeeJours ? Number(form.dureeEstimeeJours) : undefined,
+        niveauComplexite: Number(form.niveauComplexite),
+        prioriteDefaut: form.prioriteDefaut as TypeActeDto["prioriteDefaut"],
+        necessiteSignatureElectronique: form.necessiteSignatureElectronique,
+        necessitePublication: form.necessitePublication,
+        actif: form.actif,
+      };
+      const created = await typeActeService.create(payload);
+      setTypeActes(prev => [created, ...prev]);
+      setShowCreate(false);
+      resetForm();
+      toast.success(fr ? "Type d'acte créé avec succès" : "Act type created successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la création" : "Error creating"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const etatLabel = (etat: Acte["etat"]) => {
-    if (etat === "Brouillon") return t("actes.etat.brouillon");
-    if (etat === "En signature") return t("actes.etat.enSignature");
-    if (etat === "Signé") return t("actes.etat.signe");
-    if (etat === "Annulé") return t("actes.etat.annule");
-    return etat;
+  const openEdit = (t: TypeActeDto) => {
+    setEditingType(t);
+    setForm({
+      nom: t.nom ?? "",
+      code: t.code ?? "",
+      description: t.description ?? "",
+      categorieReference: t.categorieReference ?? "",
+      dureeEstimeeJours: t.dureeEstimeeJours ? String(t.dureeEstimeeJours) : "",
+      niveauComplexite: String(t.niveauComplexite ?? 1),
+      prioriteDefaut: t.prioriteDefaut ?? "NORMALE",
+      necessiteSignatureElectronique: t.necessiteSignatureElectronique ?? false,
+      necessitePublication: t.necessitePublication ?? false,
+      actif: t.actif ?? true,
+    });
+    setShowEdit(true);
   };
 
-  // ── Catalogue handlers ────────────────────────────────────────
-  const toggleCat = (idx: number) => {
-    setExpandedCats(prev => {
+  const handleEdit = async () => {
+    if (!editingType || !form.nom.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const payload: TypeActeDto = {
+        nom: form.nom.trim(),
+        code: form.code.trim(),
+        description: form.description || undefined,
+        categorieReference: form.categorieReference as TypeActeDto["categorieReference"] || undefined,
+        dureeEstimeeJours: form.dureeEstimeeJours ? Number(form.dureeEstimeeJours) : undefined,
+        niveauComplexite: Number(form.niveauComplexite),
+        prioriteDefaut: form.prioriteDefaut as TypeActeDto["prioriteDefaut"],
+        necessiteSignatureElectronique: form.necessiteSignatureElectronique,
+        necessitePublication: form.necessitePublication,
+        actif: form.actif,
+      };
+      const updated = await typeActeService.update(Number(editingType.id), payload);
+      setTypeActes(prev => prev.map(t => t.id === editingType.id ? updated : t));
+      setShowEdit(false);
+      setEditingType(null);
+      toast.success(fr ? "Type d'acte modifié" : "Act type updated");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : (fr ? "Erreur lors de la modification" : "Error updating"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleActif = async (t: TypeActeDto) => {
+    try {
+      const updated = t.actif
+        ? await typeActeService.desactiver(Number(t.id))
+        : await typeActeService.activer(Number(t.id));
+      setTypeActes(prev => prev.map(x => x.id === t.id ? updated : x));
+      toast.success(t.actif
+        ? (fr ? `« ${t.nom} » désactivé` : `"${t.nom}" deactivated`)
+        : (fr ? `« ${t.nom} » activé` : `"${t.nom}" activated`)
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : (fr ? "Erreur" : "Error"));
+    }
+  };
+
+  const handleDelete = async (t: TypeActeDto) => {
+    try {
+      await typeActeService.delete(Number(t.id));
+      setTypeActes(prev => prev.filter(x => x.id !== t.id));
+      setConfirmDelete(null);
+      toast.success(fr ? "Type d'acte supprimé" : "Act type deleted");
+    } catch (err) {
+      console.error(err);
+      setConfirmDelete(null);
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.toLowerCase().includes("utilis") || msg.toLowerCase().includes("dossier")) {
+        toast.error(fr
+          ? `Impossible de supprimer « ${t.nom} » : ce type est utilisé par des dossiers. Désactivez-le plutôt.`
+          : `Cannot delete "${t.nom}": this type is used by existing cases. Deactivate it instead.`
+        );
+      } else {
+        toast.error(msg || (fr ? "Erreur lors de la suppression" : "Error deleting"));
+      }
+    }
+  };
+
+  // ── Workflow handlers ────────────────────────────────────────
+
+  const openWorkflow = (t: TypeActeDto) => {
+    setEditingType(t);
+    setWorkflowSteps(parseWorkflowSteps(getWorkflowJson(t)));
+    setShowWorkflow(true);
+  };
+
+  const saveWorkflow = async () => {
+    if (!editingType) return;
+    setSavingWorkflow(true);
+    try {
+      const json = serializeWorkflowSteps(workflowSteps);
+      const updated = await typeActeService.configureWorkflow(Number(editingType.id), json);
+      setTypeActes(prev => prev.map(t => t.id === editingType.id ? updated : t));
+      setShowWorkflow(false);
+      toast.success(fr ? "Workflow enregistré" : "Workflow saved");
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur lors de la sauvegarde du workflow" : "Error saving workflow");
+    } finally {
+      setSavingWorkflow(false);
+    }
+  };
+
+  const addWorkflowStep = () => {
+    if (!newStepLabel.trim()) return;
+    const newStep: WorkflowStep = {
+      key: `step_${Date.now()}`,
+      label: newStepLabel.trim().toUpperCase(),
+      description: newStepDescription.trim() || undefined,
+    };
+    setWorkflowSteps(prev => [...prev, newStep]);
+    setNewStepLabel("");
+    setNewStepDescription("");
+  };
+
+  const removeWorkflowStep = (idx: number) => {
+    if (workflowSteps.length <= 1) {
+      toast.warning(fr
+        ? "Un type d'acte doit avoir au moins une étape. Si ce type n'est plus nécessaire, pensez à le supprimer."
+        : "An act type must have at least one step. Consider deleting this act type if it's no longer needed."
+      );
+      return;
+    }
+    setWorkflowSteps(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateWorkflowStep = (idx: number, label: string, description: string) => {
+    if (!label.trim()) return;
+    setWorkflowSteps(prev => prev.map((s, i) => i === idx ? { ...s, label: label.trim().toUpperCase(), description: description.trim() || undefined } : s));
+    setEditingStep(null);
+  };
+
+  const moveWorkflowStep = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= workflowSteps.length) return;
+    const steps = [...workflowSteps];
+    [steps[idx], steps[target]] = [steps[target], steps[idx]];
+    setWorkflowSteps(steps);
+  };
+
+  // ── Inline workflow toggle dans la liste ─────────────────────
+
+  const toggleExpand = (id: number) => {
+    setExpandedTypes(prev => {
       const next = new Set(prev);
-      if (next.has(idx)) { next.delete(idx); } else { next.add(idx); }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   };
 
-  const saveCategory = (idx: number, label: string) => {
+  // ── Inline step editing dans la liste ───────────────────────
+
+  const handleInlineAddStep = async (t: TypeActeDto) => {
+    if (!newStepLabel.trim() || addingStepFor !== t.id) return;
+    const currentSteps = parseWorkflowSteps(getWorkflowJson(t));
+    const newStep: WorkflowStep = {
+      key: `step_${Date.now()}`,
+      label: newStepLabel.trim().toUpperCase(),
+      description: newStepDescription.trim() || undefined,
+    };
+    const updated = [...currentSteps, newStep];
+    const json = serializeWorkflowSteps(updated);
+    try {
+      const result = await typeActeService.configureWorkflow(Number(t.id), json);
+      setTypeActes(prev => prev.map(x => x.id === t.id ? result : x));
+      setNewStepLabel("");
+      setNewStepDescription("");
+      setAddingStepFor(null);
+      toast.success(fr ? "Étape ajoutée" : "Step added");
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur lors de l'ajout" : "Error adding step");
+    }
+  };
+
+  const handleInlineDeleteStep = async (t: TypeActeDto, idx: number) => {
+    const currentSteps = parseWorkflowSteps(getWorkflowJson(t));
+    if (currentSteps.length <= 1) {
+      toast.warning(fr
+        ? "Un acte doit avoir au moins une étape. Si vous n'en avez plus besoin, pensez à supprimer ce type d'acte."
+        : "An act type must have at least one step. Consider deleting this act type if it's no longer needed."
+      );
+      return;
+    }
+    const updated = currentSteps.filter((_, i) => i !== idx);
+    const json = serializeWorkflowSteps(updated);
+    try {
+      const result = await typeActeService.configureWorkflow(Number(t.id), json);
+      setTypeActes(prev => prev.map(x => x.id === t.id ? result : x));
+      toast.success(fr ? "Étape supprimée" : "Step deleted");
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur lors de la suppression" : "Error deleting step");
+    }
+  };
+
+  const handleInlineUpdateStep = async (t: TypeActeDto, idx: number, label: string, description: string) => {
     if (!label.trim()) return;
-    setCatalogue(prev => prev.map((c, i) => i === idx ? { ...c, label: label.trim() } : c));
-    setEditingCat(null);
+    const currentSteps = parseWorkflowSteps(getWorkflowJson(t));
+    const updated = currentSteps.map((s, i) => i === idx
+      ? { ...s, label: label.trim().toUpperCase(), description: description.trim() || undefined }
+      : s
+    );
+    const json = serializeWorkflowSteps(updated);
+    try {
+      const result = await typeActeService.configureWorkflow(Number(t.id), json);
+      setTypeActes(prev => prev.map(x => x.id === t.id ? result : x));
+      setEditingStep(null);
+      toast.success(fr ? "Étape mise à jour" : "Step updated");
+    } catch (err) {
+      console.error(err);
+      toast.error(fr ? "Erreur" : "Error");
+    }
   };
 
-  const [confirmDeleteCat, setConfirmDeleteCat] = useState<{ idx: number; label: string; acteCount: number } | null>(null);
-
-  const deleteCategory = (idx: number) => {
-    setCatalogue(prev => prev.filter((_, i) => i !== idx));
-    setExpandedCats(prev => {
-      const next = new Set(prev);
-      next.delete(idx);
-      return next;
-    });
-    setConfirmDeleteCat(null);
-  };
-
-  const addCategory = () => {
-    if (!newCatLabel.trim()) return;
-    setCatalogue(prev => [...prev, { label: newCatLabel.trim(), actes: [] }]);
-    setNewCatLabel("");
-    setShowAddCat(false);
-    toast.success(fr ? "Catégorie ajoutée" : "Category added");
-  };
-
-  const saveActe = (catIdx: number, acteIdx: number, label: string) => {
-    if (!label.trim()) return;
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx
-        ? { ...c, actes: c.actes.map((a, j) => j === acteIdx ? label.trim() : a) }
-        : c
-    ));
-    setEditingActe(null);
-  };
-
-  const [confirmDeleteActe, setConfirmDeleteActe] = useState<{ catIdx: number; acteIdx: number; label: string } | null>(null);
-
-  const deleteActe = (catIdx: number, acteIdx: number) => {
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx ? { ...c, actes: c.actes.filter((_, j) => j !== acteIdx) } : c
-    ));
-    setConfirmDeleteActe(null);
-  };
-
-  const addActe = (catIdx: number) => {
-    if (!newActeLabel.trim()) return;
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx ? { ...c, actes: [...c.actes, newActeLabel.trim()] } : c
-    ));
-    setNewActeLabel("");
-    setAddActeForCat(null);
-    toast.success(fr ? "Acte ajouté" : "Act added");
-  };
-
-  const saveCatalogue = () => {
-    // TODO: persister au backend
-    toast.success(fr ? "Catalogue enregistré avec succès" : "Catalogue saved successfully");
-  };
+  // ── Render ───────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-start justify-between">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">{t("actes.pageTitle")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("actes.subtitle")}</p>
+          <h1 className="font-heading text-2xl font-bold text-foreground">
+            {fr ? "Types d'actes notariés" : "Notarial Act Types"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {fr
+              ? "Configurez les types d'actes et leur workflow pour votre cabinet. Chaque dossier utilisera ces étapes."
+              : "Configure act types and their workflow for your office. Each case will follow these steps."}
+          </p>
         </div>
-        <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-2" onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4" /> {t("actes.newActe")}
-        </Button>
-      </div>
-
-      {/* ── Tab: Actes (masqué mais gardé pour référence) ──────── */}
-      {activeTab === "catalogue" && (
-        <>
-          {/* KPIs - caché mais gardé pour stats visuelles */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-            {[
-              { label: t("actes.kpi.total"), value: String(stats.total), icon: FileText, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
-              { label: t("actes.kpi.brouillons"), value: String(stats.brouillons), icon: PenLine, bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
-              { label: t("actes.kpi.enSignature"), value: String(stats.enSignature), icon: PenLine, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
-              { label: t("actes.kpi.signes"), value: String(stats.signes), icon: CheckCircle2, bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
-              { label: t("actes.kpi.totalMontant"), value: formatGNF(stats.totalMontant), icon: DollarSign, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
-            ].map(({ label, value, icon: Icon, bg, iconBg }) => (
-              <div key={label} className={cn("rounded-xl border border-border p-5 flex items-center gap-4", bg)}>
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white", iconBg)}>
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="font-heading text-2xl font-bold text-foreground">{value}</p>
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Search & Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[250px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder={t("actes.search")} value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
-            </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[220px]"><SelectValue placeholder={t("actes.filter.allTypes")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("actes.filter.allTypes")}</SelectItem>
-                {allTypes.map(tp => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filterEtat} onValueChange={setFilterEtat}>
-              <SelectTrigger className="w-[170px]"><SelectValue placeholder={t("actes.filter.allEtats")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("actes.filter.allEtats")}</SelectItem>
-                <SelectItem value="Brouillon">{t("actes.etat.brouillon")}</SelectItem>
-                <SelectItem value="En signature">{t("actes.etat.enSignature")}</SelectItem>
-                <SelectItem value="Signé">{t("actes.etat.signe")}</SelectItem>
-                <SelectItem value="Annulé">{t("actes.etat.annule")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Table */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    {[t("actes.table.ref"), t("actes.table.dossier"), t("actes.table.type"), t("actes.table.etat"), t("actes.table.signataires"), t("actes.table.montant"), t("actes.table.actions")].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((a, i) => (
-                    <motion.tr key={a.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-                      className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-4">
-                        <span className="text-sm font-mono font-medium text-primary cursor-pointer hover:underline" onClick={() => setSelectedActe(a)}>{a.ref}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <p className="text-sm font-medium text-foreground">{a.dossier}</p>
-                        <p className="text-xs text-muted-foreground">{a.dateDossier}</p>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-primary/10 text-primary">{a.type}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", etatColors[a.etat])}>{etatLabel(a.etat)}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="space-y-1">
-                          {a.signataires.map((s, si) => (
-                            <div key={si} className="flex items-center gap-1.5">
-                              <span className="text-sm text-foreground">{s.nom}</span>
-                              <span className={cn("h-2 w-2 rounded-full", s.signe ? "bg-emerald-500" : "bg-amber-400")} />
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm font-mono font-medium text-foreground">{formatGNF(a.montant)}</td>
-                      <td className="px-4 py-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedActe(a)}><Eye className="mr-2 h-4 w-4" /> {t("actes.menu.viewWorkflow")}</DropdownMenuItem>
-                            {a.etat !== "Annulé" && (
-                              <DropdownMenuItem onClick={() => handleAction(a)}>
-                                <PenLine className="mr-2 h-4 w-4" /> {actionLabel(a.etat)}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => toast.info(`${t("actes.toast.invoiceGenerated")} ${a.ref}`)}>
-                              <Receipt className="mr-2 h-4 w-4" /> {t("actes.menu.generateInvoice")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => toast.info(`${t("actes.menu.details")} ${a.ref}`)}>
-                              <FileText className="mr-2 h-4 w-4" /> {t("actes.menu.details")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </motion.tr>
-                  ))}
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">{t("actes.empty")}</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Catalogue ──────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {fr
-                ? "Personnalisez les catégories et les actes notariés proposés dans votre cabinet. Ces modifications s'appliqueront lors de la création de nouveaux dossiers."
-                : "Customize the categories and notarial acts offered by your office. These changes will apply when creating new cases."}
-            </p>
-          </div>
-          <Button size="sm" className="bg-primary text-primary-foreground gap-2 shrink-0" onClick={saveCatalogue}>
-            <Save className="h-4 w-4" /> {fr ? "Enregistrer" : "Save"}
+        <div className="flex gap-2">
+          {typeActes.length === 0 && !loading && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleInitDefauts}>
+              <RefreshCw className="h-4 w-4" />
+              {fr ? "Initialiser les défauts" : "Initialize defaults"}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-2"
+            onClick={() => { resetForm(); setShowCreate(true); }}
+          >
+            <Plus className="h-4 w-4" />
+            {fr ? "Nouveau type d'acte" : "New act type"}
           </Button>
         </div>
+      </div>
 
+      {/* ── Stats ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: fr ? "Total types" : "Total types", value: typeActes.length, icon: FileText, bg: "bg-blue-50 dark:bg-blue-900/20", iconBg: "bg-blue-500" },
+          { label: fr ? "Actifs" : "Active", value: typeActes.filter(t => t.actif).length, icon: CheckCircle2, bg: "bg-emerald-50 dark:bg-emerald-900/20", iconBg: "bg-emerald-500" },
+          { label: fr ? "Avec workflow" : "With workflow", value: typeActes.filter(t => parseWorkflowSteps(getWorkflowJson(t)).length > 0).length, icon: PenLine, bg: "bg-purple-50 dark:bg-purple-900/20", iconBg: "bg-purple-500" },
+          { label: fr ? "Dossiers créés" : "Cases created", value: typeActes.reduce((s, t) => s + (t.nombreDossiersTotal ?? 0), 0), icon: DollarSign, bg: "bg-amber-50 dark:bg-amber-900/20", iconBg: "bg-amber-500" },
+        ].map((kpi, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+            className={cn("rounded-xl border border-border p-4 flex items-center gap-3", kpi.bg)}>
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg text-white shrink-0", kpi.iconBg)}>
+              <kpi.icon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xl font-bold font-heading text-foreground">{kpi.value}</p>
+              <p className="text-xs text-muted-foreground">{kpi.label}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* ── Filtres ── */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={fr ? "Rechercher un type d'acte..." : "Search act type..."}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={filterCategorie} onValueChange={setFilterCategorie}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder={fr ? "Toutes catégories" : "All categories"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{fr ? "Toutes catégories" : "All categories"}</SelectItem>
+            {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* ── Liste ── */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-medium">{fr ? "Aucun type d'acte trouvé" : "No act types found"}</p>
+          {typeActes.length === 0 && (
+            <Button variant="outline" size="sm" className="mt-3 gap-2" onClick={handleInitDefauts}>
+              <RefreshCw className="h-4 w-4" />
+              {fr ? "Initialiser les types par défaut" : "Initialize default types"}
+            </Button>
+          )}
+        </div>
+      ) : (
         <div className="space-y-3">
-          {catalogue.map((cat, catIdx) => (
-            <div key={catIdx} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-              {/* Category header */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b border-border">
-                <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-                <button onClick={() => toggleCat(catIdx)} className="flex items-center gap-2 flex-1 text-left">
-                  {expandedCats.has(catIdx)
-                    ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                    : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  {editingCat?.idx === catIdx ? (
-                    <Input
-                      className="h-7 text-sm w-64"
-                      value={editingCat.label}
-                      autoFocus
-                      onChange={e => setEditingCat({ idx: catIdx, label: e.target.value })}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") saveCategory(catIdx, editingCat.label);
-                        if (e.key === "Escape") setEditingCat(null);
-                      }}
-                      onClick={e => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span className="text-sm font-semibold text-foreground">{cat.label}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground ml-1">({cat.actes.length} {fr ? "actes" : "acts"})</span>
-                </button>
-                <div className="flex items-center gap-1 ml-auto">
-                  {editingCat?.idx === catIdx ? (
-                    <>
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => saveCategory(catIdx, editingCat.label)}>{fr ? "OK" : "OK"}</Button>
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditingCat(null)}>{fr ? "Annuler" : "Cancel"}</Button>
-                    </>
-                  ) : (
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingCat({ idx: catIdx, label: cat.label })}>
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteCat({ idx: catIdx, label: cat.label, acteCount: cat.actes.length })}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
+          {filtered.map((t) => {
+            const steps = parseWorkflowSteps(getWorkflowJson(t));
+            const isExpanded = expandedTypes.has(Number(t.id));
+            return (
+              <motion.div
+                key={t.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-border bg-card overflow-hidden shadow-sm"
+              >
+                {/* Type header */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
 
-              {/* Acts list */}
-              {expandedCats.has(catIdx) && (
-                <div className="p-3 space-y-1.5">
-                  {cat.actes.map((acte, acteIdx) => {
-                    const stepKey = `${catIdx}-${acteIdx}`;
-                    const stepsOpen = expandedActeSteps.has(stepKey);
-                    const steps = getSteps(acte);
-                    return (
-                      <div key={acteIdx} className="rounded-lg border border-border/50 bg-muted/10 overflow-hidden">
-                        {/* Act row */}
-                        <div className="flex items-center gap-2 group px-3 py-2 hover:bg-muted/30 transition-colors">
-                          <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
-                          <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          {editingActe?.catIdx === catIdx && editingActe?.acteIdx === acteIdx ? (
+                  {/* Toggle steps */}
+                  <button
+                    onClick={() => toggleExpand(Number(t.id))}
+                    className="flex items-center gap-2 flex-1 text-left min-w-0"
+                  >
+                    {isExpanded
+                      ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-foreground">{t.nom}</span>
+                        {t.code && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t.code}</span>
+                        )}
+                        <span className={cn(
+                          "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                          t.actif ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+                        )}>
+                          {t.actif ? (fr ? "Actif" : "Active") : (fr ? "Inactif" : "Inactive")}
+                        </span>
+                        {t.necessiteSignatureElectronique && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            {fr ? "Signature élec." : "E-signature"}
+                          </span>
+                        )}
+                      </div>
+                      {t.categorieReference && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {CATEGORIES.find(c => c.value === t.categorieReference)?.label ?? t.categorieReference}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2 text-xs text-muted-foreground">
+                      <span>{steps.length} {fr ? "étapes" : "steps"}</span>
+                      {t.nombreDossiersTotal !== undefined && (
+                        <span>{t.nombreDossiersTotal} {fr ? "dossiers" : "cases"}</span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Actions */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openWorkflow(t)}>
+                        <PenLine className="mr-2 h-4 w-4" />
+                        {fr ? "Configurer workflow" : "Configure workflow"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEdit(t)}>
+                        <Edit2 className="mr-2 h-4 w-4" />
+                        {fr ? "Modifier" : "Edit"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleActif(t)}>
+                        {t.actif
+                          ? <><span className="mr-2 h-4 w-4 inline-flex items-center justify-center">⏸</span>{fr ? "Désactiver" : "Deactivate"}</>
+                          : <><span className="mr-2 h-4 w-4 inline-flex items-center justify-center">▶</span>{fr ? "Activer" : "Activate"}</>
+                        }
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => setConfirmDelete(t)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {fr ? "Supprimer" : "Delete"}
+                        {(t.nombreDossiersTotal ?? 0) > 0 && (
+                          <span className="ml-1 text-[10px] text-muted-foreground">({fr ? "utilisé" : "in use"})</span>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Steps inline */}
+                {isExpanded && (
+                  <div className="border-t border-border bg-muted/5 px-4 py-3 space-y-1.5">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {fr ? "Étapes du workflow" : "Workflow steps"}
+                    </p>
+
+                    {steps.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic px-1">
+                        {fr ? "Aucune étape configurée" : "No steps configured"}
+                      </p>
+                    )}
+
+                    {steps.map((step, si) => (
+                      <div key={step.key} className="group/step rounded-md px-2 py-1.5 hover:bg-muted/40 transition-colors">
+                        {editingStep?.typeId === Number(t.id) && editingStep.idx === si ? (
+                          <div className="space-y-1">
                             <Input
-                              className="h-7 text-sm flex-1"
-                              value={editingActe.label}
+                              className="h-6 text-xs uppercase"
+                              value={editingStep.label}
                               autoFocus
-                              onChange={e => setEditingActe({ catIdx, acteIdx, label: e.target.value })}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") saveActe(catIdx, acteIdx, editingActe.label);
-                                if (e.key === "Escape") setEditingActe(null);
-                              }}
+                              onChange={e => setEditingStep({ ...editingStep, label: e.target.value.toUpperCase() })}
+                              onKeyDown={e => { if (e.key === "Escape") setEditingStep(null); }}
                             />
-                          ) : (
-                            <span className="text-sm text-foreground flex-1">{acte}</span>
-                          )}
-                          <div className="flex items-center gap-1">
-                            {/* Steps toggle */}
-                            <button
-                              onClick={() => toggleActeSteps(stepKey)}
-                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded transition-colors"
-                              title={fr ? "Gérer les étapes" : "Manage steps"}
-                            >
-                              {stepsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                              <span>{steps.length} {fr ? "étapes" : "steps"}</span>
-                            </button>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {editingActe?.catIdx === catIdx && editingActe?.acteIdx === acteIdx ? (
-                                <>
-                                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => saveActe(catIdx, acteIdx, editingActe.label)}>OK</Button>
-                                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingActe(null)}>✕</Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingActe({ catIdx, acteIdx, label: acte })}>
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteActe({ catIdx, acteIdx, label: acte })}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              )}
+                            <Input
+                              className="h-6 text-xs"
+                              placeholder={fr ? "Description (optionnelle)" : "Description (optional)"}
+                              value={editingStep.description}
+                              onChange={e => setEditingStep({ ...editingStep, description: e.target.value })}
+                              onKeyDown={e => { if (e.key === "Enter") handleInlineUpdateStep(t, si, editingStep.label, editingStep.description); if (e.key === "Escape") setEditingStep(null); }}
+                            />
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => handleInlineUpdateStep(t, si, editingStep.label, editingStep.description)}>OK</Button>
+                              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => setEditingStep(null)}>✕</Button>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Steps editor */}
-                        {stepsOpen && (
-                          <div className="border-t border-border/50 bg-muted/5 px-4 py-3 space-y-1.5">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              {fr ? "Étapes du workflow" : "Workflow steps"}
-                            </p>
-                            {steps.map((step, si) => (
-                              <div key={si} className="flex items-center gap-2 group/step rounded-md px-2 py-1.5 hover:bg-muted/40 transition-colors">
-                                <span className="text-[10px] text-muted-foreground w-4 text-right shrink-0">{si + 1}</span>
-                                {editingStep?.key === stepKey && editingStep.idx === si ? (
-                                  <Input
-                                    className="h-6 text-xs flex-1 uppercase"
-                                    value={editingStep.label}
-                                    autoFocus
-                                    onChange={e => setEditingStep({ key: stepKey, idx: si, label: e.target.value.toUpperCase() })}
-                                    onKeyDown={e => {
-                                      if (e.key === "Enter") renameStep(acte, si, editingStep.label);
-                                      if (e.key === "Escape") setEditingStep(null);
-                                    }}
-                                  />
-                                ) : (
-                                  <span className="text-xs font-medium text-foreground flex-1 tracking-wide">{step}</span>
-                                )}
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/step:opacity-100 transition-opacity">
-                                  {editingStep?.key === stepKey && editingStep.idx === si ? (
-                                    <>
-                                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => renameStep(acte, si, editingStep.label)}>OK</Button>
-                                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => setEditingStep(null)}>✕</Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === 0} onClick={() => moveStep(acte, si, -1)}>
-                                        <ChevronRight className="h-3 w-3 -rotate-90" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === steps.length - 1} onClick={() => moveStep(acte, si, 1)}>
-                                        <ChevronRight className="h-3 w-3 rotate-90" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setEditingStep({ key: stepKey, idx: si, label: step })}>
-                                        <Edit2 className="h-2.5 w-2.5" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteStep({ acteLabel: acte, idx: si, label: step })}>
-                                        <Trash2 className="h-2.5 w-2.5" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                            {/* Add step */}
-                            {addStepFor === stepKey ? (
-                              <div className="flex items-center gap-2 px-2 py-1">
-                                <Input
-                                  className="h-6 text-xs flex-1 uppercase"
-                                  placeholder={fr ? "Nom de l'étape (ex: SIGNATURE)" : "Step name (e.g. SIGNATURE)"}
-                                  value={newStepLabel}
-                                  autoFocus
-                                  onChange={e => setNewStepLabel(e.target.value.toUpperCase())}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter") addStep(acte);
-                                    if (e.key === "Escape") { setAddStepFor(null); setNewStepLabel(""); }
-                                  }}
-                                />
-                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => addStep(acte)}>{fr ? "Ajouter" : "Add"}</Button>
-                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => { setAddStepFor(null); setNewStepLabel(""); }}>✕</Button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => { setAddStepFor(stepKey); setNewStepLabel(""); }}
-                                className="flex items-center gap-1.5 text-[11px] text-primary hover:bg-primary/5 w-full px-2 py-1 rounded transition-colors"
-                              >
-                                <Plus className="h-3 w-3" /> {fr ? "Ajouter une étape" : "Add a step"}
-                              </button>
-                            )}
+                        ) : (
+                          <div className="flex items-start gap-2">
+                            <span className="text-[10px] text-muted-foreground w-4 text-right shrink-0 mt-0.5">{si + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-medium text-foreground tracking-wide">{step.label}</span>
+                              {step.description && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{step.description}</p>}
+                            </div>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover/step:opacity-100 transition-opacity shrink-0">
+                              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setEditingStep({ typeId: Number(t.id), idx: si, label: step.label, description: step.description ?? "" })}>
+                                <Edit2 className="h-2.5 w-2.5" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => handleInlineDeleteStep(t, si)}>
+                                <Trash2 className="h-2.5 w-2.5" />
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    ))}
 
-                  {/* Add act */}
-                  {addActeForCat === catIdx ? (
-                    <div className="flex items-center gap-2 px-3 py-2">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <Input
-                        className="h-7 text-sm flex-1"
-                        placeholder={fr ? "Nom de l'acte..." : "Act name..."}
-                        value={newActeLabel}
-                        autoFocus
-                        onChange={e => setNewActeLabel(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") addActe(catIdx);
-                          if (e.key === "Escape") { setAddActeForCat(null); setNewActeLabel(""); }
-                        }}
-                      />
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => addActe(catIdx)}>{fr ? "Ajouter" : "Add"}</Button>
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setAddActeForCat(null); setNewActeLabel(""); }}>✕</Button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => { setAddActeForCat(catIdx); setNewActeLabel(""); }}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-xs text-primary hover:bg-primary/5 rounded-lg transition-colors"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {fr ? "Ajouter un acte" : "Add an act"}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add category */}
-        {showAddCat ? (
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-3">
-            <FolderPlus className="h-4 w-4 text-primary shrink-0" />
-            <Input
-              className="h-8 text-sm flex-1"
-              placeholder={fr ? "Nom de la catégorie..." : "Category name..."}
-              value={newCatLabel}
-              autoFocus
-              onChange={e => setNewCatLabel(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter") addCategory();
-                if (e.key === "Escape") { setShowAddCat(false); setNewCatLabel(""); }
-              }}
-            />
-            <Button size="sm" onClick={addCategory}>{fr ? "Créer" : "Create"}</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowAddCat(false); setNewCatLabel(""); }}>✕</Button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowAddCat(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
-          >
-            <FolderPlus className="h-4 w-4" />
-            {fr ? "Ajouter une catégorie" : "Add a category"}
-          </button>
-        )}
-
-        <div className="flex justify-end pt-2">
-          <Button className="bg-primary text-primary-foreground gap-2" onClick={saveCatalogue}>
-            <Save className="h-4 w-4" /> {fr ? "Enregistrer le catalogue" : "Save catalogue"}
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Detail Drawer with Workflow ───────────────────────── */}
-      <AnimatePresence>
-        {selectedActe && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm" onClick={() => setSelectedActe(null)} />
-            <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 250 }}
-              className="fixed right-0 top-0 z-50 h-full w-full max-w-5xl border-l border-border bg-card shadow-2xl overflow-y-auto scrollbar-thin">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-sm font-mono font-medium text-primary">{selectedActe.ref}</span>
-                      <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", etatColors[selectedActe.etat])}>{etatLabel(selectedActe.etat)}</span>
-                    </div>
-                    <h2 className="font-heading text-xl font-bold text-foreground">{selectedActe.type}</h2>
-                    <p className="text-sm text-muted-foreground mt-1">{t("actes.drawer.dossier")} {selectedActe.dossier} · {selectedActe.dateDossier}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {selectedActe.etat !== "Annulé" && selectedActe.etat !== "Signé" && (
-                      <Button size="sm" className="bg-primary text-primary-foreground" onClick={() => { handleAction(selectedActe); setSelectedActe(null); }}>
-                        {actionLabel(selectedActe.etat)}
-                      </Button>
-                    )}
-                    <button onClick={() => setSelectedActe(null)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5 text-muted-foreground" /></button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                    <p className="text-xs text-muted-foreground">{t("actes.drawer.montant")}</p>
-                    <p className="text-lg font-bold text-foreground font-mono">{formatGNF(selectedActe.montant)}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                    <p className="text-xs text-muted-foreground">{t("actes.drawer.signataires")}</p>
-                    <p className="text-lg font-bold text-foreground">{selectedActe.signataires.length}</p>
-                    <p className="text-xs text-muted-foreground">{selectedActe.signataires.filter(s => s.signe).length} {t("actes.drawer.signed")}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                    <p className="text-xs text-muted-foreground">{t("actes.drawer.progress")}</p>
-                    <p className="text-lg font-bold text-foreground">
-                      {selectedActe.workflow
-                        ? `${Math.round((selectedActe.workflow.steps.filter(s => s.status === "completed").length / selectedActe.workflow.steps.length) * 100)}%`
-                        : "N/A"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium text-foreground mb-3">{t("actes.drawer.signataires")}</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedActe.signataires.map((s, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">{s.nom.charAt(0)}</div>
-                        <span className="text-sm text-foreground">{s.nom}</span>
-                        <span className={cn("h-2.5 w-2.5 rounded-full", s.signe ? "bg-emerald-500" : "bg-amber-400")} />
+                    {/* Add step inline */}
+                    {addingStepFor === Number(t.id) ? (
+                      <div className="space-y-1 px-2 py-1">
+                        <Input
+                          className="h-6 text-xs uppercase"
+                          placeholder={fr ? "Nom de l'étape..." : "Step name..."}
+                          value={newStepLabel}
+                          autoFocus
+                          onChange={e => setNewStepLabel(e.target.value.toUpperCase())}
+                          onKeyDown={e => { if (e.key === "Escape") { setAddingStepFor(null); setNewStepLabel(""); setNewStepDescription(""); } }}
+                        />
+                        <Input
+                          className="h-6 text-xs"
+                          placeholder={fr ? "Description (optionnelle)" : "Description (optional)"}
+                          value={newStepDescription}
+                          onChange={e => setNewStepDescription(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") handleInlineAddStep(t); if (e.key === "Escape") { setAddingStepFor(null); setNewStepLabel(""); setNewStepDescription(""); } }}
+                        />
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => handleInlineAddStep(t)}>{fr ? "Ajouter" : "Add"}</Button>
+                          <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => { setAddingStepFor(null); setNewStepLabel(""); setNewStepDescription(""); }}>✕</Button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    ) : (
+                      <button
+                        onClick={() => { setAddingStepFor(Number(t.id)); setNewStepLabel(""); }}
+                        className="flex items-center gap-1.5 text-[11px] text-primary hover:bg-primary/5 w-full px-2 py-1 rounded transition-colors"
+                      >
+                        <Plus className="h-3 w-3" />
+                        {fr ? "Ajouter une étape" : "Add a step"}
+                      </button>
+                    )}
 
-                {selectedActe.workflow && (
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground mb-4">{t("actes.drawer.workflow")}</h3>
-                    <div className="p-4 rounded-xl bg-muted/10 border border-border overflow-x-auto">
-                      <WorkflowProcedural
-                        config={selectedActe.workflow}
-                        onStart={(actionId, stepKey) => handleWorkflowStart(selectedActe, actionId, stepKey)}
-                        onRevert={(stepKey) => handleWorkflowRevert(selectedActe, stepKey)}
-                        onComplete={(stepKey) => handleWorkflowComplete(selectedActe, stepKey)}
-                      />
+                    <div className="flex justify-end pt-2">
+                      <Button size="sm" variant="outline" className="gap-1 text-xs h-7" onClick={() => openWorkflow(t)}>
+                        <PenLine className="h-3 w-3" />
+                        {fr ? "Éditer le workflow complet" : "Edit full workflow"}
+                      </Button>
                     </div>
                   </div>
                 )}
-                {!selectedActe.workflow && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">{t("actes.drawer.noWorkflow")}</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* ── Create Acte Modal ──────────────────────────────────── */}
+      {/* ── Modal Créer ── */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-heading">{t("actes.create.title")}</DialogTitle>
-            <DialogDescription>{t("actes.create.desc")}</DialogDescription>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-heading">{fr ? "Nouveau type d'acte" : "New act type"}</DialogTitle>
+            <DialogDescription>{fr ? "Créez un type d'acte personnalisé pour votre cabinet" : "Create a custom act type for your office"}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>{fr ? "Catégorie d'acte" : "Act category"} *</Label>
-              <Select value={form.categorieActe} onValueChange={v => setForm(p => ({ ...p, categorieActe: v, type: "" }))}>
-                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner une catégorie" : "Select a category"} /></SelectTrigger>
-                <SelectContent>
-                  {catalogue.map(c => <SelectItem key={c.label} value={c.label}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {form.categorieActe && (
+          <div className="overflow-y-auto flex-1 pr-1">
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 col-span-2">
+                  <Label>{fr ? "Nom *" : "Name *"}</Label>
+                  <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder={fr ? "Ex: Vente immobilière" : "E.g.: Real estate sale"} />
+                </div>
+                <div className="space-y-2">
+                  <Label>{fr ? "Code" : "Code"}</Label>
+                  <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="EX: VENTE_IMM" className="uppercase" />
+                </div>
+                <div className="space-y-2">
+                  <Label>{fr ? "Durée estimée (jours)" : "Estimated duration (days)"}</Label>
+                  <Input type="number" value={form.dureeEstimeeJours} onChange={e => setForm(f => ({ ...f, dureeEstimeeJours: e.target.value }))} placeholder="30" min={1} />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label>{t("actes.create.typeLabel")} *</Label>
-                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v }))}>
-                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un acte" : "Select an act"} /></SelectTrigger>
+                <Label>{fr ? "Catégorie de référence" : "Reference category"}</Label>
+                <Select value={form.categorieReference} onValueChange={v => setForm(f => ({ ...f, categorieReference: v }))}>
+                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner..." : "Select..."} /></SelectTrigger>
                   <SelectContent>
-                    {(catalogue.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
+                    {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            {form.type && (
-              <div className="rounded-lg bg-muted/40 border border-border px-3 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1.5">{fr ? "Étapes du workflow associé" : "Associated workflow steps"}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {getSteps(form.type).map((s, i) => (
-                    <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s}</span>
-                  ))}
+              <div className="space-y-2">
+                <Label>{fr ? "Description" : "Description"}</Label>
+                <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder={fr ? "Description de l'acte..." : "Act description..."} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>{fr ? "Priorité par défaut" : "Default priority"}</Label>
+                  <Select value={form.prioriteDefaut} onValueChange={v => setForm(f => ({ ...f, prioriteDefaut: v as typeof PRIORITES[number] }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{PRIORITES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{fr ? "Niveau complexité (1-5)" : "Complexity level (1-5)"}</Label>
+                  <Input type="number" value={form.niveauComplexite} onChange={e => setForm(f => ({ ...f, niveauComplexite: e.target.value }))} min={1} max={5} />
                 </div>
               </div>
-            )}
+              <div className="space-y-2">
+                {[
+                  { key: "actif", label: fr ? "Actif" : "Active" },
+                  { key: "necessiteSignatureElectronique", label: fr ? "Nécessite signature électronique" : "Requires electronic signature" },
+                  { key: "necessitePublication", label: fr ? "Nécessite publication" : "Requires publication" },
+                ].map(opt => (
+                  <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form[opt.key as keyof typeof form] as boolean}
+                      onChange={e => setForm(f => ({ ...f, [opt.key]: e.target.checked }))}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>{t("actes.create.cancel")}</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.type}>
-              {t("actes.create.submit")}
+          <DialogFooter className="shrink-0 pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setShowCreate(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSubmitting || !form.nom.trim()}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {fr ? "Créer" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Confirmation suppression catégorie ─────────────────── */}
-      <Dialog open={!!confirmDeleteCat} onOpenChange={o => !o && setConfirmDeleteCat(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-destructive">
-              {fr ? "Supprimer cette catégorie ?" : "Delete this category?"}
+      {/* ── Modal Modifier ── */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-heading">
+              {fr ? "Modifier le type d'acte" : "Edit act type"} — <span className="text-primary">{editingType?.nom}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 col-span-2">
+                  <Label>{fr ? "Nom *" : "Name *"}</Label>
+                  <Input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Code</Label>
+                  <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className="uppercase" />
+                </div>
+                <div className="space-y-2">
+                  <Label>{fr ? "Durée (jours)" : "Duration (days)"}</Label>
+                  <Input type="number" value={form.dureeEstimeeJours} onChange={e => setForm(f => ({ ...f, dureeEstimeeJours: e.target.value }))} min={1} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{fr ? "Catégorie de référence" : "Reference category"}</Label>
+                <Select value={form.categorieReference} onValueChange={v => setForm(f => ({ ...f, categorieReference: v }))}>
+                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner..." : "Select..."} /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{fr ? "Description" : "Description"}</Label>
+                <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>{fr ? "Priorité par défaut" : "Default priority"}</Label>
+                  <Select value={form.prioriteDefaut} onValueChange={v => setForm(f => ({ ...f, prioriteDefaut: v as typeof PRIORITES[number] }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{PRIORITES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{fr ? "Complexité (1-5)" : "Complexity (1-5)"}</Label>
+                  <Input type="number" value={form.niveauComplexite} onChange={e => setForm(f => ({ ...f, niveauComplexite: e.target.value }))} min={1} max={5} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { key: "actif", label: fr ? "Actif" : "Active" },
+                  { key: "necessiteSignatureElectronique", label: fr ? "Nécessite signature électronique" : "Requires electronic signature" },
+                  { key: "necessitePublication", label: fr ? "Nécessite publication" : "Requires publication" },
+                ].map(opt => (
+                  <label key={opt.key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form[opt.key as keyof typeof form] as boolean}
+                      onChange={e => setForm(f => ({ ...f, [opt.key]: e.target.checked }))}
+                      className="w-4 h-4 accent-primary"
+                    />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setShowEdit(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleEdit} disabled={isSubmitting || !form.nom.trim()}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {fr ? "Enregistrer" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal Workflow complet ── */}
+      <Dialog open={showWorkflow} onOpenChange={setShowWorkflow}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-heading">
+              {fr ? "Workflow" : "Workflow"} — <span className="text-primary">{editingType?.nom}</span>
             </DialogTitle>
             <DialogDescription>
               {fr
-                ? `La catégorie « ${confirmDeleteCat?.label} » et ses ${confirmDeleteCat?.acteCount} acte(s) seront définitivement supprimés du catalogue. Cette action est irréversible.`
-                : `The category "${confirmDeleteCat?.label}" and its ${confirmDeleteCat?.acteCount} act(s) will be permanently removed from the catalogue. This action cannot be undone.`}
+                ? "Définissez les étapes que chaque dossier de ce type devra suivre."
+                : "Define the steps each case of this type must follow."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
+            <div className="space-y-2 py-2">
+              {workflowSteps.length === 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                  {fr
+                    ? "⚠️ Un type d'acte doit avoir au moins une étape. Si ce type n'est plus nécessaire, pensez à le supprimer."
+                    : "⚠️ An act type must have at least one step. Consider deleting this act type if it's no longer needed."}
+                </div>
+              )}
+              {workflowSteps.map((step, i) => (
+                <div key={step.key} className="group rounded-lg border border-border px-3 py-2 bg-muted/10">
+                  {editingStep?.typeId === -1 && editingStep.idx === i ? (
+                    <div className="space-y-2">
+                      <Input
+                        className="h-7 text-sm uppercase"
+                        value={editingStep.label}
+                        autoFocus
+                        onChange={e => setEditingStep({ ...editingStep, label: e.target.value.toUpperCase() })}
+                        onKeyDown={e => { if (e.key === "Escape") setEditingStep(null); }}
+                      />
+                      <Input
+                        className="h-7 text-sm"
+                        placeholder={fr ? "Description (optionnelle)" : "Description (optional)"}
+                        value={editingStep.description}
+                        onChange={e => setEditingStep({ ...editingStep, description: e.target.value })}
+                        onKeyDown={e => { if (e.key === "Enter") updateWorkflowStep(i, editingStep.label, editingStep.description); if (e.key === "Escape") setEditingStep(null); }}
+                      />
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => updateWorkflowStep(i, editingStep.label, editingStep.description)}>OK</Button>
+                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditingStep(null)}>✕</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs text-muted-foreground w-5 text-right shrink-0 mt-0.5">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-foreground">{step.label}</span>
+                        {step.description && <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <Button size="icon" variant="ghost" className="h-6 w-6" disabled={i === 0} onClick={() => moveWorkflowStep(i, -1)}>
+                          <ChevronRight className="h-3 w-3 -rotate-90" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" disabled={i === workflowSteps.length - 1} onClick={() => moveWorkflowStep(i, 1)}>
+                          <ChevronRight className="h-3 w-3 rotate-90" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingStep({ typeId: -1, idx: i, label: step.label, description: step.description ?? "" })}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => removeWorkflowStep(i)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Add step */}
+              <div className="space-y-2 mt-2 pt-2 border-t border-border">
+                <Input
+                  className="h-8 text-sm uppercase"
+                  placeholder={fr ? "Nom de l'étape (ex: SIGNATURE)" : "Step name (e.g.: SIGNATURE)"}
+                  value={newStepLabel}
+                  onChange={e => setNewStepLabel(e.target.value.toUpperCase())}
+                  onKeyDown={e => { if (e.key === "Enter") addWorkflowStep(); }}
+                />
+                <Input
+                  className="h-8 text-sm"
+                  placeholder={fr ? "Description de l'étape (optionnelle)" : "Step description (optional)"}
+                  value={newStepDescription}
+                  onChange={e => setNewStepDescription(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") addWorkflowStep(); }}
+                />
+                <Button size="sm" onClick={addWorkflowStep} disabled={!newStepLabel.trim()}>
+                  <Plus className="h-4 w-4 mr-1" /> {fr ? "Ajouter" : "Add"}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 pt-2 border-t border-border">
+            <Button variant="outline" onClick={() => setShowWorkflow(false)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button className="bg-primary text-primary-foreground gap-2" onClick={saveWorkflow} disabled={savingWorkflow}>
+              {savingWorkflow ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {fr ? "Enregistrer le workflow" : "Save workflow"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Confirm Delete ── */}
+      <Dialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-destructive">
+              {fr ? "Supprimer ce type d'acte ?" : "Delete this act type?"}
+            </DialogTitle>
+            <DialogDescription>
+              {fr
+                ? `Le type « ${confirmDelete?.nom} » sera définitivement supprimé. Cette action est irréversible.`
+                : `The type "${confirmDelete?.nom}" will be permanently deleted. This cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteCat(null)}>
-              {fr ? "Annuler" : "Cancel"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => confirmDeleteCat && deleteCategory(confirmDeleteCat.idx)}
-            >
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>{fr ? "Annuler" : "Cancel"}</Button>
+            <Button variant="destructive" onClick={() => confirmDelete && handleDelete(confirmDelete)}>
               {fr ? "Supprimer" : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Confirmation suppression acte ──────────────────────── */}
-      <Dialog open={!!confirmDeleteActe} onOpenChange={o => !o && setConfirmDeleteActe(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-destructive">
-              {fr ? "Supprimer cet acte ?" : "Delete this act?"}
-            </DialogTitle>
-            <DialogDescription>
-              {fr
-                ? `L'acte « ${confirmDeleteActe?.label} » sera définitivement supprimé du catalogue. Cette action est irréversible.`
-                : `The act "${confirmDeleteActe?.label}" will be permanently removed from the catalogue. This action cannot be undone.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteActe(null)}>
-              {fr ? "Annuler" : "Cancel"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => confirmDeleteActe && deleteActe(confirmDeleteActe.catIdx, confirmDeleteActe.acteIdx)}
-            >
-              {fr ? "Supprimer" : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Confirmation suppression étape ─────────────────────── */}
-      <Dialog open={!!confirmDeleteStep} onOpenChange={o => !o && setConfirmDeleteStep(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-destructive">
-              {fr ? "Supprimer cette étape ?" : "Delete this step?"}
-            </DialogTitle>
-            <DialogDescription>
-              {fr
-                ? `L'étape « ${confirmDeleteStep?.label} » sera supprimée du workflow de cet acte. Cette action est irréversible.`
-                : `The step "${confirmDeleteStep?.label}" will be removed from this act's workflow. This action cannot be undone.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteStep(null)}>
-              {fr ? "Annuler" : "Cancel"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => confirmDeleteStep && deleteStep(confirmDeleteStep.acteLabel, confirmDeleteStep.idx)}
-            >
-              {fr ? "Supprimer" : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
-
