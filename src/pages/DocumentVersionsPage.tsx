@@ -2,7 +2,7 @@
 // Page Historique des Versions — /documents/:documentId/versions
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { mockDocuments } from "@/data/documentsData";
 import type { DocumentVersion, DocumentStatus } from "@/types/documents";
-import VersionPanel from "@/components/documents/VersionPanel";
+const VersionPanel = lazy(() => import("@/components/documents/VersionPanel"));
 
 // ─── Utilitaires ──────────────────────────────────────────────
 
@@ -160,16 +160,18 @@ export default function DocumentVersionsPage() {
         </div>
 
         {/* Timeline des versions */}
-        <VersionPanel
-          versions={versions}
-          currentVersionId={currentVersionId}
-          onRestore={handleRestore}
-          onCompare={handleCompare}
-          onDownload={handleDownload}
-          externalCreateOpen={createModalOpen}
-          onExternalCreateClose={() => setCreateModalOpen(false)}
-          onVersionsChange={handleVersionsChange}
-        />
+        <Suspense fallback={<div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Chargement des versions…</div>}>
+          <VersionPanel
+            versions={versions}
+            currentVersionId={currentVersionId}
+            onRestore={handleRestore}
+            onCompare={handleCompare}
+            onDownload={handleDownload}
+            externalCreateOpen={createModalOpen}
+            onExternalCreateClose={() => setCreateModalOpen(false)}
+            onVersionsChange={handleVersionsChange}
+          />
+        </Suspense>
       </div>
     </div>
   );

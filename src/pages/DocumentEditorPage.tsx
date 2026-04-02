@@ -4,7 +4,7 @@
 // panel droit (collaborateurs, commentaires, activité, versions)
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -80,7 +80,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { mockDocuments } from "@/data/documentsData";
-import VersionPanel from "@/components/documents/VersionPanel";
+const VersionPanel = lazy(() => import("@/components/documents/VersionPanel"));
 import type {
   NotarioDocument,
   DocumentStatus,
@@ -2139,31 +2139,33 @@ export default function DocumentEditorPage() {
                       Voir tout
                     </Button>
                   </div>
-                  <VersionPanel
-                    versions={panelVersions}
-                    currentVersionId={currentVersionId}
-                    onRestore={(v) => {
-                      setCurrentVersionId(v.id);
-                      setDoc((prev) =>
-                        prev ? { ...prev, currentVersion: v } : prev
-                      );
-                      toast.success(`Version ${v.versionLabel} restaurée`);
-                    }}
-                    onCompare={() => {}}
-                    onDownload={(v) => {
-                      const blob = new Blob([v.content], {
-                        type: "text/html",
-                      });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `v${v.versionLabel}.html`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    showCreateButton
-                    onVersionsChange={(updated) => setPanelVersions(updated)}
-                  />
+                  <Suspense fallback={<div className="flex items-center justify-center py-8 text-xs text-muted-foreground">Chargement…</div>}>
+                    <VersionPanel
+                      versions={panelVersions}
+                      currentVersionId={currentVersionId}
+                      onRestore={(v) => {
+                        setCurrentVersionId(v.id);
+                        setDoc((prev) =>
+                          prev ? { ...prev, currentVersion: v } : prev
+                        );
+                        toast.success(`Version ${v.versionLabel} restaurée`);
+                      }}
+                      onCompare={() => {}}
+                      onDownload={(v) => {
+                        const blob = new Blob([v.content], {
+                          type: "text/html",
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `v${v.versionLabel}.html`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      showCreateButton
+                      onVersionsChange={(updated) => setPanelVersions(updated)}
+                    />
+                  </Suspense>
                 </div>
               )}
             </div>

@@ -4,7 +4,7 @@
 // tags, quota stockage, accès rapide, versions, filtres avancés
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   Folder, FileText, Image, File, Plus, Upload, FolderInput,
   Search, List, MoreVertical, Download, Pencil, Share2, MoveRight,
@@ -13,6 +13,7 @@ import {
   AlertTriangle, HardDrive, Edit3, SlidersHorizontal, Tag,
   RotateCcw, Flame, Lock, Clock, Bookmark, BarChart2,
   Video, Music, FileSpreadsheet, FileCode,
+  Keyboard, AlignJustify, FolderOpen, Rows3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -151,6 +152,29 @@ function parseFrDate(s: string): number {
   return new Date(year, month - 1, day).getTime();
 }
 
+function formatSize(label: string | undefined): string {
+  if (!label) return '—';
+  const n = parseFloat(label);
+  if (isNaN(n)) return label;
+  if (n >= 1000) return `${(n / 1000).toFixed(2)} Go`;
+  if (n < 0.1)   return `${Math.round(n * 1000)} Ko`;
+  return `${n.toFixed(1)} Mo`;
+}
+
+function relativeTime(dateStr: string): string {
+  const ts = parseFrDate(dateStr);
+  if (!ts) return dateStr;
+  const diffMs  = Date.now() - ts;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH   = Math.floor(diffMs / 3600000);
+  const diffD   = Math.floor(diffMs / 86400000);
+  if (diffMin < 1)  return "À l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  if (diffH   < 24) return `Il y a ${diffH} h`;
+  if (diffD   < 7)  return `Il y a ${diffD} j`;
+  return dateStr;
+}
+
 // ─── FilterChip ─────────────────────────────────────────────────
 
 interface FilterChipProps { label: string; active: boolean; children: React.ReactNode; }
@@ -193,9 +217,11 @@ function TagBadge({ tag, onRemove }: { tag: DriveTag; onRemove?: () => void }) {
 export default function ArchivesNumeriques() {
   useLanguage();
 
-  const fileInputRef    = useRef<HTMLInputElement>(null);
-  const folderInputRef  = useRef<HTMLInputElement>(null);
-  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef        = useRef<HTMLInputElement>(null);
+  const folderInputRef      = useRef<HTMLInputElement>(null);
+  const replaceInputRef     = useRef<HTMLInputElement>(null);
+  const ctxImportInputRef   = useRef<HTMLInputElement>(null);
+  const [ctxImportTarget, setCtxImportTarget] = useState<DriveItem | null>(null);
 
   useEffect(() => { folderInputRef.current?.setAttribute('webkitdirectory', ''); }, []);
 
@@ -204,7 +230,7 @@ export default function ArchivesNumeriques() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumb, setBreadcrumb]           = useState<{ id: string; name: string }[]>([]);
   const [selected, setSelected]               = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode]               = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode]               = useState<'grid' | 'list' | 'compact'>('grid');
   const [search, setSearch]                   = useState('');
   const [dragging, setDragging]               = useState(false);
   const [importing, setImporting]             = useState(false);
@@ -238,6 +264,16 @@ export default function ArchivesNumeriques() {
   const [bulkStatusItem, setBulkStatusItem] = useState<DriveItem[] | null>(null);
   const [bulkNewStatus, setBulkNewStatus]   = useState<DocStatus>('Indexé');
 
+  // ─── Nouveaux états (améliorations DMS) ───────────────────
+  const [panelItem, setPanelItem]           = useState<DriveItem | null>(null);
+  const [isDragOver, setIsDragOver]         = useState(false);
+  const [showShortcuts, setShowShortcuts]   = useState(false);
+
+  // ─── Import avec choix de destination ────────────────────
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [showImportDest, setShowImportDest]       = useState(false);
+  const [importNewFolder, setImportNewFolder]     = useState('');
+
   // ─── Audit ────────────────────────────────────────────────
 
   const audit = (action: string, detail: string) =>
@@ -246,17 +282,7 @@ export default function ArchivesNumeriques() {
       date: new Date().toLocaleString('fr-FR'),
     }, ...prev]);
 
-  // ─── Quota (simulé) ────────────────────────────────────────
-  const usedGb   = useMemo(() => {
-    const totalMo = items.filter(i => i.type === 'file' && !i.isDeleted)
-      .reduce((acc, f) => acc + parseFloat(f.sizeLabel ?? '0'), 0);
-    return (totalMo / 1000).toFixed(2);
-  }, [items]);
-  const totalGb  = 15;
-  const usedPct  = Math.min(100, Math.round((parseFloat(usedGb) / totalGb) * 100));
-
-  // ─── Items courants (drive ou corbeille) ───────────────────
-
+  // ─── Items courants (drive ou corbeille) — déclaré ici pour les raccourcis ─
   const currentItems = useMemo(() => {
     let base = showTrash
       ? items.filter(i => i.isDeleted)
@@ -294,6 +320,42 @@ export default function ArchivesNumeriques() {
 
     return sorted;
   }, [items, currentFolderId, search, filterType, filterStatus, filterDate, filterTag, sortBy, showTrash]);
+
+  // ─── Raccourcis clavier ────────────────────────────────────
+  const handleKeyboard = useCallback((e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'Escape') {
+      setPanelItem(null);
+      setSelected(new Set());
+    } else if (e.key === 'n' || e.key === 'N') {
+      if (!showTrash) { setNewFolderName(''); setShowNewFolder(true); }
+    } else if (e.key === 'u' || e.key === 'U') {
+      if (!showTrash) fileInputRef.current?.click();
+    } else if (e.key === 'Delete') {
+      if (selected.size > 0 && !showTrash) {
+        [...selected].forEach(id => { const it = items.find(i => i.id === id); if (it) softDelete(it); });
+        setSelected(new Set());
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
+      setSelected(new Set(currentItems.map(i => i.id)));
+    }
+  }, [showTrash, selected, items, currentItems]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyboard);
+    return () => document.removeEventListener('keydown', handleKeyboard);
+  }, [handleKeyboard]);
+
+  // ─── Quota (simulé) ────────────────────────────────────────
+  const usedGb   = useMemo(() => {
+    const totalMo = items.filter(i => i.type === 'file' && !i.isDeleted)
+      .reduce((acc, f) => acc + parseFloat(f.sizeLabel ?? '0'), 0);
+    return (totalMo / 1000).toFixed(2);
+  }, [items]);
+  const totalGb  = 15;
+  const usedPct  = Math.min(100, Math.round((parseFloat(usedGb) / totalGb) * 100));
 
   const folders      = currentItems.filter(i => i.type === 'folder');
   const files        = currentItems.filter(i => i.type === 'file');
@@ -456,8 +518,50 @@ export default function ArchivesNumeriques() {
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    importFile(f);
+    setPendingImportFile(f);
+    setImportNewFolder('');
+    setShowImportDest(true);
     if (e.target) e.target.value = '';
+  };
+
+  const confirmImport = () => {
+    if (!pendingImportFile) return;
+    let targetParentId = currentFolderId;
+    if (importNewFolder.trim()) {
+      const folderId = `f-${Date.now()}`;
+      const folder: DriveItem = {
+        id: folderId, name: importNewFolder.trim(), type: 'folder',
+        parentId: currentFolderId, modifiedAt: nowLabel(), owner: 'Me Diallo',
+      };
+      setItems(prev => [folder, ...prev]);
+      audit('Nouveau dossier', `Dossier « ${importNewFolder.trim()} » créé`);
+      targetParentId = folderId;
+    }
+    setImporting(true);
+    setTimeout(() => {
+      const file = pendingImportFile;
+      const item: DriveItem = {
+        id: `d-${Date.now()}`, name: file.name, type: 'file',
+        parentId: targetParentId,
+        docType: /\.pdf$/i.test(file.name) ? 'PDF'
+          : /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(file.name) ? 'Image'
+          : /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(file.name) ? 'Vidéo'
+          : /\.(mp3|wav|aac|flac|ogg|m4a|wma)$/i.test(file.name) ? 'Audio'
+          : /\.(xlsx?|csv|ods)$/i.test(file.name) ? 'Tableur'
+          : /\.(docx?|odt|rtf|txt)$/i.test(file.name) ? 'Texte'
+          : /\.(js|ts|jsx|tsx|py|java|cpp|c|html|css|json|xml)$/i.test(file.name) ? 'Code'
+          : 'Autre',
+        sizeLabel: `${(file.size / 1_000_000).toFixed(1)} Mo`,
+        statut: 'En traitement', modifiedAt: nowLabel(), owner: 'Me Diallo', version: 1,
+      };
+      setItems(prev => [item, ...prev]);
+      audit('Import', `« ${file.name} » importé${importNewFolder.trim() ? ` dans « ${importNewFolder.trim()} »` : ''}`);
+      setImporting(false);
+      toast.success(`« ${file.name} » importé${importNewFolder.trim() ? ` dans « ${importNewFolder.trim()} »` : ''}`);
+    }, 600);
+    setShowImportDest(false);
+    setPendingImportFile(null);
+    setImportNewFolder('');
   };
 
   const handleImportFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -468,6 +572,34 @@ export default function ArchivesNumeriques() {
     audit('Import dossier', `« ${folderName} » — ${files.length} fichier(s)`);
     toast.success(`Dossier « ${folderName} » importé (${files.length} fichier${files.length > 1 ? 's' : ''})`);
     if (e.target) e.target.value = '';
+  };
+
+  const handleCtxImportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !ctxImportTarget) return;
+    files.forEach(file => {
+      const item: DriveItem = {
+        id: `d-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: file.name, type: 'file',
+        parentId: ctxImportTarget.id,
+        docType: /\.pdf$/i.test(file.name) ? 'PDF'
+          : /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/i.test(file.name) ? 'Image'
+          : /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i.test(file.name) ? 'Vidéo'
+          : /\.(mp3|wav|aac|flac|ogg|m4a|wma)$/i.test(file.name) ? 'Audio'
+          : /\.(xlsx?|csv|ods)$/i.test(file.name) ? 'Tableur'
+          : /\.(docx?|odt|rtf|txt)$/i.test(file.name) ? 'Texte'
+          : 'Autre',
+        sizeLabel: `${(file.size / 1_000_000).toFixed(1)} Mo`,
+        statut: 'En traitement', modifiedAt: nowLabel(), owner: 'Me Diallo', version: 1,
+      };
+      setItems(prev => [item, ...prev]);
+      audit('Import', `« ${file.name} » → « ${ctxImportTarget.name} »`);
+    });
+    toast.success(files.length === 1
+      ? `« ${files[0].name} » importé dans « ${ctxImportTarget.name} »`
+      : `${files.length} fichiers importés dans « ${ctxImportTarget.name} »`
+    );
+    if (e.target) e.target.value = '';
+    setCtxImportTarget(null);
   };
 
   const handleReplaceFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -485,7 +617,7 @@ export default function ArchivesNumeriques() {
   // ─── Drag & Drop ───────────────────────────────────────────
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setDragging(false);
+    e.preventDefault(); setDragging(false); setIsDragOver(false);
     Array.from(e.dataTransfer.files).forEach(importFile);
   };
 
@@ -503,8 +635,13 @@ export default function ArchivesNumeriques() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {item.type === 'file' && (
-          <DropdownMenuItem onClick={() => setPreviewItem(item)}>
+          <DropdownMenuItem onClick={() => setPanelItem(item)}>
             <Eye className="h-4 w-4 mr-2" /> Aperçu
+          </DropdownMenuItem>
+        )}
+        {item.type === 'folder' && (
+          <DropdownMenuItem onClick={() => { setCtxImportTarget(item); ctxImportInputRef.current?.click(); }}>
+            <Upload className="h-4 w-4 mr-2" /> Importer des fichiers
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => download(item)}>
@@ -683,13 +820,18 @@ export default function ArchivesNumeriques() {
         {/* Aperçu */}
         <div
           className="h-24 flex flex-col items-center justify-center bg-muted/30 border-b border-border gap-1 cursor-zoom-in relative"
-          onClick={e => { e.stopPropagation(); setPreviewItem(file); }}
+          onClick={e => { e.stopPropagation(); setPanelItem(file); }}
         >
           <IconComp className={cn('h-10 w-10', hasErr ? 'text-red-400' : 'text-muted-foreground/40')} />
           {hasErr && <AlertTriangle className="h-3.5 w-3.5 text-red-400" />}
           {(file.version ?? 1) > 1 && (
             <span className="absolute bottom-1.5 left-1.5 text-[9px] bg-muted text-muted-foreground px-1 rounded font-mono">
               v{file.version}
+            </span>
+          )}
+          {file.docType === 'PDF' && file.statut === 'Indexé' && (
+            <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold px-1 py-px rounded bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400 leading-tight">
+              OCR
             </span>
           )}
         </div>
@@ -715,14 +857,16 @@ export default function ArchivesNumeriques() {
 
   // ─── Ligne liste ───────────────────────────────────────────
 
-  const ItemRow = ({ item }: { item: DriveItem }) => {
+  const ItemRow = ({ item, compact = false }: { item: DriveItem; compact?: boolean }) => {
     const isSel    = selected.has(item.id);
     const IconComp = item.type === 'folder' ? Folder : fileIconComp(item);
     const color    = item.type === 'folder' ? (item.color ?? '#94A3B8') : undefined;
     return (
       <div
-        className={cn('group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-accent/50 select-none', isSel && 'bg-primary/5')}
-        onClick={() => item.type === 'folder' ? openFolder(item) : setPreviewItem(item)}
+        className={cn('group flex items-center gap-3 px-3 rounded-lg cursor-pointer hover:bg-accent/50 select-none',
+          compact ? 'py-1' : 'py-2',
+          isSel && 'bg-primary/5')}
+        onClick={() => item.type === 'folder' ? openFolder(item) : setPanelItem(item)}
       >
         <div
           className={cn('h-4 w-4 rounded border-2 border-muted-foreground/40 flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity', isSel && 'opacity-100 border-primary bg-primary')}
@@ -737,6 +881,9 @@ export default function ArchivesNumeriques() {
           {item.tags?.slice(0, 2).map(tag => <TagBadge key={tag} tag={tag} />)}
         </div>
         {item.starred && <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 shrink-0" />}
+        {item.type === 'file' && item.docType === 'PDF' && item.statut === 'Indexé' && (
+          <span className="text-[9px] font-bold px-1 py-px rounded bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400 shrink-0 hidden sm:block">OCR</span>
+        )}
         {item.type === 'file' && item.statut && (
           <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0', STATUS_STYLES[item.statut])}>
             {item.statut}
@@ -763,8 +910,8 @@ export default function ArchivesNumeriques() {
   return (
     <div
       className="flex flex-col h-full min-h-0 bg-background"
-      onDragOver={e => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
+      onDragOver={e => { e.preventDefault(); setDragging(true); setIsDragOver(true); }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) { setDragging(false); setIsDragOver(false); } }}
       onDrop={handleDrop}
     >
       {/* ── Barre stockage + statistiques ── */}
@@ -827,6 +974,9 @@ export default function ArchivesNumeriques() {
         <div className="flex items-center gap-0.5 shrink-0">
           <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')} title="Vue liste">
             <List className="h-4 w-4" />
+          </Button>
+          <Button variant={viewMode === 'compact' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('compact')} title="Vue compacte">
+            <Rows3 className="h-4 w-4" />
           </Button>
           <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')} title="Vue grille">
             <LayoutGrid className="h-4 w-4" />
@@ -1023,103 +1173,276 @@ export default function ArchivesNumeriques() {
       })()}
 
       {/* Inputs cachés */}
-      <input ref={fileInputRef}    type="file"          className="hidden" onChange={handleImportFile} accept="*/*" />
-      <input ref={folderInputRef}  type="file" multiple className="hidden" onChange={handleImportFolder} />
-      <input ref={replaceInputRef} type="file"          className="hidden" onChange={handleReplaceFile} />
+      <input ref={fileInputRef}      type="file"          className="hidden" onChange={handleImportFile} accept="*/*" />
+      <input ref={folderInputRef}    type="file" multiple className="hidden" onChange={handleImportFolder} />
+      <input ref={replaceInputRef}   type="file"          className="hidden" onChange={handleReplaceFile} />
+      <input ref={ctxImportInputRef} type="file" multiple className="hidden" onChange={handleCtxImportFiles} accept="*/*" />
 
       {/* ── Overlay drag & drop ── */}
-      {dragging && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm border-4 border-dashed border-primary rounded-xl pointer-events-none">
-          <div className="flex flex-col items-center gap-3 text-primary">
-            <Upload className="h-12 w-12" />
-            <p className="text-lg font-semibold">Déposez vos fichiers ici</p>
-            <p className="text-sm text-muted-foreground">Ils seront importés dans le dossier courant</p>
+      {isDragOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-50/90 dark:bg-blue-950/80 backdrop-blur-sm border-4 border-dashed border-blue-500 rounded-xl pointer-events-none">
+          <div className="flex flex-col items-center gap-3 text-blue-600 dark:text-blue-400">
+            <Upload className="h-14 w-14" />
+            <p className="text-xl font-bold">Déposez vos fichiers ici</p>
+            <p className="text-sm opacity-80">Ils seront importés dans le dossier courant</p>
           </div>
         </div>
       )}
 
-      {/* ── Contenu ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+      {/* ── Contenu principal + panneau latéral ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Accès rapide (racine, hors corbeille, si des favoris existent) */}
-        {!showTrash && !currentFolderId && !search && activeFilterCount === 0 && quickAccessItems.length > 0 && (
-          <section>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" /> Accès rapide
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {quickAccessItems.map(f => (
-                <div
-                  key={f.id}
-                  className="group relative flex items-center gap-2.5 rounded-xl border bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/60 dark:border-amber-700/30 px-3 py-2.5 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
-                  onClick={() => openFolder(f)}
-                >
-                  <Folder className="h-6 w-6 shrink-0" style={{ color: f.color ?? '#F59E0B', fill: f.color ?? '#F59E0B', fillOpacity: 0.18 }} />
-                  <p className="text-xs font-medium truncate">{f.name}</p>
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400 ml-auto shrink-0" />
+        {/* Zone de contenu scrollable */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 min-w-0">
+
+          {/* Accès rapide (racine, hors corbeille, si des favoris existent) */}
+          {!showTrash && !currentFolderId && !search && activeFilterCount === 0 && quickAccessItems.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" /> Accès rapide
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {quickAccessItems.map(f => (
+                  <div
+                    key={f.id}
+                    className="group relative flex items-center gap-2.5 rounded-xl border bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/60 dark:border-amber-700/30 px-3 py-2.5 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
+                    onClick={() => openFolder(f)}
+                  >
+                    <Folder className="h-6 w-6 shrink-0" style={{ color: f.color ?? '#F59E0B', fill: f.color ?? '#F59E0B', fillOpacity: 0.18 }} />
+                    <p className="text-xs font-medium truncate">{f.name}</p>
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400 ml-auto shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!hasContent ? (
+            /* ── État vide illustré ── */
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <div className={cn(
+                'h-28 w-28 rounded-3xl flex items-center justify-center mb-6 shadow-inner',
+                showTrash ? 'bg-red-50 dark:bg-red-950/30' :
+                search ? 'bg-blue-50 dark:bg-blue-950/30' :
+                activeFilterCount > 0 ? 'bg-amber-50 dark:bg-amber-950/30' :
+                'bg-muted/60'
+              )}>
+                {showTrash
+                  ? <Trash2 className="h-12 w-12 text-red-300 dark:text-red-700" />
+                  : search
+                  ? <Search className="h-12 w-12 text-blue-300 dark:text-blue-700" />
+                  : activeFilterCount > 0
+                  ? <SlidersHorizontal className="h-12 w-12 text-amber-400 dark:text-amber-600" />
+                  : <FolderOpen className="h-12 w-12 text-muted-foreground/30" />
+                }
+              </div>
+              <p className="text-base font-semibold mb-1">
+                {showTrash ? 'La corbeille est vide'
+                 : search ? `Aucun résultat pour « ${search} »`
+                 : activeFilterCount > 0 ? 'Aucun élément ne correspond aux filtres'
+                 : 'Ce dossier est vide'}
+              </p>
+              <p className="text-xs opacity-60 text-center max-w-xs">
+                {showTrash ? 'Les fichiers supprimés apparaissent ici avant suppression définitive.'
+                 : search ? 'Vérifiez l\'orthographe ou essayez un autre terme de recherche.'
+                 : activeFilterCount > 0 ? 'Modifiez ou réinitialisez les filtres actifs pour voir plus d\'éléments.'
+                 : 'Glissez des fichiers ici ou utilisez le bouton « Nouveau » pour commencer.'}
+              </p>
+              {!search && activeFilterCount === 0 && !showTrash && (
+                <Button size="sm" className="mt-5 gap-1.5" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" /> Importer un fichier
+                </Button>
+              )}
+              {activeFilterCount > 0 && (
+                <Button variant="outline" size="sm" className="mt-4 gap-1.5"
+                  onClick={() => { setFilterType('all'); setFilterStatus('all'); setFilterDate('all'); setFilterTag('all'); setSortBy('name-asc'); }}>
+                  <X className="h-3.5 w-3.5" /> Réinitialiser les filtres
+                </Button>
+              )}
+              {search && (
+                <Button variant="outline" size="sm" className="mt-4 gap-1.5" onClick={() => setSearch('')}>
+                  <X className="h-3.5 w-3.5" /> Effacer la recherche
+                </Button>
+              )}
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="space-y-6">
+              {folders.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    {showTrash ? 'Dossiers dans la corbeille' : 'Dossiers'}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {folders.map(f => <FolderCard key={f.id} folder={f} />)}
+                  </div>
+                </section>
+              )}
+              {files.length > 0 && (
+                <section>
+                  <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                    {showTrash ? 'Fichiers dans la corbeille' : 'Fichiers'}
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    {files.map(f => <FileCard key={f.id} file={f} />)}
+                  </div>
+                </section>
+              )}
+            </div>
+          ) : (
+            /* Vue liste + vue compacte */
+            <div>
+              <div className="flex items-center gap-3 px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
+                <div className="w-4 shrink-0" /><div className="w-5 shrink-0" />
+                <span className="flex-1">Nom</span>
+                <span className="hidden sm:block w-16">OCR</span>
+                <span className="hidden lg:block w-28">Étiquettes</span>
+                <span className="hidden sm:block w-24">Propriétaire</span>
+                <span className="hidden md:block w-28 text-right">Modifié</span>
+                <span className="w-14 text-right">Taille</span>
+                <div className="w-7 shrink-0" />
+              </div>
+              {[...folders, ...files].map(i => (
+                <ItemRow key={i.id} item={i} compact={viewMode === 'compact'} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Panneau latéral d'aperçu ── */}
+        {panelItem && (
+          <aside className="w-72 shrink-0 border-l border-border bg-card flex flex-col overflow-y-auto">
+            {/* En-tête du panneau */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <span className="text-sm font-semibold truncate flex-1 mr-2">{panelItem.name}</span>
+              <button
+                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors shrink-0"
+                onClick={() => setPanelItem(null)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Zone d'aperçu simulée */}
+            <div className="mx-4 mt-4 rounded-xl border border-border bg-muted/30 h-40 flex flex-col items-center justify-center gap-2 shrink-0">
+              {(() => {
+                const I = fileIconComp(panelItem);
+                return <I className="h-12 w-12 text-muted-foreground/25" />;
+              })()}
+              <p className="text-[11px] text-muted-foreground text-center px-3">Aperçu non disponible</p>
+              {panelItem.docType === 'PDF' && panelItem.statut === 'Indexé' && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400">
+                  OCR indexé
+                </span>
+              )}
+            </div>
+
+            {/* Métadonnées */}
+            <div className="px-4 py-3 space-y-3 flex-1">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Informations</p>
+                <dl className="space-y-1.5 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Type</dt>
+                    <dd className="font-medium text-right">{panelItem.docType ?? '—'}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Taille</dt>
+                    <dd className="font-medium text-right">{formatSize(panelItem.sizeLabel)}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Version</dt>
+                    <dd className="font-medium text-right font-mono">v{panelItem.version ?? 1}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Statut</dt>
+                    <dd>
+                      {panelItem.statut && (
+                        <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', STATUS_STYLES[panelItem.statut])}>
+                          {panelItem.statut}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Propriétaire</dt>
+                    <dd className="font-medium text-right">{panelItem.owner}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="text-muted-foreground shrink-0">Modifié</dt>
+                    <dd className="font-medium text-right">{panelItem.modifiedAt}</dd>
+                  </div>
+                  {panelItem.client && (
+                    <div className="flex items-start justify-between gap-2">
+                      <dt className="text-muted-foreground shrink-0">Client</dt>
+                      <dd className="font-medium text-right truncate max-w-[130px]">{panelItem.client}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+
+              {panelItem.tags && panelItem.tags.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Étiquettes</p>
+                  <div className="flex flex-wrap gap-1">
+                    {panelItem.tags.map(tag => <TagBadge key={tag} tag={tag} />)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Boutons d'action */}
+            <div className="px-4 pb-4 pt-2 border-t border-border space-y-2">
+              <Button size="sm" className="w-full gap-1.5 justify-start" onClick={() => { setPreviewItem(panelItem); }}>
+                <Eye className="h-3.5 w-3.5" /> Ouvrir l'aperçu
+              </Button>
+              <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start" onClick={() => download(panelItem)}>
+                <Download className="h-3.5 w-3.5" /> Télécharger
+              </Button>
+              <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start" onClick={() => setShareItem(panelItem)}>
+                <Share2 className="h-3.5 w-3.5" /> Partager
+              </Button>
+              <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start text-destructive hover:text-destructive"
+                onClick={() => { setDeleteItem(panelItem); setDeleteReason(''); setPanelItem(null); }}>
+                <Trash2 className="h-3.5 w-3.5" /> Mettre à la corbeille
+              </Button>
+            </div>
+          </aside>
+        )}
+
+        {/* ── Barre latérale activité (sidebar droite quand pas de panneau) ── */}
+        {!panelItem && auditLog.length > 0 && (
+          <aside className="w-56 shrink-0 border-l border-border bg-card/50 flex flex-col overflow-y-auto hidden xl:flex">
+            <div className="px-3 py-3 border-b border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <History className="h-3 w-3" /> Activité récente
+              </p>
+            </div>
+            <div className="flex-1 px-3 py-3 space-y-3 overflow-y-auto">
+              {auditLog.slice(0, 5).map((entry, idx) => (
+                <div key={entry.id} className="flex items-start gap-2 text-xs relative">
+                  {idx < Math.min(4, auditLog.length - 1) && (
+                    <div className="absolute left-[7px] top-5 bottom-0 w-px bg-border" />
+                  )}
+                  <div className="h-3.5 w-3.5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5 z-10">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground leading-snug truncate">{entry.action}</p>
+                    <p className="text-muted-foreground truncate text-[10px] leading-snug">{entry.detail}</p>
+                    <p className="text-muted-foreground text-[10px] mt-0.5">{entry.date.split(' ').slice(0, 2).join(' ')}</p>
+                  </div>
                 </div>
               ))}
             </div>
-          </section>
-        )}
-
-        {!hasContent ? (
-          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-            <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-              {showTrash ? <Trash2 className="h-9 w-9 opacity-30" /> : <Upload className="h-9 w-9 opacity-30" />}
-            </div>
-            <p className="text-sm font-medium">
-              {showTrash ? 'La corbeille est vide' :
-               search ? `Aucun résultat pour « ${search} »` :
-               activeFilterCount > 0 ? 'Aucun élément ne correspond aux filtres' :
-               'Ce dossier est vide'}
-            </p>
-            {!search && activeFilterCount === 0 && !showTrash && (
-              <p className="text-xs mt-1 opacity-60">Glissez des fichiers ici ou utilisez le bouton « Nouveau »</p>
-            )}
-            {activeFilterCount > 0 && (
-              <button className="text-xs mt-2 text-primary hover:underline"
-                onClick={() => { setFilterType('all'); setFilterStatus('all'); setFilterDate('all'); setFilterTag('all'); setSortBy('name-asc'); }}>
-                Réinitialiser les filtres
+            <div className="px-3 pb-3">
+              <button
+                className="w-full text-[10px] text-muted-foreground hover:text-foreground text-center transition-colors"
+                onClick={() => setShowAudit(true)}
+              >
+                Voir tout le journal →
               </button>
-            )}
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="space-y-6">
-            {folders.length > 0 && (
-              <section>
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  {showTrash ? 'Dossiers dans la corbeille' : 'Dossiers'}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {folders.map(f => <FolderCard key={f.id} folder={f} />)}
-                </div>
-              </section>
-            )}
-            {files.length > 0 && (
-              <section>
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  {showTrash ? 'Fichiers dans la corbeille' : 'Fichiers'}
-                </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {files.map(f => <FileCard key={f.id} file={f} />)}
-                </div>
-              </section>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div className="flex items-center gap-3 px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border mb-1">
-              <div className="w-4 shrink-0" /><div className="w-5 shrink-0" />
-              <span className="flex-1">Nom</span>
-              <span className="hidden lg:block w-28">Étiquettes</span>
-              <span className="hidden sm:block w-24">Propriétaire</span>
-              <span className="hidden md:block w-28 text-right">Modifié</span>
-              <span className="w-14 text-right">Taille</span>
-              <div className="w-7 shrink-0" />
             </div>
-            {[...folders, ...files].map(i => <ItemRow key={i.id} item={i} />)}
-          </div>
+          </aside>
         )}
       </div>
 
@@ -1133,6 +1456,57 @@ export default function ArchivesNumeriques() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowNewFolder(false)}>Annuler</Button>
             <Button onClick={createFolder} disabled={!newFolderName.trim()}>Créer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Destination d'import */}
+      <Dialog open={showImportDest} onOpenChange={o => { setShowImportDest(o); if (!o) setPendingImportFile(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-4 w-4 text-primary" />
+              Importer un fichier
+            </DialogTitle>
+            <DialogDescription className="truncate text-xs">
+              {pendingImportFile?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            {/* Emplacement actuel */}
+            <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
+              <p className="text-xs text-muted-foreground mb-0.5">Emplacement actuel</p>
+              <p className="font-medium truncate">
+                {breadcrumb.length > 0 ? breadcrumb.map(b => b.name).join(' / ') : 'Racine'}
+              </p>
+            </div>
+            {/* Option: nouveau dossier */}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Créer un nouveau dossier <span className="text-muted-foreground font-normal">(optionnel)</span></Label>
+              <div className="flex items-center gap-2">
+                <FolderPlus className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  placeholder="Nom du nouveau dossier…"
+                  value={importNewFolder}
+                  onChange={e => setImportNewFolder(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && pendingImportFile && confirmImport()}
+                />
+              </div>
+              {importNewFolder.trim() && (
+                <p className="text-xs text-muted-foreground pl-6">
+                  Le fichier sera ajouté dans ce nouveau dossier.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setShowImportDest(false); setPendingImportFile(null); }}>
+              Annuler
+            </Button>
+            <Button onClick={confirmImport} disabled={!pendingImportFile}>
+              <Upload className="h-4 w-4 mr-1.5" />
+              Importer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1436,6 +1810,53 @@ export default function ArchivesNumeriques() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Raccourcis clavier */}
+      <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Keyboard className="h-5 w-5" /> Raccourcis clavier
+            </DialogTitle>
+            <DialogDescription>Accédez rapidement aux fonctions principales</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            {[
+              { keys: ['N'],       desc: 'Nouveau dossier' },
+              { keys: ['U'],       desc: 'Importer un fichier' },
+              { keys: ['Del'],     desc: 'Supprimer la sélection' },
+              { keys: ['Ctrl', 'A'], desc: 'Tout sélectionner' },
+              { keys: ['Esc'],     desc: 'Fermer le panneau / Désélectionner' },
+            ].map(({ keys, desc }) => (
+              <div key={desc} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <span className="text-sm text-foreground">{desc}</span>
+                <div className="flex items-center gap-1">
+                  {keys.map((k, i) => (
+                    <span key={k} className="flex items-center gap-1">
+                      <kbd className="inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded border border-border bg-muted text-xs font-mono font-medium shadow-sm">
+                        {k}
+                      </kbd>
+                      {i < keys.length - 1 && <span className="text-muted-foreground text-xs">+</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowShortcuts(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bouton flottant raccourcis */}
+      <button
+        className="fixed bottom-6 right-6 z-40 h-8 w-8 rounded-full border border-border bg-card shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all hover:scale-110"
+        title="Raccourcis clavier"
+        onClick={() => setShowShortcuts(true)}
+      >
+        <span className="text-sm font-bold leading-none">?</span>
+      </button>
     </div>
   );
 }

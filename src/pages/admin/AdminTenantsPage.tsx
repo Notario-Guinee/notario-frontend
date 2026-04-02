@@ -135,7 +135,7 @@ function LogoPicker({
       <div className="flex items-center gap-3">
         <div className="h-16 w-16 rounded-xl border-2 border-dashed border-border bg-muted/40 flex items-center justify-center overflow-hidden shrink-0">
           {displaySrc ? (
-            <img src={displaySrc} alt="Logo" className="h-full w-full object-cover rounded-xl" />
+            <img src={displaySrc} alt="Logo" loading="lazy" className="h-full w-full object-cover rounded-xl" />
           ) : (
             <Building2 className="h-6 w-6 text-muted-foreground/50" />
           )}
@@ -576,7 +576,7 @@ export default function AdminTenantsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     {t.logoUrl
-                      ? <img src={t.logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover border border-border" />
+                      ? <img src={t.logoUrl} alt="" loading="lazy" className="h-8 w-8 rounded-lg object-cover border border-border" />
                       : <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="h-4 w-4 text-primary/60" /></div>
                     }
                     <div>
@@ -829,7 +829,7 @@ export default function AdminTenantsPage() {
                 <div className="relative flex items-center gap-5">
                   {viewingTenant.logoUrl || viewConfig?.logoUrl ? (
                     <img src={viewingTenant.logoUrl ?? viewConfig?.logoUrl ?? ""} alt="Logo"
-                      className="h-20 w-20 rounded-2xl object-cover border-2 border-white/20 shadow-xl" />
+                      loading="lazy" className="h-20 w-20 rounded-2xl object-cover border-2 border-white/20 shadow-xl" />
                   ) : (
                     <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 border-2 border-white/20 backdrop-blur-sm">
                       <Building2 className="h-9 w-9 text-white/70" />

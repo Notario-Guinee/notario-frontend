@@ -4,12 +4,12 @@
 // gestion des parties prenantes, filtres, export CSV/PDF
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { searchMatch } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
-import { Plus, Download, Search, FolderOpen, Clock, PenLine, CheckCircle2, DollarSign, MoreHorizontal, X, Trash2, Edit, FileText, List, LayoutGrid, Archive, Receipt, UserPlus, Users, FileDown, CalendarDays, Upload, GitBranch, FileSignature } from "lucide-react";
+import { Plus, Download, Search, FolderOpen, Clock, PenLine, CheckCircle2, DollarSign, MoreHorizontal, X, Trash2, Edit, FileText, List, LayoutGrid, Archive, Receipt, UserPlus, Users, FileDown, CalendarDays, Upload, GitBranch, FileSignature, Check as CheckIcon, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import { CATEGORIES_ACTES, TYPES_ACTE } from "@/data/constants";
 import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -40,6 +42,56 @@ const statuts: Dossier["statut"][] = ["En cours", "En signature", "En attente pi
 const priorites: Dossier["priorite"][] = ["Basse", "Normale", "Haute", "Urgente"];
 
 const PAGE_SIZE = 20;
+
+// ─── Combobox avec recherche ────────────────────────────────────
+function SearchCombobox({
+  options, value, onValueChange, placeholder = "Sélectionner…",
+  searchPlaceholder = "Rechercher…", emptyText = "Aucun résultat", disabled = false,
+}: {
+  options: string[]; value: string; onValueChange: (v: string) => void;
+  placeholder?: string; searchPlaceholder?: string; emptyText?: string; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ]       = useState("");
+  // Reset search when closed
+  useEffect(() => { if (!open) setQ(""); }, [open]);
+  const filtered = options.filter(o => o.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background",
+            "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+          )}
+        >
+          <span className={cn("truncate text-left", !value && "text-muted-foreground")}>
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" style={{ width: "var(--radix-popover-trigger-width)" }} align="start">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder={searchPlaceholder} value={q} onValueChange={setQ} />
+          <CommandEmpty>{emptyText}</CommandEmpty>
+          <CommandGroup className="max-h-56 overflow-auto">
+            {filtered.map(opt => (
+              <CommandItem key={opt} value={opt} onSelect={() => { onValueChange(opt === value ? "" : opt); setOpen(false); }}>
+                <CheckIcon className={cn("mr-2 h-4 w-4 shrink-0", value === opt ? "opacity-100" : "opacity-0")} />
+                {opt}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function ProgressBar({ value, className }: { value: number; className?: string }) {
   const color = value >= 75 ? "bg-emerald-500" : value >= 50 ? "bg-primary" : value >= 30 ? "bg-amber-500" : "bg-destructive";
@@ -1078,24 +1130,26 @@ export default function Dossiers() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>{fr ? "Catégorie d'acte *" : "Act category *"}</Label>
-              <Select value={form.categorieActe} onValueChange={v => setForm(f => ({ ...f, categorieActe: v, typeActe: "" }))}>
-                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner une catégorie" : "Select a category"} /></SelectTrigger>
-                <SelectContent>
-                  {categoriesActes.map(c => <SelectItem key={c.label} value={c.label}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchCombobox
+                options={categoriesActes.map(c => c.label)}
+                value={form.categorieActe}
+                onValueChange={v => setForm(f => ({ ...f, categorieActe: v, typeActe: "" }))}
+                placeholder={fr ? "Sélectionner une catégorie" : "Select a category"}
+                searchPlaceholder={fr ? "Rechercher une catégorie…" : "Search category…"}
+                emptyText={fr ? "Aucune catégorie trouvée" : "No category found"}
+              />
             </div>
             {form.categorieActe && (
               <div className="space-y-2">
                 <Label>{fr ? "Acte spécifique *" : "Specific act *"}</Label>
-                <Select value={form.typeActe} onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}>
-                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un acte" : "Select an act"} /></SelectTrigger>
-                  <SelectContent>
-                    {(categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchCombobox
+                  options={categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []}
+                  value={form.typeActe}
+                  onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}
+                  placeholder={fr ? "Sélectionner un acte" : "Select an act"}
+                  searchPlaceholder={fr ? "Rechercher un acte…" : "Search act…"}
+                  emptyText={fr ? "Aucun acte trouvé" : "No act found"}
+                />
               </div>
             )}
             <div className="space-y-2">
@@ -1190,24 +1244,26 @@ export default function Dossiers() {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>{fr ? "Catégorie d'acte" : "Act category"}</Label>
-              <Select value={form.categorieActe} onValueChange={v => setForm(f => ({ ...f, categorieActe: v, typeActe: "" }))}>
-                <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner une catégorie" : "Select a category"} /></SelectTrigger>
-                <SelectContent>
-                  {categoriesActes.map(c => <SelectItem key={c.label} value={c.label}>{c.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchCombobox
+                options={categoriesActes.map(c => c.label)}
+                value={form.categorieActe}
+                onValueChange={v => setForm(f => ({ ...f, categorieActe: v, typeActe: "" }))}
+                placeholder={fr ? "Sélectionner une catégorie" : "Select a category"}
+                searchPlaceholder={fr ? "Rechercher une catégorie…" : "Search category…"}
+                emptyText={fr ? "Aucune catégorie trouvée" : "No category found"}
+              />
             </div>
             {form.categorieActe && (
               <div className="space-y-2">
                 <Label>{fr ? "Acte spécifique" : "Specific act"}</Label>
-                <Select value={form.typeActe} onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}>
-                  <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un acte" : "Select an act"} /></SelectTrigger>
-                  <SelectContent>
-                    {(categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchCombobox
+                  options={categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []}
+                  value={form.typeActe}
+                  onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}
+                  placeholder={fr ? "Sélectionner un acte" : "Select an act"}
+                  searchPlaceholder={fr ? "Rechercher un acte…" : "Search act…"}
+                  emptyText={fr ? "Aucun acte trouvé" : "No act found"}
+                />
               </div>
             )}
             <div className="space-y-2">
