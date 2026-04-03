@@ -19,8 +19,11 @@ import { formatGNF, mockDossiers } from "@/data/mockData";
 import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
 import { workflowTemplates, type WorkflowConfig } from "@/components/workflow/workflow-types";
 import { useLanguage } from "@/context/LanguageContext";
-import { CATEGORIES_ACTES, type CategorieActe } from "@/data/constants";
+import { type CategorieActe } from "@/data/constants";
 import { useActeSteps } from "@/context/ActeStepsContext";
+import { typeActeService } from "@/services/typeActeService";
+import { categorieActeService, type CategorieActeDto } from "@/services/categorieActeService";
+import type { TypeActeDto } from "@/services/typeActeService";
 
 interface Acte {
   id: string;
@@ -100,57 +103,133 @@ export default function ActesSignatures() {
   // ── Steps per act (catalogue) ─────────────────────────────────
   const { acteSteps, setActeSteps, getSteps: getStepsFromContext } = useActeSteps();
   const [expandedActeSteps, setExpandedActeSteps] = useState<Set<string>>(new Set());
-  const [editingStep, setEditingStep] = useState<{ key: string; idx: number; label: string } | null>(null);
+  const [editingStep, setEditingStep] = useState<{ 
+    key: string; 
+    idx: number; 
+    label: string; 
+    description: string 
+  } | null>(null);
   const [addStepFor, setAddStepFor] = useState<string | null>(null);
   const [newStepLabel, setNewStepLabel] = useState("");
+  const [newStepDescription, setNewStepDescription] = useState("");
 
   const getSteps = (acteLabel: string) => getStepsFromContext(acteLabel);
 
   const toggleActeSteps = (key: string) => {
     setExpandedActeSteps(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
 
-  const moveStep = (acteLabel: string, idx: number, dir: -1 | 1) => {
+  /** Trouve le TypeActeDto correspondant à un libellé dans le catalogue chargé */
+  const findTypeActeByLabel = (acteLabel: string) => {
+    for (const cat of categories) {
+      const found = (cat.typesActes ?? []).find(t => (t.nom ?? t.libelle) === acteLabel);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  /** Persiste les étapes du template via PUT /api/types-actes/{id} (workflowConfigJson) */
+const persistSteps = async (acteLabel: string, steps: WorkflowStepData[]) => {
+  const dto = findTypeActeByLabel(acteLabel);
+  if (!dto?.id) return;
+  
+  console.log("=== PERSIST STEPS ===");
+  console.log("acteLabel:", acteLabel);
+  console.log("steps à sauvegarder:", steps);
+  
+  const existingType = await typeActeService.getById(dto.id);
+  
+  const workflowConfigJson = {
+    steps: steps.map((step, i) => ({
+      key: step.label.toLowerCase().replace(/\s+/g, "_"),
+      label: step.label,
+      description: step.description || "",
+      icon: "FileText",
+      time: "1 j",
+      status: "pending"
+    })),
+  };
+  
+  console.log("workflowConfigJson à envoyer:", workflowConfigJson);
+  
+  try {
+    await typeActeService.update(dto.id, { 
+      code: existingType.code,
+      nom: existingType.nom || acteLabel,
+      workflowConfigJson: JSON.stringify(workflowConfigJson)
+    });
+    console.log("✅ Sauvegarde réussie");
+  } catch (error) {
+    console.error("❌ Erreur sauvegarde:", error);
+  }
+};
+
+  const moveStep = async (acteLabel: string, idx: number, dir: -1 | 1) => {
     const steps = [...getSteps(acteLabel)];
     const target = idx + dir;
     if (target < 0 || target >= steps.length) return;
+    const stepLabel = steps[idx].label;
     [steps[idx], steps[target]] = [steps[target], steps[idx]];
     setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
+    await persistSteps(acteLabel, steps);
+    
+  
+    toast.info(fr ? `Étape "${stepLabel}" déplacée avec succès` : `Step "${stepLabel}" moved`);
   };
 
-  const renameStep = (acteLabel: string, idx: number, label: string) => {
-    if (!label.trim()) return;
-    const steps = [...getSteps(acteLabel)];
-    steps[idx] = label.trim().toUpperCase();
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-    setEditingStep(null);
+const renameStep = async (acteLabel: string, idx: number, label: string, description?: string) => {
+  if (!label.trim()) return;
+  const steps = [...getSteps(acteLabel)];
+  const oldLabel = steps[idx].label;
+  steps[idx] = {
+    label: label.trim().toUpperCase(),
+    description: description?.trim() || steps[idx].description
   };
+  setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
+  setEditingStep(null);
+  await persistSteps(acteLabel, steps);
+  
+  toast.success(fr ? `Étape renommée de "${oldLabel}" à "${label.trim().toUpperCase()}"` : `Etape mis à jour à "${oldLabel}" to "${label.trim().toUpperCase()}"`);
+};
 
   const [confirmDeleteStep, setConfirmDeleteStep] = useState<{ acteLabel: string; idx: number; label: string } | null>(null);
 
-  const deleteStep = (acteLabel: string, idx: number) => {
+  const deleteStep = async (acteLabel: string, idx: number) => {
     const steps = getSteps(acteLabel).filter((_, i) => i !== idx);
+    const deletedLabel = getSteps(acteLabel)[idx]?.label;
     setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
     setConfirmDeleteStep(null);
+    await persistSteps(acteLabel, steps);
+    
+    
+    toast.success(fr ? `Étape "${deletedLabel}" supprimée avec succès` : `Step "${deletedLabel}" deleted`);
   };
 
-  const addStep = (acteLabel: string) => {
-    if (!newStepLabel.trim()) return;
-    const steps = [...getSteps(acteLabel), newStepLabel.trim().toUpperCase()];
-    setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
-    setNewStepLabel("");
-    setAddStepFor(null);
-  };
+    const addStep = async (acteLabel: string) => {
+      if (!newStepLabel.trim()) return;
+      const steps = [...getSteps(acteLabel)];
+      steps.push({
+        label: newStepLabel.trim().toUpperCase(),
+        description: newStepDescription.trim() || undefined
+      });
+      setActeSteps(prev => ({ ...prev, [acteLabel]: steps }));
+      setNewStepLabel("");
+      setNewStepDescription("");
+      setAddStepFor(null);
+      await persistSteps(acteLabel, steps);
+      
+      toast.success(fr ? `Étape "${newStepLabel.trim().toUpperCase()}" ajoutée avec succès` : `Step "${newStepLabel.trim().toUpperCase()}" added`);
+    };
 
   // ── Catalogue state ───────────────────────────────────────────
   const [activeTab] = useState<"catalogue">("catalogue");
-  const [catalogue, setCatalogue] = useState<CategorieActe[]>(
-    CATEGORIES_ACTES.map(c => ({ ...c, actes: [...c.actes] }))
-  );
+  const [catalogue, setCatalogue] = useState<CategorieActe[]>([]);
+  const [categories, setCategories] = useState<CategorieActeDto[]>([]);
+  const [catalogueLoading, setCatalogueLoading] = useState(true);
   const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set([0]));
   const [editingCat, setEditingCat] = useState<{ idx: number; label: string } | null>(null);
   const [editingActe, setEditingActe] = useState<{ catIdx: number; acteIdx: number; label: string } | null>(null);
@@ -161,6 +240,95 @@ export default function ActesSignatures() {
 
   const selectedActe = selectedActeId ? actes.find(a => a.id === selectedActeId) || null : null;
   const setSelectedActe = (a: Acte | null) => setSelectedActeId(a?.id || null);
+
+  // ── Chargement du catalogue depuis l'API ─────────────────────
+    const loadCatalogue = async () => {
+      setCatalogueLoading(true);
+      try {
+        // Charger les catégories ET tous les types d'actes complets en parallèle
+        const [cats, allTypes] = await Promise.all([
+          categorieActeService.getActives(),
+          typeActeService.getAll()  // ← Charge les types complets avec workflowConfigJson
+        ]);
+        
+        setCategories(cats);
+        
+        // Créer un Map pour accéder rapidement aux types complets par ID
+        const typesMap = new Map<number, TypeActeDto>();
+        allTypes.forEach(t => {
+          if (t.id) typesMap.set(t.id, t);
+        });
+        
+        // Enrichir les catégories avec les types complets
+        const enrichedCats = cats.map(cat => ({
+          ...cat,
+          typesActes: (cat.typesActes ?? []).map(t => {
+            const fullType = t.id ? typesMap.get(t.id) : null;
+            return fullType || t;  // Utiliser le type complet s'il existe
+          })
+        }));
+        
+        setCategories(enrichedCats);
+        
+        // Transformer pour l'affichage catalogue (simple)
+        setCatalogue(enrichedCats.map(c => ({
+          label: c.libelle,
+          actes: (c.typesActes ?? []).map(t => t.nom ?? t.libelle ?? ""),
+        })));
+        
+        // Charger les étapes depuis workflowConfigJson des types complets
+        const stepsFromApi: Record<string, string[]> = {};
+        enrichedCats.forEach(cat => {
+          (cat.typesActes ?? []).forEach(t => {
+            const name = t.nom ?? t.libelle ?? "";
+            if (!name) return;
+            
+            // Récupérer le workflow depuis le type complet
+            const workflowConfig = t.workflowConfigJson;
+            if (!workflowConfig) return;
+            
+            try {
+              const wf = typeof workflowConfig === "string"
+                ? JSON.parse(workflowConfig)
+                : workflowConfig;
+              if (Array.isArray((wf as { steps?: string[] }).steps)) {
+                stepsFromApi[name] = (wf as { steps: string[] }).steps;
+              }
+            } catch {
+              // JSON malformé — on ignore
+            }
+          });
+        });
+        
+        if (Object.keys(stepsFromApi).length > 0) {
+          setActeSteps(prev => ({ ...prev, ...stepsFromApi }));
+        }
+        
+      } catch (error) {
+        console.error("Erreur chargement catalogue:", error);
+        toast.error(fr ? "Erreur lors du chargement du catalogue" : "Error loading catalogue");
+      } finally {
+        setCatalogueLoading(false);
+      }
+    };
+
+
+
+
+  useEffect(() => { loadCatalogue(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+
+  const saveCatalogue = async () => {
+  try {
+    // Recharger le catalogue depuis l'API pour sauvegarder les modifications
+    await loadCatalogue();
+    toast.success(fr ? "Catalogue enregistré avec succès" : "Catalogue saved successfully");
+  } catch (error) {
+    console.error("Erreur lors de la sauvegarde du catalogue:", error);
+    toast.error(fr ? "Erreur lors de la sauvegarde du catalogue" : "Error saving catalogue");
+  }
+};
 
   // All types from current catalogue (flat)
   const allTypes = catalogue.flatMap(c => c.actes);
@@ -181,42 +349,47 @@ export default function ActesSignatures() {
   };
 
   // ── Acte handlers ────────────────────────────────────────────
-  const handleCreate = () => {
-    if (!form.type) return;
-    const steps = getSteps(form.type);
-    const template = workflowTemplates[form.type] ?? workflowTemplates["Vente immobilière"];
-    const workflow: WorkflowConfig = {
-      ...(template ?? { name: form.type, description: "" }),
-      name: form.type,
-      steps: steps.map((label, i) => {
-        const existing = template?.steps[i];
-        return {
-          key: label.toLowerCase().replace(/\s+/g, "_"),
-          label,
-          description: existing?.description ?? "",
-          icon: existing?.icon ?? "FileText",
-          time: existing?.time ?? "1 j",
-          status: "pending" as const,
-          button: { actionId: `start_${label.toLowerCase()}` },
-        };
-      }),
-    };
-    const newActe: Acte = {
-      id: String(Date.now()),
-      ref: `A-${8844 + actes.length}`,
-      dossier: "N-2025-XXX",
-      dateDossier: new Date().toLocaleDateString("fr-FR"),
-      type: form.type,
-      etat: "Brouillon",
-      signataires: [],
-      montant: 0,
-      workflow,
-    };
-    setActes(prev => [newActe, ...prev]);
-    setShowCreate(false);
-    setForm({ categorieActe: "", type: "" });
-    toast.success(t("actes.toast.created"));
+const handleCreate = () => {
+  if (!form.type) return;
+  
+  // getSteps retourne maintenant des objets WorkflowStepData[]
+  const stepsData = getSteps(form.type);
+  
+  const template = workflowTemplates[form.type] ?? workflowTemplates["Vente immobilière"];
+  const workflow: WorkflowConfig = {
+    ...(template ?? { name: form.type, description: "" }),
+    name: form.type,
+    steps: stepsData.map((step, i) => {
+      const existing = template?.steps[i];
+      return {
+        key: step.label.toLowerCase().replace(/\s+/g, "_"),
+        label: step.label,
+        // ✅ Correction : utiliser ?? avec parenthèses ou séparer
+        description: step.description || (existing?.description ?? ""),
+        icon: existing?.icon ?? "FileText",
+        time: existing?.time ?? "1 j",
+        status: "pending" as const,
+        button: { actionId: `start_${step.label.toLowerCase()}` },
+      };
+    }),
   };
+  
+  const newActe: Acte = {
+    id: String(Date.now()),
+    ref: `A-${8844 + actes.length}`,
+    dossier: "N-2025-XXX",
+    dateDossier: new Date().toLocaleDateString("fr-FR"),
+    type: form.type,
+    etat: "Brouillon",
+    signataires: [],
+    montant: 0,
+    workflow,
+  };
+  setActes(prev => [newActe, ...prev]);
+  setShowCreate(false);
+  setForm({ categorieActe: "", type: "" });
+  toast.success(t("actes.toast.created"));
+};
 
   const handleWorkflowStart = (acte: Acte, _actionId: string, stepKey: string) => {
     const now = new Date().toISOString();
@@ -292,12 +465,13 @@ export default function ActesSignatures() {
   const toggleCat = (idx: number) => {
     setExpandedCats(prev => {
       const next = new Set(prev);
-      next.has(idx) ? next.delete(idx) : next.add(idx);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
       return next;
     });
   };
 
   const saveCategory = (idx: number, label: string) => {
+    // Renommage local uniquement (les catégories sont des codes fixes côté backend)
     if (!label.trim()) return;
     setCatalogue(prev => prev.map((c, i) => i === idx ? { ...c, label: label.trim() } : c));
     setEditingCat(null);
@@ -305,56 +479,136 @@ export default function ActesSignatures() {
 
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<{ idx: number; label: string; acteCount: number } | null>(null);
 
-  const deleteCategory = (idx: number) => {
-    setCatalogue(prev => prev.filter((_, i) => i !== idx));
-    setExpandedCats(prev => {
-      const next = new Set(prev);
-      next.delete(idx);
-      return next;
-    });
+  const deleteCategory = async (idx: number) => {
+    const cat = categories[idx];
+    if (!cat?.id) { setConfirmDeleteCat(null); return; }
+    try {
+      await categorieActeService.delete(cat.id);
+      await loadCatalogue();
+      toast.success(fr ? "Catégorie supprimée" : "Category deleted");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error(msg || (fr ? "Erreur lors de la suppression" : "Error deleting category"));
+    }
     setConfirmDeleteCat(null);
   };
 
-  const addCategory = () => {
+  const addCategory = async () => {
     if (!newCatLabel.trim()) return;
-    setCatalogue(prev => [...prev, { label: newCatLabel.trim(), actes: [] }]);
+    const code = newCatLabel.trim().toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_");
+    try {
+      await categorieActeService.create({ code, libelle: newCatLabel.trim() });
+      await loadCatalogue();
+      toast.success(fr ? "Catégorie ajoutée" : "Category added");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error(msg || (fr ? "Erreur lors de l'ajout" : "Error adding category"));
+    }
     setNewCatLabel("");
     setShowAddCat(false);
-    toast.success(fr ? "Catégorie ajoutée" : "Category added");
   };
 
-  const saveActe = (catIdx: number, acteIdx: number, label: string) => {
-    if (!label.trim()) return;
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx
-        ? { ...c, actes: c.actes.map((a, j) => j === acteIdx ? label.trim() : a) }
-        : c
-    ));
+const saveActe = async (catIdx: number, acteIdx: number, label: string) => {
+  if (!label.trim()) return;
+  
+  const acte = categories[catIdx]?.typesActes?.[acteIdx];
+  
+  // 🔍 Debug - voir ce qui est vraiment dans l'objet
+  console.log("=== DÉBOGAGE SAVE ACTE ===");
+  console.log("catIdx:", catIdx, "acteIdx:", acteIdx);
+  console.log("acte:", acte);
+  console.log("acte.id:", acte?.id);
+  console.log("acte.code:", acte?.code);
+  console.log("acte.nom:", acte?.nom);
+  console.log("label à sauvegarder:", label);
+  
+  if (!acte?.id) {
+    toast.error(fr ? "Impossible de modifier : type d'acte introuvable" : "Cannot update: act type not found");
     setEditingActe(null);
-  };
+    return;
+  }
+  
+  // ✅ Générer un code si absent
+  const codeToSend = acte.code || label.trim().toUpperCase().replace(/\s+/g, "_");
+  console.log("code à envoyer:", codeToSend);
+  
+  try {
+    await typeActeService.update(acte.id, { 
+      code: codeToSend,
+      nom: label.trim()
+    });
+    await loadCatalogue();
+    toast.success(fr ? "Acte modifié" : "Act updated");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    console.error("Erreur modification acte:", e);
+    toast.error(msg || (fr ? "Erreur lors de la modification" : "Error updating act"));
+  }
+  setEditingActe(null);
+};
 
   const [confirmDeleteActe, setConfirmDeleteActe] = useState<{ catIdx: number; acteIdx: number; label: string } | null>(null);
 
-  const deleteActe = (catIdx: number, acteIdx: number) => {
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx ? { ...c, actes: c.actes.filter((_, j) => j !== acteIdx) } : c
-    ));
+  const deleteActe = async (catIdx: number, acteIdx: number) => {
+    const acte = categories[catIdx]?.typesActes?.[acteIdx];
+    if (acte?.id) {
+      try {
+        await typeActeService.delete(acte.id);
+        await loadCatalogue();
+        toast.success(fr ? "Acte supprimé" : "Act deleted");
+      } catch {
+        toast.error(fr ? "Erreur lors de la suppression" : "Error deleting act");
+      }
+    } else {
+      setCatalogue(prev => prev.map((c, i) =>
+        i === catIdx ? { ...c, actes: c.actes.filter((_, j) => j !== acteIdx) } : c
+      ));
+    }
     setConfirmDeleteActe(null);
   };
 
-  const addActe = (catIdx: number) => {
+  const addActe = async (catIdx: number) => {
     if (!newActeLabel.trim()) return;
-    setCatalogue(prev => prev.map((c, i) =>
-      i === catIdx ? { ...c, actes: [...c.actes, newActeLabel.trim()] } : c
-    ));
+    const cat = categories[catIdx];
+    const code = newActeLabel.trim().toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Z0-9]/g, "_").replace(/_+/g, "_");
+    try {
+      let typeId: number | undefined;
+      try {
+        // Tenter de créer un nouveau type d'acte
+        const created = await typeActeService.create({ code, nom: newActeLabel.trim() });
+        typeId = created?.id;
+      } catch {
+        // Code déjà existant — chercher l'existant par code
+        const allTypes = await typeActeService.getAll();
+        const existing = allTypes.find(t => t.code === code || t.nom === newActeLabel.trim());
+        typeId = existing?.id;
+      }
+      if (typeId && cat?.id) {
+        await categorieActeService.assignTypeActe(cat.id, typeId);
+        await loadCatalogue();
+        toast.success(fr ? "Acte ajouté" : "Act added");
+      } else {
+        toast.error(fr ? "Type d'acte introuvable" : "Act type not found");
+      }
+    } catch {
+      toast.error(fr ? "Erreur lors de l'ajout" : "Error adding act");
+    }
     setNewActeLabel("");
     setAddActeForCat(null);
-    toast.success(fr ? "Acte ajouté" : "Act added");
   };
 
-  const saveCatalogue = () => {
-    // TODO: persister au backend
-    toast.success(fr ? "Catalogue enregistré avec succès" : "Catalogue saved successfully");
+  const handleInitDefauts = async () => {
+    try {
+      await categorieActeService.initialiserDefauts();
+      await loadCatalogue();
+      toast.success(fr ? "Catégories et types d'actes initialisés !" : "Categories and act types initialized!");
+    } catch {
+      toast.error(fr ? "Erreur lors de l'initialisation" : "Initialization error");
+    }
   };
 
   return (
@@ -380,9 +634,14 @@ export default function ActesSignatures() {
                 : "Customize the categories and notarial acts offered by your office. These changes will apply when creating new cases."}
             </p>
           </div>
-          <Button size="sm" className="bg-primary text-primary-foreground gap-2 shrink-0" onClick={saveCatalogue}>
-            <Save className="h-4 w-4" /> {fr ? "Enregistrer" : "Save"}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" className="gap-2" onClick={handleInitDefauts}>
+              {fr ? "Initialiser les défauts" : "Initialize defaults"}
+            </Button>
+            <Button size="sm" className="bg-primary text-primary-foreground gap-2" onClick={saveCatalogue}>
+              <Save className="h-4 w-4" /> {fr ? "Actualiser" : "Refresh"}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -492,66 +751,97 @@ export default function ActesSignatures() {
                             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                               {fr ? "Étapes du workflow" : "Workflow steps"}
                             </p>
-                            {steps.map((step, si) => (
-                              <div key={si} className="flex items-center gap-2 group/step rounded-md px-2 py-1.5 hover:bg-muted/40 transition-colors">
-                                <span className="text-[10px] text-muted-foreground w-4 text-right shrink-0">{si + 1}</span>
-                                {editingStep?.key === stepKey && editingStep.idx === si ? (
-                                  <Input
-                                    className="h-6 text-xs flex-1 uppercase"
-                                    value={editingStep.label}
-                                    autoFocus
-                                    onChange={e => setEditingStep({ key: stepKey, idx: si, label: e.target.value.toUpperCase() })}
-                                    onKeyDown={e => {
-                                      if (e.key === "Enter") renameStep(acte, si, editingStep.label);
-                                      if (e.key === "Escape") setEditingStep(null);
-                                    }}
-                                  />
-                                ) : (
-                                  <span className="text-xs font-medium text-foreground flex-1 tracking-wide">{step}</span>
-                                )}
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/step:opacity-100 transition-opacity">
-                                  {editingStep?.key === stepKey && editingStep.idx === si ? (
-                                    <>
-                                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => renameStep(acte, si, editingStep.label)}>OK</Button>
-                                      <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" onClick={() => setEditingStep(null)}>✕</Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === 0} onClick={() => moveStep(acte, si, -1)}>
-                                        <ChevronRight className="h-3 w-3 -rotate-90" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === steps.length - 1} onClick={() => moveStep(acte, si, 1)}>
-                                        <ChevronRight className="h-3 w-3 rotate-90" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setEditingStep({ key: stepKey, idx: si, label: step })}>
-                                        <Edit2 className="h-2.5 w-2.5" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteStep({ acteLabel: acte, idx: si, label: step })}>
-                                        <Trash2 className="h-2.5 w-2.5" />
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+
+                           {steps.map((step, si) => {
+  const stepData = typeof step === 'string' ? { label: step, description: undefined } : step;
+  return (
+    <div key={si} className="flex items-start gap-2 group/step rounded-md px-2 py-1.5 hover:bg-muted/40 transition-colors">
+      <span className="text-[10px] text-muted-foreground w-4 text-right shrink-0 mt-0.5">{si + 1}</span>
+      
+      {editingStep?.key === stepKey && editingStep.idx === si ? (
+        <div className="flex-1 space-y-1">
+          <Input
+            className="h-6 text-xs uppercase"
+            value={editingStep.label}
+            autoFocus
+            onChange={e => setEditingStep({ ...editingStep, label: e.target.value.toUpperCase() })}
+            onKeyDown={e => { if (e.key === "Escape") setEditingStep(null); }}
+          />
+          <Input
+            className="h-6 text-xs"
+            placeholder={fr ? "Description (optionnelle)" : "Description (optional)"}
+            value={editingStep.description}
+            onChange={e => setEditingStep({ ...editingStep, description: e.target.value })}
+            onKeyDown={e => { if (e.key === "Enter") renameStep(acte, si, editingStep.label, editingStep.description); }}
+          />
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" 
+              onClick={() => renameStep(acte, si, editingStep.label, editingStep.description)}>OK</Button>
+            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px]" 
+              onClick={() => setEditingStep(null)}>✕</Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1">
+            <span className="text-xs font-medium text-foreground tracking-wide">{stepData.label}</span>
+            {stepData.description && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">{stepData.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/step:opacity-100 transition-opacity shrink-0">
+            <Button size="icon" variant="ghost" className="h-5 w-5" 
+              onClick={() => setEditingStep({ key: stepKey, idx: si, label: stepData.label, description: stepData.description || "" })}>
+              <Edit2 className="h-2.5 w-2.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === 0} 
+              onClick={() => moveStep(acte, si, -1)}>
+              <ChevronRight className="h-3 w-3 -rotate-90" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-5 w-5" disabled={si === steps.length - 1} 
+              onClick={() => moveStep(acte, si, 1)}>
+              <ChevronRight className="h-3 w-3 rotate-90" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-5 w-5 text-destructive hover:text-destructive" 
+              onClick={() => setConfirmDeleteStep({ acteLabel: acte, idx: si, label: stepData.label })}>
+              <Trash2 className="h-2.5 w-2.5" />
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+                            })}
+
                             {/* Add step */}
-                            {addStepFor === stepKey ? (
-                              <div className="flex items-center gap-2 px-2 py-1">
-                                <Input
-                                  className="h-6 text-xs flex-1 uppercase"
-                                  placeholder={fr ? "Nom de l'étape (ex: SIGNATURE)" : "Step name (e.g. SIGNATURE)"}
-                                  value={newStepLabel}
-                                  autoFocus
-                                  onChange={e => setNewStepLabel(e.target.value.toUpperCase())}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter") addStep(acte);
-                                    if (e.key === "Escape") { setAddStepFor(null); setNewStepLabel(""); }
-                                  }}
-                                />
-                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => addStep(acte)}>{fr ? "Ajouter" : "Add"}</Button>
-                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => { setAddStepFor(null); setNewStepLabel(""); }}>✕</Button>
-                              </div>
-                            ) : (
+                              {addStepFor === stepKey ? (
+                                <div className="space-y-1 px-2 py-1">
+                                  <Input
+                                    className="h-6 text-xs uppercase"
+                                    placeholder={fr ? "Nom de l'étape (ex: SIGNATURE)" : "Step name (e.g. SIGNATURE)"}
+                                    value={newStepLabel}
+                                    autoFocus
+                                    onChange={e => setNewStepLabel(e.target.value.toUpperCase())}
+                                    onKeyDown={e => { if (e.key === "Escape") { setAddStepFor(null); setNewStepLabel(""); setNewStepDescription(""); } }}
+                                  />
+                                  <Input
+                                    className="h-6 text-xs"
+                                    placeholder={fr ? "Description (optionnelle)" : "Description (optional)"}
+                                    value={newStepDescription}
+                                    onChange={e => setNewStepDescription(e.target.value)}
+                                    onKeyDown={e => { if (e.key === "Enter") addStep(acte); }}
+                                  />
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => addStep(acte)}>
+                                      {fr ? "Ajouter" : "Add"}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" 
+                                      onClick={() => { setAddStepFor(null); setNewStepLabel(""); setNewStepDescription(""); }}>
+                                      ✕
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
                               <button
                                 onClick={() => { setAddStepFor(stepKey); setNewStepLabel(""); }}
                                 className="flex items-center gap-1.5 text-[11px] text-primary hover:bg-primary/5 w-full px-2 py-1 rounded transition-colors"
@@ -750,16 +1040,18 @@ export default function ActesSignatures() {
                 </Select>
               </div>
             )}
-            {form.type && (
-              <div className="rounded-lg bg-muted/40 border border-border px-3 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1.5">{fr ? "Étapes du workflow associé" : "Associated workflow steps"}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {getSteps(form.type).map((s, i) => (
-                    <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s}</span>
-                  ))}
-                </div>
-              </div>
-            )}
+{form.type && (
+  <div className="rounded-lg bg-muted/40 border border-border px-3 py-2.5">
+    <p className="text-xs text-muted-foreground mb-1.5">{fr ? "Étapes du workflow associé" : "Associated workflow steps"}</p>
+    <div className="flex flex-wrap gap-1.5">
+      {getSteps(form.type).map((step, i) => (
+        <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+          {typeof step === 'string' ? step : step.label}
+        </span>
+      ))}
+    </div>
+  </div>
+)}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>{t("actes.create.cancel")}</Button>
