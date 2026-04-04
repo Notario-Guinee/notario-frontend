@@ -20,7 +20,7 @@ import WorkflowProcedural from "@/components/workflow/WorkflowProcedural";
 import { workflowTemplates, type WorkflowConfig } from "@/components/workflow/workflow-types";
 import { useLanguage } from "@/context/LanguageContext";
 import { type CategorieActe } from "@/data/constants";
-import { useActeSteps } from "@/context/ActeStepsContext";
+import { useActeSteps, type WorkflowStepData } from "@/context/ActeStepsContext";
 import { typeActeService } from "@/services/typeActeService";
 import { categorieActeService, type CategorieActeDto } from "@/services/categorieActeService";
 import type { TypeActeDto } from "@/services/typeActeService";
@@ -276,33 +276,7 @@ const renameStep = async (acteLabel: string, idx: number, label: string, descrip
           actes: (c.typesActes ?? []).map(t => t.nom ?? t.libelle ?? ""),
         })));
         
-        // Charger les étapes depuis workflowConfigJson des types complets
-        const stepsFromApi: Record<string, string[]> = {};
-        enrichedCats.forEach(cat => {
-          (cat.typesActes ?? []).forEach(t => {
-            const name = t.nom ?? t.libelle ?? "";
-            if (!name) return;
-            
-            // Récupérer le workflow depuis le type complet
-            const workflowConfig = t.workflowConfigJson;
-            if (!workflowConfig) return;
-            
-            try {
-              const wf = typeof workflowConfig === "string"
-                ? JSON.parse(workflowConfig)
-                : workflowConfig;
-              if (Array.isArray((wf as { steps?: string[] }).steps)) {
-                stepsFromApi[name] = (wf as { steps: string[] }).steps;
-              }
-            } catch {
-              // JSON malformé — on ignore
-            }
-          });
-        });
-        
-        if (Object.keys(stepsFromApi).length > 0) {
-          setActeSteps(prev => ({ ...prev, ...stepsFromApi }));
-        }
+        // Les étapes sont chargées par ActeStepsContext au démarrage
         
       } catch (error) {
         console.error("Erreur chargement catalogue:", error);
@@ -357,8 +331,7 @@ const handleCreate = () => {
   
   const template = workflowTemplates[form.type] ?? workflowTemplates["Vente immobilière"];
   const workflow: WorkflowConfig = {
-    ...(template ?? { name: form.type, description: "" }),
-    name: form.type,
+    ...(template ?? {}),
     steps: stepsData.map((step, i) => {
       const existing = template?.steps[i];
       return {
@@ -475,7 +448,7 @@ const handleCreate = () => {
     const cat = categories[idx];
     if (cat?.id) {
       try {
-        await categorieActeService.update(cat.id, { libelle: label.trim() });
+        await categorieActeService.update(cat.id, { code: cat.code, libelle: label.trim() });
         await loadCatalogue();
         toast.success(fr ? "Catégorie modifiée" : "Category updated");
       } catch (e) {

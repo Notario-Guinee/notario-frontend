@@ -43,6 +43,7 @@ export interface Dossier {
   clients: string[];
   clientDate: string;
   montant: number;
+  montantVerse?: number;
   statut: "Brouillon" | "En Cours" | "En Attente" | "En Attente de Signature" | "En Attente de Validation" | "Prêt pour Signature" | "Signé" | "Enregistré" | "Suspendu" | "Clôturé" | "Annulé" | "Archivé";
   priorite: "Basse" | "Normale" | "Haute" | "Urgente";
   avancement: number;

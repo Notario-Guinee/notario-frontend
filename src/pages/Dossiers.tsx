@@ -140,10 +140,10 @@ function resolveClientName(c: ClientDto): string {
   };
 
   // Pour les personnes morales, priorité à la dénomination sociale
-  if (c.typeClient === "Personne Morale" || c.typeClient === "MORALE") {
+  if (c.typeClient === "Personne Morale") {
     const denomination = c.denominationSociale;
     if (!isPlaceholder(denomination)) {
-      return denomination;
+      return denomination ?? c.codeClient ?? `Client #${c.id}`;
     }
     // Fallback: utiliser le code client si la dénomination est invalide
     return c.codeClient || `Client #${c.id}`;
@@ -276,7 +276,8 @@ export default function Dossiers() {
     try {
       setLoading(true);
       const response = await dossierService.getAll({ page: 0, size: 200 });
-      const items = (response as unknown as { content?: DossierDto[] }).content ?? [];
+      const items = ((response as unknown as { content?: DossierDto[] }).content ?? [])
+        .filter(d => !d.deleted);
       setDossiers(items.map(mapDtoToLocal));
     } catch {
       toast.error(fr ? "Erreur lors du chargement des dossiers" : "Error loading cases");
@@ -1604,8 +1605,7 @@ const getEventLabel = (type: string, fr: boolean): string => {
         
         const response = await dossierService.signerDocument(Number(selectedDossier.id), doc.id);
         
-        // ✅ Gérer la réponse quel que soit le format
-        const result = response.data || response;
+        const result = response;
         
         // ✅ Si la signature a réussi (même sans PDF retourné)
         if (result.success || result.pdfSigne || result.urlSignature) {

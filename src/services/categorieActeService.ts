@@ -28,6 +28,7 @@ export interface CreateCategorieActeDto {
 }
 
 export interface UpdateCategorieActeDto {
+  code?: string;
   libelle?: string;
   couleur?: string;
   icone?: string;
