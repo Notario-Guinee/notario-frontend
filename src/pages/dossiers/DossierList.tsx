@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { DossierCard } from '@/components/dossiers/DossierCard';
 import { DossierCardSkeleton } from '@/components/dossiers/DossierCardSkeleton';
 import type { StatutDossier } from '@/types/dossier';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function DossierList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [statut, setStatut] = useState<StatutDossier | undefined>(undefined);
   const debouncedSearch = useDebounce(search, 400);
@@ -30,16 +32,16 @@ export default function DossierList() {
 
   return (
     <InfiniteListLayout
-      title="Dossiers"
+      title={t("list.dossiers.title")}
       icon={<FolderOpen className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher un dossier…"
+      searchPlaceholder={t("list.dossiers.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucun dossier enregistré."
+      emptyMessage={t("list.dossiers.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -53,11 +55,11 @@ export default function DossierList() {
           }}
           className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
         >
-          <option value="">Tous les statuts</option>
-          <option value="OUVERT">Ouvert</option>
-          <option value="EN_COURS">En cours</option>
-          <option value="CLOTURE">Clôturé</option>
-          <option value="ARCHIVE">Archivé</option>
+          <option value="">{t("list.dossiers.allStatuses")}</option>
+          <option value="OUVERT">{t("list.dossiers.open")}</option>
+          <option value="EN_COURS">{t("list.dossiers.inProgress")}</option>
+          <option value="CLOTURE">{t("list.dossiers.closed")}</option>
+          <option value="ARCHIVE">{t("list.dossiers.archived")}</option>
         </select>
       }
     >

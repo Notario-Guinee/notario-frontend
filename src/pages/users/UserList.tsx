@@ -6,8 +6,10 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { UserCard } from '@/components/users/UserCard';
 import { UserCardSkeleton } from '@/components/users/UserCardSkeleton';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function UserList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
 
@@ -28,16 +30,16 @@ export default function UserList() {
 
   return (
     <InfiniteListLayout
-      title="Utilisateurs"
+      title={t("list.users.title")}
       icon={<Users className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher un utilisateur…"
+      searchPlaceholder={t("list.users.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucun utilisateur enregistré."
+      emptyMessage={t("list.users.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}

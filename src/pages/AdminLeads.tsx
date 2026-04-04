@@ -5,6 +5,7 @@
 
 import { StatusBadge } from "@/components/ui/status-badge";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 const leads = [
   { id:"1",nom:"Me Alpha Diallo",cabinet:"Étude Diallo",email:"alpha@email.gn",tel:"+224 622 11 11 11",message:"Intéressé par la solution complète.",date:"2026-03-08",statut:"Nouveau" },
@@ -14,23 +15,46 @@ const leads = [
 ];
 
 export default function AdminLeads() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "EN" ? "en-GB" : "fr-FR";
+
+  const kpiLabels = [
+    { key: "Nouveau",  label: "Nouveau" },
+    { key: "En cours", label: "En cours" },
+    { key: "Contacté", label: "Contacté" },
+    { key: "Fermé",    label: "Fermé" },
+  ];
+
+  const tableHeaders = [
+    t("adminLeads.colNom"),
+    t("adminLeads.colCabinet"),
+    t("adminLeads.colEmail"),
+    t("adminLeads.colTel"),
+    t("adminLeads.colMessage"),
+    t("adminLeads.colDate"),
+    t("adminLeads.colStatut"),
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-xl font-bold text-foreground">📈 Leads & Démos</h1>
-      <div className="grid grid-cols-4 gap-3">{[{l:"Nouveau",v:1},{l:"En cours",v:1},{l:"Contacté",v:1},{l:"Fermé",v:1}].map(s=>(
-        <div key={s.l} className="rounded-xl border border-border bg-card p-4 text-center"><p className="font-heading text-2xl font-bold text-foreground">{s.v}</p><p className="text-xs text-muted-foreground">{s.l}</p></div>
+      <h1 className="font-heading text-xl font-bold text-foreground">📈 {t("adminLeads.title")}</h1>
+      <div className="grid grid-cols-4 gap-3">{kpiLabels.map(s=>(
+        <div key={s.key} className="rounded-xl border border-border bg-card p-4 text-center">
+          <p className="font-heading text-2xl font-bold text-foreground">{leads.filter(l=>l.statut===s.key).length}</p>
+          <p className="text-xs text-muted-foreground">{s.label}</p>
+        </div>
       ))}</div>
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
-        <table className="w-full"><thead><tr className="border-b border-border">{["Nom","Cabinet","Email","Téléphone","Message","Date","Statut"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
-        <tbody>{leads.map(l=>(
-          <motion.tr key={l.id} initial={{opacity:0}} animate={{opacity:1}} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-            <td className="px-4 py-3 text-sm font-medium text-foreground">{l.nom}</td>
-            <td className="px-4 py-3 text-sm text-foreground">{l.cabinet}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{l.email}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{l.tel}</td>
-            <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate">{l.message}</td>
-            <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(l.date).toLocaleDateString('fr-FR')}</td>
-            <td className="px-4 py-3"><StatusBadge status={l.statut}/></td>
+        <table className="w-full"><thead><tr className="border-b border-border">{tableHeaders.map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
+        <tbody>{leads.map(lead=>(
+          <motion.tr key={lead.id} initial={{opacity:0}} animate={{opacity:1}} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+            <td className="px-4 py-3 text-sm font-medium text-foreground">{lead.nom}</td>
+            <td className="px-4 py-3 text-sm text-foreground">{lead.cabinet}</td>
+            <td className="px-4 py-3 text-sm text-muted-foreground">{lead.email}</td>
+            <td className="px-4 py-3 text-sm text-muted-foreground">{lead.tel}</td>
+            <td className="px-4 py-3 text-xs text-muted-foreground max-w-[200px] truncate">{lead.message}</td>
+            <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(lead.date).toLocaleDateString(locale)}</td>
+            <td className="px-4 py-3"><StatusBadge status={lead.statut}/></td>
           </motion.tr>
         ))}</tbody></table>
       </div>

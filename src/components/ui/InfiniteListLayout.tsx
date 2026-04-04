@@ -10,6 +10,7 @@ import { Search, SearchX, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface InfiniteListLayoutProps {
   title: string;
@@ -56,6 +57,8 @@ export function InfiniteListLayout({
   actions,
   filters,
 }: InfiniteListLayoutProps) {
+  const { t, lang } = useLanguage();
+  const locale = lang === 'EN' ? 'en-GB' : 'fr-FR';
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -67,7 +70,7 @@ export function InfiniteListLayout({
             <h1 className="font-heading text-xl font-bold text-foreground">{title}</h1>
             {totalElements !== undefined && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                {totalElements.toLocaleString('fr-FR')} élément{totalElements > 1 ? 's' : ''}
+                {totalElements.toLocaleString(locale)} {totalElements > 1 ? t('list.items') : t('list.item')}
               </p>
             )}
           </div>
@@ -93,7 +96,7 @@ export function InfiniteListLayout({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {errorMessage ?? 'Impossible de charger les données. Veuillez réessayer.'}
+            {errorMessage ?? t('list.loadError')}
           </AlertDescription>
         </Alert>
       )}
@@ -109,8 +112,8 @@ export function InfiniteListLayout({
           {search ? (
             <>
               <SearchX className="h-12 w-12 mb-3 opacity-30" />
-              <p className="text-sm font-medium">Aucun résultat pour « {search} »</p>
-              <p className="text-xs mt-1 opacity-70">Essayez un autre terme de recherche.</p>
+              <p className="text-sm font-medium">{t('list.noResultsFor')} « {search} »</p>
+              <p className="text-xs mt-1 opacity-70">{t('list.noResultsHint')}</p>
             </>
           ) : (
             <>
@@ -134,7 +137,7 @@ export function InfiniteListLayout({
           <div ref={sentinelRef} aria-hidden="true" className="h-4" />
           {!hasNextPage && totalElements !== undefined && (
             <p className="text-center text-xs text-muted-foreground py-4">
-              {totalElements.toLocaleString('fr-FR')} élément{totalElements > 1 ? 's' : ''} au total
+              {totalElements.toLocaleString(locale)} {totalElements > 1 ? t('list.items') : t('list.item')}
             </p>
           )}
         </>

@@ -62,7 +62,7 @@ export default function ForgotPassword() {
       setSubmitted(true);
       toast.success(t("forgot.successToast"));
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de l'envoi");
+      toast.error(err instanceof Error ? err.message : t("forgot.sendError"));
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ export default function ForgotPassword() {
                   </div>
                 </div>
                 <Button type="submit" disabled={loading} className={`w-full ${config.accentColor} ${config.accentHover} text-white font-medium h-11`}>
-                  {loading ? "Envoi en cours..." : t("forgot.submit")}
+                  {loading ? t("forgot.sending") : t("forgot.submit")}
                 </Button>
               </form>
               <div className="h-px bg-border my-6" />

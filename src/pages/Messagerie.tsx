@@ -152,11 +152,7 @@ const presenceColor: Record<Presence, string> = {
   offline: "bg-muted-foreground",
 };
 
-const presenceLabel: Record<Presence, string> = {
-  online: "En ligne",
-  busy: "Occupé",
-  offline: "Hors ligne",
-};
+// presenceLabel is built inside the component using t() for i18n
 
 const priorityStyles: Record<string, string> = {
   urgente: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -200,12 +196,7 @@ function ConvAvatar({ conv, size = "md" }: { conv: Conversation; size?: "sm" | "
 
 // ─── Onglets ────────────────────────────────────────────────────
 
-const TABS: { id: ConvTab; label: string }[] = [
-  { id: "all",     label: "Toutes"   },
-  { id: "unread",  label: "Non lues" },
-  { id: "starred", label: "Favoris"  },
-  { id: "groups",  label: "Groupes"  },
-];
+// TABS is built inside the component using t() for i18n
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -239,6 +230,20 @@ const mockAppels: AppelRecord[] = [
 
 export default function Messagerie() {
   const { t } = useLanguage();
+
+  const presenceLabel: Record<Presence, string> = {
+    online: t("msg.presenceOnline"),
+    busy: t("msg.presenceBusy"),
+    offline: t("msg.presenceOffline"),
+  };
+
+  const TABS: { id: ConvTab; label: string }[] = [
+    { id: "all",     label: t("msg.tabAll")     },
+    { id: "unread",  label: t("msg.tabUnread")  },
+    { id: "starred", label: t("msg.tabStarred") },
+    { id: "groups",  label: t("msg.tabGroups")  },
+  ];
+
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConv, setSelectedConv]   = useState(conversations[0]);
   const [message, setMessage]             = useState("");
@@ -335,7 +340,7 @@ export default function Messagerie() {
         setRecordingSecs(s => s + 1);
       }, 1000);
     } catch {
-      toast.error("Microphone non disponible");
+      toast.error(t("msg.toastMicUnavailable"));
     }
   };
 
@@ -357,7 +362,7 @@ export default function Messagerie() {
   };
 
   const playVoice = (msg: ChatMessage) => {
-    if (!msg.audioUrl) { toast.info("Audio non disponible"); return; }
+    if (!msg.audioUrl) { toast.info(t("msg.toastAudioUnavailable")); return; }
     if (playingId === msg.id) {
       audioRef.current?.pause();
       setPlayingId(null);
@@ -366,8 +371,8 @@ export default function Messagerie() {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     const audio = new Audio(msg.audioUrl);
     audio.onended  = () => setPlayingId(null);
-    audio.onerror  = () => { toast.error("Erreur de lecture"); setPlayingId(null); };
-    audio.play().catch(() => { toast.error("Lecture impossible"); setPlayingId(null); });
+    audio.onerror  = () => { toast.error(t("msg.toastAudioError")); setPlayingId(null); };
+    audio.play().catch(() => { toast.error(t("msg.toastAudioImpossible")); setPlayingId(null); });
     audioRef.current = audio;
     setPlayingId(msg.id);
   };
@@ -420,7 +425,7 @@ export default function Messagerie() {
     }));
     setEditingMsgId(null);
     setEditText("");
-    toast.success("Message modifié");
+    toast.success(t("msg.toastMsgEdited"));
   };
 
   const deleteSelected = () => {
@@ -429,7 +434,7 @@ export default function Messagerie() {
       ...prev,
       [selectedConv.id]: (prev[selectedConv.id] || []).map(m => ids.has(m.id) ? { ...m, deleted: true } : m),
     }));
-    toast.success(`${ids.size} message${ids.size > 1 ? "s" : ""} supprimé${ids.size > 1 ? "s" : ""}`);
+    toast.success(`${ids.size} ${ids.size > 1 ? t("msg.toastMsgsDeletedPlural") : t("msg.toastMsgsDeletedSingular")}`);
     exitSelectionMode();
   };
 
@@ -444,7 +449,7 @@ export default function Messagerie() {
     };
     setMessages(prev => ({ ...prev, [convId]: [...(prev[convId] || []), fwd] }));
     setConversations(prev => prev.map(c => c.id === convId ? { ...c, lastMsg: fwd.text.slice(0, 60), time: "à l'instant" } : c));
-    toast.success(`Message transféré à « ${target.nom} »`);
+    toast.success(`${t("msg.toastTransferredTo")} « ${target.nom} »`);
     setForwardMsg(null);
   };
 
@@ -484,7 +489,7 @@ export default function Messagerie() {
       mime: f.type,
     }));
     setAttachedFiles(prev => [...prev, ...newFiles]);
-    toast.success(files.length === 1 ? `Fichier joint : ${files[0].name}` : `${files.length} fichiers joints`);
+    toast.success(files.length === 1 ? `${t("msg.toastFileJoined")} ${files[0].name}` : `${files.length} ${t("msg.toastFilesJoined")}`);
     e.target.value = "";
   };
 
@@ -495,7 +500,7 @@ export default function Messagerie() {
       const remaining = conversations.filter(c => c.id !== id);
       if (remaining.length > 0) setSelectedConv(remaining[0]);
     }
-    toast.success(`Conversation « ${conv?.nom} » supprimée.`);
+    toast.success(`${t("msg.deleteConversation")} « ${conv?.nom} »`);
   };
 
   const toggleStarred = (id: string) => {
@@ -533,7 +538,7 @@ export default function Messagerie() {
     const last = msgs[msgs.length - 1];
     const lastMsgText = last.type === "image" ? "🖼 Photo"
       : last.type === "video" ? "🎬 Vidéo"
-      : last.type === "file" ? `📎 ${last.fileName ?? "Fichier"}`
+      : last.type === "file" ? `📎 ${last.fileName ?? t("msg.fileDefault")}`
       : last.text.slice(0, 60);
     setConversations(prev => prev.map(c =>
       c.id === selectedConv.id ? { ...c, lastMsg: lastMsgText, time: "à l'instant" } : c
@@ -557,7 +562,7 @@ export default function Messagerie() {
     }));
     setSelectedConv(newGroup);
     setShowGroupModal(false); setGroupName(""); setSelectedMembers([]);
-    toast.success(`Groupe « ${groupName} » créé`);
+    toast.success(`${t("msg.group")} « ${groupName} » ${t("msg.toastGroupCreated")}`);
   };
 
   const toggleMember = (name: string) =>
@@ -606,7 +611,7 @@ export default function Messagerie() {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {s === "messages" ? "Messages" : "Appels"}
+            {s === "messages" ? t("msg.messages") : t("msg.calls")}
           </button>
         ))}
       </div>
@@ -666,8 +671,8 @@ export default function Messagerie() {
           {mainSection === "appels" && (
             <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60 shrink-0">
               <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-semibold text-foreground">Historique des appels</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">{mockAppels.filter(a => a.direction === "missed").length} manqués</span>
+              <span className="text-xs font-semibold text-foreground">{t("msg.callHistory")}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">{mockAppels.filter(a => a.direction === "missed").length} {t("msg.missed")}</span>
             </div>
           )}
 
@@ -677,8 +682,8 @@ export default function Messagerie() {
               <div className="flex flex-col">
                 {/* Légende */}
                 <div className="flex items-center gap-3 px-3 py-2 border-b border-border/60">
-                  <Phone className="h-3 w-3 text-red-500" /><span className="text-[10px] text-red-500 font-medium">Manqué</span>
-                  <Phone className="h-3 w-3 text-muted-foreground ml-2" /><span className="text-[10px] text-muted-foreground">Reçu / Émis</span>
+                  <Phone className="h-3 w-3 text-red-500" /><span className="text-[10px] text-red-500 font-medium">{t("msg.missedLegend")}</span>
+                  <Phone className="h-3 w-3 text-muted-foreground ml-2" /><span className="text-[10px] text-muted-foreground">{t("msg.receivedOrSent")}</span>
                 </div>
                 {mockAppels.map(appel => (
                   <div key={appel.id} className="flex items-center gap-3 px-3 py-3 border-b border-border/60 hover:bg-muted/40 transition-colors">
@@ -702,15 +707,15 @@ export default function Messagerie() {
                           : <Phone className={cn("h-3 w-3", appel.direction === "missed" ? "text-red-400" : "text-muted-foreground")} />
                         }
                         <span className={cn("text-xs", appel.direction === "missed" ? "text-red-400" : "text-muted-foreground")}>
-                          {appel.direction === "missed" ? "Appel manqué"
-                           : appel.direction === "outgoing" ? `Émis${appel.duration ? " · " + appel.duration : ""}`
-                           : `Reçu${appel.duration ? " · " + appel.duration : ""}`}
+                          {appel.direction === "missed" ? t("msg.missedCall")
+                           : appel.direction === "outgoing" ? `${t("msg.outgoing")}${appel.duration ? " · " + appel.duration : ""}`
+                           : `${t("msg.incoming")}${appel.duration ? " · " + appel.duration : ""}`}
                         </span>
                       </div>
                     </div>
                     {/* Rappeler */}
                     <button
-                      onClick={() => toast.info(`Rappel de ${appel.with}…`)}
+                      onClick={() => toast.info(`${t("msg.toastReminderOf")} ${appel.with}…`)}
                       className={cn(
                         "shrink-0 h-8 w-8 rounded-full flex items-center justify-center transition-colors",
                         appel.kind === "video" ? "bg-primary/10 hover:bg-primary/20 text-primary" : "bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400",
@@ -724,8 +729,8 @@ export default function Messagerie() {
             ) : filteredConversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <MessageSquare className="h-10 w-10 text-muted-foreground mb-3" />
-                <p className="text-sm font-medium text-foreground">Aucune conversation</p>
-                <p className="text-xs text-muted-foreground mt-1">Aucun résultat pour cet onglet.</p>
+                <p className="text-sm font-medium text-foreground">{t("msg.noConversation")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t("msg.noResult")}</p>
               </div>
             ) : null}
             <AnimatePresence initial={false}>
@@ -769,7 +774,7 @@ export default function Messagerie() {
                       </Badge>
                     )}
                     {conv.isGroup && conv.members && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{conv.members.length} membres</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{conv.members.length} {t("msg.membersCount")}</p>
                     )}
                   </div>
 
@@ -783,8 +788,8 @@ export default function Messagerie() {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); toggleStarred(conv.id); }}>
                         {conv.starred
-                          ? <><StarOff className="mr-2 h-4 w-4" /> Retirer des favoris</>
-                          : <><Star className="mr-2 h-4 w-4" /> Ajouter aux favoris</>
+                          ? <><StarOff className="mr-2 h-4 w-4" /> {t("msg.removeFavorite")}</>
+                          : <><Star className="mr-2 h-4 w-4" /> {t("msg.addFavorite")}</>
                         }
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -792,7 +797,7 @@ export default function Messagerie() {
                         className="text-destructive"
                         onClick={e => { e.stopPropagation(); setDeleteConvId(conv.id); }}
                       >
-                        <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                        <Trash2 className="mr-2 h-4 w-4" /> {t("msg.delete")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -812,7 +817,7 @@ export default function Messagerie() {
               <p className="text-sm font-semibold text-foreground truncate">{selectedConv.nom}</p>
               <p className="text-xs text-muted-foreground">
                 {selectedConv.isGroup
-                  ? `${selectedConv.members?.length ?? 0} membres`
+                  ? `${selectedConv.members?.length ?? 0} ${t("msg.membersCount")}`
                   : presenceLabel[selectedConv.presence]
                 }
               </p>
@@ -823,7 +828,7 @@ export default function Messagerie() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs">
                   <Phone className="h-3.5 w-3.5" />
-                  Appeler
+                  {t("msg.callBtn")}
                   <ChevronDown className="h-3 w-3 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
@@ -838,24 +843,24 @@ export default function Messagerie() {
                 {/* Appels principaux */}
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <button
-                    onClick={() => toast.info(`Appel vocal avec ${selectedConv.nom}...`)}
+                    onClick={() => toast.info(`${t("msg.toastVoiceCallWith")} ${selectedConv.nom}...`)}
                     className="flex items-center justify-center gap-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-2.5 transition-colors"
                   >
-                    <Phone className="h-3.5 w-3.5" /> Vocal
+                    <Phone className="h-3.5 w-3.5" /> {t("msg.voiceCall")}
                   </button>
                   <button
-                    onClick={() => toast.info(`Appel vidéo avec ${selectedConv.nom}...`)}
+                    onClick={() => toast.info(`${t("msg.toastVideoCallWith")} ${selectedConv.nom}...`)}
                     className="flex items-center justify-center gap-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-2.5 transition-colors"
                   >
-                    <Video className="h-3.5 w-3.5" /> Vidéo
+                    <Video className="h-3.5 w-3.5" /> {t("msg.videoCall")}
                   </button>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => { setGroupName(""); setSelectedMembers([]); setShowGroupModal(true); }}>
-                  <UserPlus className="mr-2 h-4 w-4" /> Nouvel appel de groupe
+                  <UserPlus className="mr-2 h-4 w-4" /> {t("msg.newGroupCall")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast.info("Planification d'appel — bientôt disponible")}>
-                  <Calendar className="mr-2 h-4 w-4" /> Planifier un appel
+                <DropdownMenuItem onClick={() => toast.info(t("msg.toastScheduleCall"))}>
+                  <Calendar className="mr-2 h-4 w-4" /> {t("msg.scheduleCall")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -869,11 +874,11 @@ export default function Messagerie() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => toggleStarred(selectedConv.id)}>
-                  {selectedConv.starred ? <><StarOff className="mr-2 h-4 w-4" /> Retirer des favoris</> : <><Star className="mr-2 h-4 w-4" /> Ajouter aux favoris</>}
+                  {selectedConv.starred ? <><StarOff className="mr-2 h-4 w-4" /> {t("msg.removeFavorite")}</> : <><Star className="mr-2 h-4 w-4" /> {t("msg.addFavorite")}</>}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive" onClick={() => setDeleteConvId(selectedConv.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Supprimer la conversation
+                  <Trash2 className="mr-2 h-4 w-4" /> {t("msg.deleteConversation")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -892,7 +897,7 @@ export default function Messagerie() {
               <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 shrink-0">
                 <Pin className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                 <span className="text-xs text-amber-700 dark:text-amber-300 truncate flex-1">
-                  {pinned.length === 1 ? `Épinglé : ${pinned[0].text.slice(0, 60)}` : `${pinned.length} messages épinglés`}
+                  {pinned.length === 1 ? `${t("msg.pinned")} : ${pinned[0].text.slice(0, 60)}` : `${pinned.length} ${t("msg.pinnedMessages")}`}
                 </span>
               </div>
             );
@@ -902,16 +907,16 @@ export default function Messagerie() {
           {selectionMode && (
             <div className="flex items-center gap-3 px-4 py-2 bg-primary/10 border-b border-primary/20 shrink-0">
               <span className="text-sm font-medium text-primary flex-1">
-                {selectedMsgIds.size} sélectionné{selectedMsgIds.size > 1 ? "s" : ""}
+                {selectedMsgIds.size} {selectedMsgIds.size > 1 ? t("msg.selectedPlural") : t("msg.selectedSingular")}
               </span>
               <button onClick={deleteSelected} disabled={!selectedMsgIds.size}
                 className="text-xs text-destructive font-medium hover:underline disabled:opacity-40">
-                Supprimer
+                {t("msg.deleteSelected")}
               </button>
               <button onClick={() => { const m = currentMsgs.find(m => selectedMsgIds.has(m.id)); if (m) setForwardMsg(m); }}
                 disabled={!selectedMsgIds.size}
                 className="text-xs text-primary font-medium hover:underline disabled:opacity-40">
-                Transférer
+                {t("msg.transferSelected")}
               </button>
               <button onClick={exitSelectionMode}
                 className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20">
@@ -968,7 +973,7 @@ export default function Messagerie() {
                             "text-xs italic flex items-center gap-1.5",
                             msg.mine ? "text-primary-foreground/60" : "text-muted-foreground",
                           )}>
-                            <span>🚫</span> Ce message a été supprimé
+                            <span>🚫</span> {t("msg.msgDeleted")}
                           </p>
                         ) : (
                         <>
@@ -983,7 +988,7 @@ export default function Messagerie() {
                               <p className={cn("text-[11px] font-semibold mb-0.5",
                                 msg.mine ? "text-white/90" : "text-primary",
                               )}>
-                                {msg.replyTo.from === "Moi" ? "Vous" : msg.replyTo.from}
+                                {msg.replyTo.from === "Moi" ? t("msg.you") : msg.replyTo.from}
                               </p>
                               <p className={cn("text-xs truncate",
                                 msg.mine ? "text-white/70" : "text-muted-foreground",
@@ -1094,7 +1099,7 @@ export default function Messagerie() {
                                 <FileText className={cn("h-6 w-6", msg.mine ? "text-white/80" : "text-red-500")} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{msg.fileName || "Fichier"}</p>
+                                <p className="text-sm font-medium truncate">{msg.fileName || t("msg.fileDefault")}</p>
                                 <p className={cn("text-xs", msg.mine ? "text-primary-foreground/60" : "text-muted-foreground")}>{msg.fileSize || ""}</p>
                               </div>
                             </div>
@@ -1118,14 +1123,14 @@ export default function Messagerie() {
                                 {msg.text}
                                 {/* Spacer fantôme — réserve la place pour "Modifié  heure  coches" */}
                                 <span aria-hidden="true" className="invisible inline-flex items-center gap-1 ml-2 text-[10px] whitespace-nowrap align-bottom select-none pointer-events-none">
-                                  {msg.edited ? "Modifié\u00a0" : ""}{msg.time}{msg.mine ? "\u00a0✓✓" : ""}
+                                  {msg.edited ? `${t("msg.edited")}\u00a0` : ""}{msg.time}{msg.mine ? "\u00a0✓✓" : ""}
                                 </span>
                               </p>
                               {/* Métadonnées réelles — superposées au spacer, style WhatsApp */}
                               <div className="absolute bottom-0 right-0 flex items-center gap-1 pointer-events-none select-none">
                                 {msg.edited && (
                                   <span className={cn("text-[10px] italic", msg.mine ? "text-primary-foreground/60" : "text-muted-foreground/70")}>
-                                    Modifié
+                                    {t("msg.edited")}
                                   </span>
                                 )}
                                 <span className={cn("text-[10px] whitespace-nowrap", msg.mine ? "text-primary-foreground/70" : "text-muted-foreground")}>
@@ -1167,41 +1172,41 @@ export default function Messagerie() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align={msg.mine ? "end" : "start"} className="w-56 rounded-2xl p-1">
                           <DropdownMenuItem onClick={() => setReplyTo(msg)}>
-                            <Reply className="mr-2.5 h-4 w-4" /> Répondre
+                            <Reply className="mr-2.5 h-4 w-4" /> {t("msg.reply")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setReactionPickerId(msg.id)}>
-                            <Smile className="mr-2.5 h-4 w-4" /> Réagir
+                            <Smile className="mr-2.5 h-4 w-4" /> {t("msg.react")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { toggleImportant(msg.id); toast.success(importantIds.has(msg.id) ? "Retiré des importants" : "Marqué comme important"); }}>
+                          <DropdownMenuItem onClick={() => { toggleImportant(msg.id); toast.success(importantIds.has(msg.id) ? t("msg.toastMsgUnimportant") : t("msg.toastMsgImportant")); }}>
                             <Flag className="mr-2.5 h-4 w-4" />
-                            {importantIds.has(msg.id) ? "Retirer l'importance" : "Important"}
+                            {importantIds.has(msg.id) ? t("msg.removeImportant") : t("msg.markImportant")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { togglePin(msg.id); toast.success(pinnedIds.has(msg.id) ? "Message désépinglé" : "Message épinglé"); }}>
+                          <DropdownMenuItem onClick={() => { togglePin(msg.id); toast.success(pinnedIds.has(msg.id) ? t("msg.toastMsgUnpinned") : t("msg.toastMsgPinned")); }}>
                             <Pin className="mr-2.5 h-4 w-4" />
-                            {pinnedIds.has(msg.id) ? "Désépingler" : "Épingler"}
+                            {pinnedIds.has(msg.id) ? t("msg.unpin") : t("msg.pin")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setForwardMsg(msg)}>
-                            <Forward className="mr-2.5 h-4 w-4" /> Transférer
+                            <Forward className="mr-2.5 h-4 w-4" /> {t("msg.forward")}
                           </DropdownMenuItem>
                           {msg.mine && !msg.deleted && (!msg.type || msg.type === "text") && (
                             <DropdownMenuItem onClick={() => startEdit(msg)}>
-                              <Pencil className="mr-2.5 h-4 w-4" /> Modifier
+                              <Pencil className="mr-2.5 h-4 w-4" /> {t("msg.edit")}
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => { navigator.clipboard?.writeText(msg.text).catch(() => null); toast.success("Message copié"); }}>
-                            <Copy className="mr-2.5 h-4 w-4" /> Copier
+                          <DropdownMenuItem onClick={() => { navigator.clipboard?.writeText(msg.text).catch(() => null); toast.success(t("msg.toastMsgCopied")); }}>
+                            <Copy className="mr-2.5 h-4 w-4" /> {t("msg.copy")}
                           </DropdownMenuItem>
                           {(msg.type === "image" || msg.type === "video" || msg.type === "voice" || msg.type === "file") && (
                             <>
                               <DropdownMenuSeparator />
                               {(msg.type === "image" || msg.type === "video") && (
-                                <DropdownMenuItem onClick={() => toast.info("Affichage du média")}>
-                                  <Eye className="mr-2.5 h-4 w-4" /> Afficher
+                                <DropdownMenuItem onClick={() => toast.info(t("msg.toastMediaView"))}>
+                                  <Eye className="mr-2.5 h-4 w-4" /> {t("msg.view")}
                                 </DropdownMenuItem>
                               )}
                               {msg.type === "file" && msg.audioUrl && (
                                 <DropdownMenuItem onClick={() => window.open(msg.audioUrl, "_blank")}>
-                                  <Eye className="mr-2.5 h-4 w-4" /> Ouvrir
+                                  <Eye className="mr-2.5 h-4 w-4" /> {t("msg.open")}
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => {
@@ -1210,29 +1215,29 @@ export default function Messagerie() {
                                   a.href = msg.audioUrl;
                                   a.download = msg.fileName || "fichier";
                                   a.click();
-                                } else { toast.info("Enregistrement en cours…"); }
+                                } else { toast.info(t("msg.toastSavingFile")); }
                               }}>
-                                <Download className="mr-2.5 h-4 w-4" /> Enregistrer dans Téléchargements
+                                <Download className="mr-2.5 h-4 w-4" /> {t("msg.saveToDownloads")}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => toast.info("Choisir l'emplacement…")}>
-                                <Download className="mr-2.5 h-4 w-4" /> Enregistrer sous...
+                              <DropdownMenuItem onClick={() => toast.info(t("msg.toastChooseLocation"))}>
+                                <Download className="mr-2.5 h-4 w-4" /> {t("msg.saveAs")}
                               </DropdownMenuItem>
                             </>
                           )}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => toast.warning("Message signalé")}>
-                            <AlertTriangle className="mr-2.5 h-4 w-4" /> Signaler
+                          <DropdownMenuItem onClick={() => toast.warning(t("msg.toastMsgReported"))}>
+                            <AlertTriangle className="mr-2.5 h-4 w-4" /> {t("msg.report")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => setDeleteMsgId(msg.id)}
                           >
-                            <Trash2 className="mr-2.5 h-4 w-4" /> Supprimer
+                            <Trash2 className="mr-2.5 h-4 w-4" /> {t("msg.delete")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => { setSelectionMode(true); toggleSelectMsg(msg.id); }}>
-                            <CheckSquare className="mr-2.5 h-4 w-4" /> Sélectionner des messages
+                            <CheckSquare className="mr-2.5 h-4 w-4" /> {t("msg.selectMessages")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1305,7 +1310,7 @@ export default function Messagerie() {
                             {isMine && (
                               <div className="absolute bottom-full right-0 mb-1 z-[100] pointer-events-none hidden group-hover/reaction:block">
                                 <div className="bg-foreground/90 text-background text-[10px] px-2 py-0.5 rounded whitespace-nowrap shadow-sm">
-                                  Cliquez pour supprimer
+                                  {t("msg.clickToRemoveReaction")}
                                 </div>
                               </div>
                             )}
@@ -1326,7 +1331,7 @@ export default function Messagerie() {
               <div className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 px-3 py-2">
                 <Pencil className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-amber-600 mb-0.5">Modifier le message</p>
+                  <p className="text-xs font-semibold text-amber-600 mb-0.5">{t("msg.editMessage")}</p>
                   <input
                     value={editText}
                     onChange={e => setEditText(e.target.value)}
@@ -1354,7 +1359,7 @@ export default function Messagerie() {
             {replyTo && (
               <div className="flex items-start gap-2 rounded-xl bg-muted/60 border-l-4 border-primary px-3 py-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-primary mb-0.5">{replyTo.mine ? "Vous" : replyTo.from}</p>
+                  <p className="text-xs font-semibold text-primary mb-0.5">{replyTo.mine ? t("msg.you") : replyTo.from}</p>
                   <p className="text-xs text-muted-foreground truncate">{replyTo.text.slice(0, 80)}{replyTo.text.length > 80 ? "…" : ""}</p>
                 </div>
                 <button onClick={() => setReplyTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground mt-0.5">
@@ -1400,7 +1405,7 @@ export default function Messagerie() {
                   {fmtSecs(recordingSecs)}
                 </span>
                 <button onClick={cancelRecording} className="text-xs text-muted-foreground hover:text-foreground">
-                  Annuler
+                  {t("msg.recordingCancel")}
                 </button>
                 <button
                   onClick={stopAndSendVoice}
@@ -1453,13 +1458,13 @@ export default function Messagerie() {
       <AlertDialog open={!!deleteMsgId} onOpenChange={open => !open && setDeleteMsgId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce message ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("msg.deleteMsgTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Ce message sera supprimé définitivement. Cette action est irréversible.
+              {t("msg.deleteMsgDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t("msg.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -1469,11 +1474,11 @@ export default function Messagerie() {
                     m.id === deleteMsgId ? { ...m, deleted: true } : m
                   ),
                 }));
-                toast.success("Message supprimé");
+                toast.success(t("msg.toastMsgDeleted"));
                 setDeleteMsgId(null);
               }}
             >
-              Supprimer
+              {t("msg.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1483,18 +1488,18 @@ export default function Messagerie() {
       <AlertDialog open={!!deleteConvId} onOpenChange={open => !open && setDeleteConvId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette conversation ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("msg.deleteConvTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tous les messages seront supprimés définitivement. Cette action est irréversible.
+              {t("msg.deleteConvDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t("msg.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => { handleDeleteConversation(deleteConvId!); setDeleteConvId(null); }}
             >
-              Supprimer
+              {t("msg.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1505,7 +1510,7 @@ export default function Messagerie() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{t("msg.newConversation")}</DialogTitle>
-            <DialogDescription>Choisissez un collaborateur pour démarrer une conversation.</DialogDescription>
+            <DialogDescription>{t("msg.newConvDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1 py-2">
             {cabinetEmployees.map(emp => (
@@ -1542,15 +1547,15 @@ export default function Messagerie() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Forward className="h-4 w-4 text-primary" />
-              Transférer le message
+              {t("msg.forwardTitle")}
             </DialogTitle>
             <DialogDescription>
-              Choisissez la conversation de destination.
+              {t("msg.forwardDesc")}
             </DialogDescription>
           </DialogHeader>
           {forwardMsg && (
             <div className="rounded-xl bg-muted/60 border-l-4 border-primary px-3 py-2 mb-2">
-              <p className="text-xs font-semibold text-primary mb-0.5">{forwardMsg.mine ? "Vous" : forwardMsg.from}</p>
+              <p className="text-xs font-semibold text-primary mb-0.5">{forwardMsg.mine ? t("msg.you") : forwardMsg.from}</p>
               <p className="text-xs text-muted-foreground line-clamp-2">{forwardMsg.text}</p>
             </div>
           )}
@@ -1577,7 +1582,7 @@ export default function Messagerie() {
               ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setForwardMsg(null)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setForwardMsg(null)}>{t("msg.cancel")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

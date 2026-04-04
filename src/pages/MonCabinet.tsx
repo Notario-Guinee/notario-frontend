@@ -129,7 +129,7 @@ export default function MonCabinet() {
         await cabinetService.updateLogo(dataUrl);
         toast.success(t("cabinet.toastLogoUpdated"));
       } catch {
-        toast.error("Erreur lors de la mise à jour du logo");
+        toast.error(t("cabinet.toastLogoError"));
       }
     };
     reader.readAsDataURL(file);
@@ -301,7 +301,7 @@ export default function MonCabinet() {
                 <Input value={cabinetForm.adresse} onChange={e => setCabinetForm(f => ({ ...f, adresse: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Ville</Label>
+                <Label>{t("subs.billing.city")}</Label>
                 <Input value={cabinetForm.ville} onChange={e => setCabinetForm(f => ({ ...f, ville: e.target.value }))} />
               </div>
             </div>
@@ -351,9 +351,9 @@ export default function MonCabinet() {
 
             {/* Zone danger */}
             <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 shadow-card">
-              <h2 className="font-heading text-sm font-semibold text-destructive mb-1">Zone de danger</h2>
+              <h2 className="font-heading text-sm font-semibold text-destructive mb-1">{t("cabinet.dangerZone")}</h2>
               <p className="text-xs text-muted-foreground mb-4">
-                La suppression du cabinet est irréversible. Toutes les données seront désactivées.
+                {t("cabinet.dangerZoneDesc")}
               </p>
               <Button
                 variant="outline"
@@ -362,7 +362,7 @@ export default function MonCabinet() {
                 onClick={() => setDeletingCabinet(true)}
               >
                 <Trash2 className="h-4 w-4" />
-                Supprimer le cabinet
+                {t("cabinet.deleteOffice")}
               </Button>
             </div>
           </div>
@@ -373,21 +373,20 @@ export default function MonCabinet() {
       <AlertDialog open={deletingCabinet} onOpenChange={setDeletingCabinet}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer le cabinet ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("cabinet.deleteOfficeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action va désactiver <strong>{cabinetForm.nom}</strong> et toutes ses données.
-              Cette opération est irréversible.
+              {t("cabinet.deleteOfficeDesc")} <strong>{cabinetForm.nom}</strong> {t("cabinet.deleteOfficeDesc2")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingInProgress}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingInProgress}>{t("action.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteCabinet}
               disabled={deletingInProgress}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deletingInProgress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Supprimer définitivement
+              {t("cabinet.deleteOfficePermanently")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -425,14 +424,14 @@ export default function MonCabinet() {
 
             {/* URL photo */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> URL de la photo</Label>
+              <Label className="flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> {t("cabinet.photoUrl")}</Label>
               <Input
                 value={profilForm.photoUrl}
                 onChange={e => { setProfilForm(f => ({ ...f, photoUrl: e.target.value })); setPhotoPreview(e.target.value); }}
                 placeholder="https://cdn.example.com/photo.jpg"
                 className="font-mono text-xs"
               />
-              <p className="text-[10px] text-muted-foreground">Le fichier sélectionné est une prévisualisation locale — saisissez une URL HTTPS pour l'enregistrer.</p>
+              <p className="text-[10px] text-muted-foreground">{t("cabinet.photoUrlHint")}</p>
             </div>
 
             {/* Nom / Prénom */}
@@ -454,7 +453,7 @@ export default function MonCabinet() {
                 <Input value={profilForm.email} onChange={e => setProfilForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Téléphone</Label>
+                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {t("cabinet.phone")}</Label>
                 <Input value={profilForm.telephone} onChange={e => setProfilForm(f => ({ ...f, telephone: e.target.value }))} placeholder="+224 6XX XXX XXX" />
               </div>
             </div>
@@ -462,18 +461,18 @@ export default function MonCabinet() {
             {/* Date / Lieu de naissance */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Date de naissance</Label>
+                <Label className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {t("cabinet.birthDate")}</Label>
                 <Input type="date" value={profilForm.dateNaissance} onChange={e => setProfilForm(f => ({ ...f, dateNaissance: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><Flag className="h-3.5 w-3.5" /> Lieu de naissance</Label>
+                <Label className="flex items-center gap-1"><Flag className="h-3.5 w-3.5" /> {t("cabinet.birthPlace")}</Label>
                 <Input value={profilForm.lieuNaissance} onChange={e => setProfilForm(f => ({ ...f, lieuNaissance: e.target.value }))} placeholder="Ex: Conakry" />
               </div>
             </div>
 
             {/* Adresse */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Adresse</Label>
+              <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {t("label.adresse")}</Label>
               <Input value={profilForm.adresse} onChange={e => setProfilForm(f => ({ ...f, adresse: e.target.value }))} placeholder="Ex: Quartier Kaloum, Conakry" />
             </div>
 

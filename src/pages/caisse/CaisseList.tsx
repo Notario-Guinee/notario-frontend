@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { EcritureCaisseCard } from '@/components/caisse/EcritureCaisseCard';
 import { EcritureCaisseCardSkeleton } from '@/components/caisse/EcritureCaisseCardSkeleton';
 import type { TypeEcriture } from '@/types/caisse';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function CaisseList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [typeEcriture, setTypeEcriture] = useState<TypeEcriture | undefined>(undefined);
   const debouncedSearch = useDebounce(search, 400);
@@ -30,16 +32,16 @@ export default function CaisseList() {
 
   return (
     <InfiniteListLayout
-      title="Caisse"
+      title={t("list.caisse.title")}
       icon={<Wallet className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher une écriture…"
+      searchPlaceholder={t("list.caisse.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucune écriture enregistrée."
+      emptyMessage={t("list.caisse.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -53,10 +55,10 @@ export default function CaisseList() {
           }}
           className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
         >
-          <option value="">Tous les types</option>
-          <option value="RECETTE">Recette</option>
-          <option value="DEPENSE">Dépense</option>
-          <option value="DEBOURS">Débours</option>
+          <option value="">{t("list.caisse.allTypes")}</option>
+          <option value="RECETTE">{t("list.caisse.income")}</option>
+          <option value="DEPENSE">{t("list.caisse.expense")}</option>
+          <option value="DEBOURS">{t("list.caisse.disbursement")}</option>
         </select>
       }
     >

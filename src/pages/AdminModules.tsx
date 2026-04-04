@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { formatGNF } from "@/data/mockData";
+import { useLanguage } from "@/context/LanguageContext";
 
 const initialModules = [
   { id:"1",nom:"Gestion Clients",prix:100000,actif:true },
@@ -21,17 +22,25 @@ const initialModules = [
 ];
 
 export default function AdminModules() {
+  const { t } = useLanguage();
   const [modules, setModules] = useState(initialModules);
 
   const toggleModule = (id: string) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, actif: !m.actif } : m));
   };
 
+  const headers = [
+    t("adminModules.colModule"),
+    t("adminModules.colPrice"),
+    t("adminModules.colStatus"),
+    t("adminModules.colActions"),
+  ];
+
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-xl font-bold text-foreground">📦 Modules & Facturation</h1>
+      <h1 className="font-heading text-xl font-bold text-foreground">📦 {t("adminModules.title")}</h1>
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-card">
-        <table className="w-full"><thead><tr className="border-b border-border">{["Module","Prix mensuel","Statut","Actions"].map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
+        <table className="w-full"><thead><tr className="border-b border-border">{headers.map(h=><th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>)}</tr></thead>
         <tbody>{modules.map(m=>(
           <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
             <td className="px-4 py-3 text-sm font-medium text-foreground">{m.nom}</td>
@@ -39,7 +48,7 @@ export default function AdminModules() {
             <td className="px-4 py-3">
               <Switch checked={m.actif} onCheckedChange={() => toggleModule(m.id)} />
             </td>
-            <td className="px-4 py-3"><Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">Configurer</Button></td>
+            <td className="px-4 py-3"><Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">{t("adminModules.configure")}</Button></td>
           </tr>
         ))}</tbody></table>
       </div>

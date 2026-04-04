@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { FormationCard } from '@/components/formations/FormationCard';
 import { FormationCardSkeleton } from '@/components/formations/FormationCardSkeleton';
 import type { StatutFormation } from '@/types/formation';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function FormationList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [statut, setStatut] = useState<StatutFormation | undefined>(undefined);
   const debouncedSearch = useDebounce(search, 400);
@@ -30,16 +32,16 @@ export default function FormationList() {
 
   return (
     <InfiniteListLayout
-      title="Formations"
+      title={t("list.formations.title")}
       icon={<GraduationCap className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher une formation…"
+      searchPlaceholder={t("list.formations.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucune formation enregistrée."
+      emptyMessage={t("list.formations.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -53,11 +55,11 @@ export default function FormationList() {
           }}
           className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
         >
-          <option value="">Tous les statuts</option>
-          <option value="PLANIFIEE">Planifiée</option>
-          <option value="EN_COURS">En cours</option>
-          <option value="TERMINEE">Terminée</option>
-          <option value="ANNULEE">Annulée</option>
+          <option value="">{t("list.formations.allStatuses")}</option>
+          <option value="PLANIFIEE">{t("list.formations.planned")}</option>
+          <option value="EN_COURS">{t("list.formations.inProgress")}</option>
+          <option value="TERMINEE">{t("list.formations.completed")}</option>
+          <option value="ANNULEE">{t("list.formations.cancelled")}</option>
         </select>
       }
     >

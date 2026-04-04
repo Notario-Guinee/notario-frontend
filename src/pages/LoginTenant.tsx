@@ -48,7 +48,7 @@ export default function LoginTenant() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError("Veuillez remplir tous les champs");
+      setError(t("login.fillAllFields"));
       return;
     }
     setLoading(true);
@@ -57,7 +57,7 @@ export default function LoginTenant() {
       await login(email, password, getTenantId(portal));
       navigate(getDashboardPath(portal));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
+      setError(err instanceof Error ? err.message : t("login.connectionError"));
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ export default function LoginTenant() {
             {portal === "admin" && (
               <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full mb-6">
                 <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                <span className="text-[11px] text-white/60 font-medium">Accès restreint</span>
+                <span className="text-[11px] text-white/60 font-medium">{t("login.accessRestricted")}</span>
               </div>
             )}
             <h2 className="text-white text-[22px] font-medium leading-snug mb-3 whitespace-pre-line">
@@ -205,7 +205,7 @@ export default function LoginTenant() {
             </div>
 
             <Button className={`w-full ${btnBg} text-white font-medium h-11`} onClick={handleLogin} disabled={loading}>
-              {loading ? "Connexion en cours..." : t("login.tenantSubmit")}
+              {loading ? t("login.connecting") : t("login.tenantSubmit")}
             </Button>
           </div>
 
@@ -224,8 +224,8 @@ export default function LoginTenant() {
             )}
             {portal === "client" && (
               <p>
-                Vous êtes du cabinet ?{" "}
-                <button onClick={() => navigate("/login")} className="text-primary hover:underline font-medium">Connexion cabinet</button>
+                {t("login.clientQuestion")}{" "}
+                <button onClick={() => navigate("/login")} className="text-primary hover:underline font-medium">{t("login.officeLogin")}</button>
               </p>
             )}
           </div>

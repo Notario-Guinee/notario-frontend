@@ -60,9 +60,9 @@ export default function Factures() {
 
   // Création d'une nouvelle facture
   const handleCreate = useCallback(() => {
-    if (!form.client?.trim()) { toast.error("Le client est obligatoire."); return; }
+    if (!form.client?.trim()) { toast.error(t("factures.errorClientRequired")); return; }
     const montant = Number(form.montant);
-    if (!montant || montant <= 0) { toast.error("Le montant doit être supérieur à 0."); return; }
+    if (!montant || montant <= 0) { toast.error(t("factures.errorAmountInvalid")); return; }
 
     setIsSubmitting(true);
     try {
@@ -78,7 +78,7 @@ export default function Factures() {
       toast.success(`${num} ${t("factures.toastCreated")}`);
       announce(fr ? "Facture créée" : "Invoice created");
     } catch (err) {
-      toast.error(fr ? "Erreur lors de la création" : "Error creating invoice");
+      toast.error(t("factures.errorCreating"));
       console.error(err);
     } finally {
       setIsSubmitting(false);

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 import type { DocumentChange, DocumentCollaborator } from "@/types/documents";
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -57,70 +58,25 @@ interface AuditEntry {
   device: string;
 }
 
-// ─── Config événements ─────────────────────────────────────────
+// ─── Config événements (sans labels — computed inside component) ────────────
 
-interface EventConfig {
+interface EventMeta {
   icon: React.ReactNode;
   colorClass: string;
-  label: string;
 }
 
-const EVENT_CONFIG: Record<AuditEventType, EventConfig> = {
-  view: {
-    icon: <Eye className="h-4 w-4" />,
-    colorClass: "text-muted-foreground",
-    label: "Consultation",
-  },
-  edit: {
-    icon: <Pencil className="h-4 w-4" />,
-    colorClass: "text-primary",
-    label: "Modification",
-  },
-  comment: {
-    icon: <MessageSquare className="h-4 w-4" />,
-    colorClass: "text-blue-500",
-    label: "Commentaire",
-  },
-  version_create: {
-    icon: <GitBranch className="h-4 w-4" />,
-    colorClass: "text-amber-500",
-    label: "Création de version",
-  },
-  collaborator_add: {
-    icon: <UserPlus className="h-4 w-4" />,
-    colorClass: "text-emerald-500",
-    label: "Collaborateur ajouté",
-  },
-  collaborator_remove: {
-    icon: <UserMinus className="h-4 w-4" />,
-    colorClass: "text-destructive",
-    label: "Collaborateur retiré",
-  },
-  status_change: {
-    icon: <RefreshCw className="h-4 w-4" />,
-    colorClass: "text-amber-400",
-    label: "Changement de statut",
-  },
-  lock: {
-    icon: <Lock className="h-4 w-4" />,
-    colorClass: "text-destructive",
-    label: "Verrouillage",
-  },
-  unlock: {
-    icon: <LockOpen className="h-4 w-4" />,
-    colorClass: "text-emerald-500",
-    label: "Déverrouillage",
-  },
-  export: {
-    icon: <Download className="h-4 w-4" />,
-    colorClass: "text-muted-foreground",
-    label: "Export",
-  },
-  restore: {
-    icon: <RotateCcw className="h-4 w-4" />,
-    colorClass: "text-primary",
-    label: "Restauration",
-  },
+const EVENT_META: Record<AuditEventType, EventMeta> = {
+  view:                { icon: <Eye className="h-4 w-4" />,          colorClass: "text-muted-foreground" },
+  edit:                { icon: <Pencil className="h-4 w-4" />,       colorClass: "text-primary" },
+  comment:             { icon: <MessageSquare className="h-4 w-4" />, colorClass: "text-blue-500" },
+  version_create:      { icon: <GitBranch className="h-4 w-4" />,    colorClass: "text-amber-500" },
+  collaborator_add:    { icon: <UserPlus className="h-4 w-4" />,     colorClass: "text-emerald-500" },
+  collaborator_remove: { icon: <UserMinus className="h-4 w-4" />,    colorClass: "text-destructive" },
+  status_change:       { icon: <RefreshCw className="h-4 w-4" />,    colorClass: "text-amber-400" },
+  lock:                { icon: <Lock className="h-4 w-4" />,         colorClass: "text-destructive" },
+  unlock:              { icon: <LockOpen className="h-4 w-4" />,     colorClass: "text-emerald-500" },
+  export:              { icon: <Download className="h-4 w-4" />,     colorClass: "text-muted-foreground" },
+  restore:             { icon: <RotateCcw className="h-4 w-4" />,    colorClass: "text-primary" },
 };
 
 // ─── IP et Device simulés ──────────────────────────────────────
@@ -145,7 +101,6 @@ function buildAuditEntries(
 ): AuditEntry[] {
   const entries: AuditEntry[] = [];
 
-  // Entrées depuis les DocumentChange
   changes.forEach((change, i) => {
     const typeMap: Record<string, AuditEventType> = {
       insertion: "edit",
@@ -167,7 +122,6 @@ function buildAuditEntries(
     });
   });
 
-  // Ajout de collaborateurs
   collaborators.forEach((c, i) => {
     entries.push({
       id: `audit-collab-add-${c.id}`,
@@ -182,7 +136,6 @@ function buildAuditEntries(
     });
   });
 
-  // Événements fictifs supplémentaires
   const fictiveUsers = [
     { id: "u1", name: "Mamadou Diallo", initiales: "MD" },
     { id: "u2", name: "Aïssatou Keita", initiales: "AK" },
@@ -276,20 +229,7 @@ function buildAuditEntries(
     entries.push({ ...ev, id: `audit-fictive-${i}-${documentId}` });
   });
 
-  // Trier par timestamp décroissant
   return entries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-}
-
-// ─── Formatage timestamp ───────────────────────────────────────
-
-function formatRelative(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "à l'instant";
-  if (diffMin < 60) return `il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `il y a ${diffH}h`;
-  return `il y a ${Math.floor(diffH / 24)}j`;
 }
 
 // ─── Props ─────────────────────────────────────────────────────
@@ -307,10 +247,38 @@ const PAGE_SIZE = 20;
 // ─── Composant ─────────────────────────────────────────────────
 
 export default function AuditLog({ documentId, changes, collaborators }: AuditLogProps) {
+  const { t } = useLanguage();
+
   const allEntries = useMemo(
     () => buildAuditEntries(documentId, changes, collaborators),
     [documentId, changes, collaborators]
   );
+
+  // ── Event labels (translated)
+  const eventLabels: Record<AuditEventType, string> = {
+    view:                t("audit.eventView"),
+    edit:                t("audit.eventEdit"),
+    comment:             t("audit.eventComment"),
+    version_create:      t("audit.eventVersionCreate"),
+    collaborator_add:    t("audit.eventCollaboratorAdd"),
+    collaborator_remove: t("audit.eventCollaboratorRemove"),
+    status_change:       t("audit.eventStatusChange"),
+    lock:                t("audit.eventLock"),
+    unlock:              t("audit.eventUnlock"),
+    export:              t("audit.eventExport"),
+    restore:             t("audit.eventRestore"),
+  };
+
+  // ── Relative time (translated)
+  function formatRelative(date: Date): string {
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return t("audit.now");
+    if (diffMin < 60) return `${t("audit.minutesAgo")} ${diffMin} ${t("audit.min")}`.trim();
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${t("audit.hoursAgo")} ${diffH}${t("audit.hour")}`.trim();
+    return `${t("audit.daysAgo")} ${Math.floor(diffH / 24)}${t("audit.day")}`.trim();
+  }
 
   // ── Filtres
   const [search, setSearch] = useState("");
@@ -331,14 +299,13 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
   }, [allEntries]);
 
   // ── Types uniques
-  const uniqueTypes = Object.keys(EVENT_CONFIG) as AuditEventType[];
+  const uniqueTypes = Object.keys(EVENT_META) as AuditEventType[];
 
   // ── Filtrage
   const now = Date.now();
 
   const filtered = useMemo(() => {
     return allEntries.filter((entry) => {
-      // Search
       if (
         search &&
         !entry.userName.toLowerCase().includes(search.toLowerCase()) &&
@@ -346,11 +313,8 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
       ) {
         return false;
       }
-      // User
       if (filterUser !== "all" && entry.userId !== filterUser) return false;
-      // Type
       if (filterType !== "all" && entry.type !== filterType) return false;
-      // Period
       if (filterPeriod !== "all") {
         const diffH = (now - entry.timestamp.getTime()) / 3600000;
         if (filterPeriod === "today" && diffH > 24) return false;
@@ -367,7 +331,7 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
   const pageEntries = filtered.slice((safeePage - 1) * PAGE_SIZE, safeePage * PAGE_SIZE);
 
   const handleExport = () => {
-    toast.info("Export du journal en cours...");
+    toast.info(t("audit.exportInProgress"));
   };
 
   return (
@@ -376,10 +340,10 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <h2 className="font-heading text-base font-semibold text-foreground">
-            Journal d'audit
+            {t("audit.title")}
           </h2>
           <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
-            {filtered.length} entrée{filtered.length > 1 ? "s" : ""}
+            {filtered.length} {filtered.length > 1 ? t("audit.entries") : t("audit.entry")}
           </span>
         </div>
         <Button
@@ -389,14 +353,14 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
           onClick={handleExport}
         >
           <FileDown className="h-4 w-4" />
-          Exporter PDF
+          {t("audit.exportPdf")}
         </Button>
       </div>
 
       {/* ── Filtres */}
       <div className="flex flex-wrap gap-2">
         <Input
-          placeholder="Rechercher dans le journal..."
+          placeholder={t("audit.searchPlaceholder")}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -413,10 +377,10 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
           }}
         >
           <SelectTrigger className="h-8 text-xs w-44">
-            <SelectValue placeholder="Tous les utilisateurs" />
+            <SelectValue placeholder={t("audit.filterAllUsers")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les utilisateurs</SelectItem>
+            <SelectItem value="all">{t("audit.filterAllUsers")}</SelectItem>
             {uniqueUsers.map((u) => (
               <SelectItem key={u.id} value={u.id} className="text-xs">
                 {u.name}
@@ -433,13 +397,13 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
           }}
         >
           <SelectTrigger className="h-8 text-xs w-44">
-            <SelectValue placeholder="Tous les types" />
+            <SelectValue placeholder={t("audit.filterAllTypes")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les types</SelectItem>
-            {uniqueTypes.map((t) => (
-              <SelectItem key={t} value={t} className="text-xs">
-                {EVENT_CONFIG[t].label}
+            <SelectItem value="all">{t("audit.filterAllTypes")}</SelectItem>
+            {uniqueTypes.map((type) => (
+              <SelectItem key={type} value={type} className="text-xs">
+                {eventLabels[type]}
               </SelectItem>
             ))}
           </SelectContent>
@@ -453,13 +417,13 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
           }}
         >
           <SelectTrigger className="h-8 text-xs w-36">
-            <SelectValue placeholder="Période" />
+            <SelectValue placeholder={t("audit.filterPeriod")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tout</SelectItem>
-            <SelectItem value="today">Aujourd'hui</SelectItem>
-            <SelectItem value="7days">7 derniers jours</SelectItem>
-            <SelectItem value="30days">30 jours</SelectItem>
+            <SelectItem value="all">{t("audit.filterAll")}</SelectItem>
+            <SelectItem value="today">{t("audit.filterToday")}</SelectItem>
+            <SelectItem value="7days">{t("audit.filter7days")}</SelectItem>
+            <SelectItem value="30days">{t("audit.filter30days")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -468,11 +432,11 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
       <div className="space-y-2">
         {pageEntries.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Aucun événement trouvé
+            {t("audit.noEvents")}
           </p>
         )}
         {pageEntries.map((entry) => {
-          const config = EVENT_CONFIG[entry.type];
+          const meta = EVENT_META[entry.type];
           return (
             <div
               key={entry.id}
@@ -482,10 +446,10 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
               <div
                 className={cn(
                   "h-7 w-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0 mt-0.5",
-                  config.colorClass
+                  meta.colorClass
                 )}
               >
-                {config.icon}
+                {meta.icon}
               </div>
 
               {/* Avatar utilisateur */}
@@ -521,10 +485,10 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
             disabled={safeePage <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            Précédent
+            {t("audit.prev")}
           </Button>
           <span className="text-xs text-muted-foreground">
-            Page {safeePage} sur {totalPages}
+            {t("list.item") !== "item" ? "Page" : "Page"} {safeePage} {t("audit.pageOf")} {totalPages}
           </span>
           <Button
             variant="outline"
@@ -533,7 +497,7 @@ export default function AuditLog({ documentId, changes, collaborators }: AuditLo
             disabled={safeePage >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Suivant
+            {t("audit.next")}
           </Button>
         </div>
       )}

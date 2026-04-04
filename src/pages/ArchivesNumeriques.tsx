@@ -215,7 +215,7 @@ function TagBadge({ tag, onRemove }: { tag: DriveTag; onRemove?: () => void }) {
 // ═══════════════════════════════════════════════════════════════
 
 export default function ArchivesNumeriques() {
-  useLanguage();
+  const { t } = useLanguage();
 
   const fileInputRef        = useRef<HTMLInputElement>(null);
   const folderInputRef      = useRef<HTMLInputElement>(null);
@@ -719,7 +719,7 @@ export default function ArchivesNumeriques() {
             <div className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
               <p className="text-xs font-medium text-muted-foreground mb-2">Couleur du dossier</p>
               <div className="grid grid-cols-6 gap-1">
-                <button title="Aucune couleur"
+                <button title={t("archNum.noColor")}
                   className="h-5 w-5 rounded-full border-2 border-border flex items-center justify-center"
                   onClick={() => setFolderColor(item.id, undefined)}>
                   {!item.color && <Check className="h-2.5 w-2.5" />}
@@ -972,13 +972,13 @@ export default function ArchivesNumeriques() {
         </nav>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')} title="Vue liste">
+          <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')} title={t("archNum.viewList")}>
             <List className="h-4 w-4" />
           </Button>
-          <Button variant={viewMode === 'compact' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('compact')} title="Vue compacte">
+          <Button variant={viewMode === 'compact' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('compact')} title={t("archNum.viewCompact")}>
             <Rows3 className="h-4 w-4" />
           </Button>
-          <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')} title="Vue grille">
+          <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')} title={t("archNum.viewGrid")}>
             <LayoutGrid className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setShowAudit(true)} title="Journal d'audit">
@@ -990,7 +990,7 @@ export default function ArchivesNumeriques() {
             size="icon"
             className="h-8 w-8 relative"
             onClick={() => { setShowTrash(v => !v); setSearch(''); }}
-            title="Corbeille"
+            title={t("archNum.trash")}
           >
             <Trash2 className="h-4 w-4" />
             {trashedCount > 0 && <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">{trashedCount}</span>}
@@ -1007,7 +1007,7 @@ export default function ArchivesNumeriques() {
             </button>
             <span className="text-sm font-medium">{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</span>
             <div className="flex items-center gap-1 ml-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8" title="Télécharger" onClick={() => [...selected].forEach(id => { const it = items.find(i => i.id === id); if (it) download(it); })}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" title={t("archNum.download")} onClick={() => [...selected].forEach(id => { const it = items.find(i => i.id === id); if (it) download(it); })}>
                 <Download className="h-4 w-4" />
               </Button>
               {showTrash ? (
@@ -1023,14 +1023,14 @@ export default function ArchivesNumeriques() {
                 <>
                   {/* Changer le statut en masse */}
                   {[...selected].some(id => items.find(i => i.id === id)?.type === 'file') && (
-                    <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" title="Changer le statut" onClick={() => {
+                    <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" title={t("archNum.changeStatus")} onClick={() => {
                       const fileItems = [...selected].map(id => items.find(i => i.id === id)).filter(Boolean).filter(i => i!.type === 'file') as DriveItem[];
                       setBulkStatusItem(fileItems); setBulkNewStatus('Indexé');
                     }}>
                       <Clock className="h-3.5 w-3.5" /> Statut
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title="Mettre à la corbeille" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" title={t("archNum.moveToTrash")} onClick={() => {
                     [...selected].forEach(id => { const it = items.find(i => i.id === id); if (it) softDelete(it); });
                     setSelected(new Set());
                   }}>
@@ -1339,22 +1339,22 @@ export default function ArchivesNumeriques() {
             {/* Métadonnées */}
             <div className="px-4 py-3 space-y-3 flex-1">
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Informations</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("archNum.info")}</p>
                 <dl className="space-y-1.5 text-xs">
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Type</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelType")}</dt>
                     <dd className="font-medium text-right">{panelItem.docType ?? '—'}</dd>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Taille</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelSize")}</dt>
                     <dd className="font-medium text-right">{formatSize(panelItem.sizeLabel)}</dd>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Version</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelVersion")}</dt>
                     <dd className="font-medium text-right font-mono">v{panelItem.version ?? 1}</dd>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Statut</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelStatus")}</dt>
                     <dd>
                       {panelItem.statut && (
                         <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded-full', STATUS_STYLES[panelItem.statut])}>
@@ -1364,16 +1364,16 @@ export default function ArchivesNumeriques() {
                     </dd>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Propriétaire</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelOwner")}</dt>
                     <dd className="font-medium text-right">{panelItem.owner}</dd>
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <dt className="text-muted-foreground shrink-0">Modifié</dt>
+                    <dt className="text-muted-foreground shrink-0">{t("archNum.labelModified")}</dt>
                     <dd className="font-medium text-right">{panelItem.modifiedAt}</dd>
                   </div>
                   {panelItem.client && (
                     <div className="flex items-start justify-between gap-2">
-                      <dt className="text-muted-foreground shrink-0">Client</dt>
+                      <dt className="text-muted-foreground shrink-0">{t("archNum.labelClient")}</dt>
                       <dd className="font-medium text-right truncate max-w-[130px]">{panelItem.client}</dd>
                     </div>
                   )}
@@ -1382,7 +1382,7 @@ export default function ArchivesNumeriques() {
 
               {panelItem.tags && panelItem.tags.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Étiquettes</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t("archNum.labelTags")}</p>
                   <div className="flex flex-wrap gap-1">
                     {panelItem.tags.map(tag => <TagBadge key={tag} tag={tag} />)}
                   </div>
@@ -1393,17 +1393,17 @@ export default function ArchivesNumeriques() {
             {/* Boutons d'action */}
             <div className="px-4 pb-4 pt-2 border-t border-border space-y-2">
               <Button size="sm" className="w-full gap-1.5 justify-start" onClick={() => { setPreviewItem(panelItem); }}>
-                <Eye className="h-3.5 w-3.5" /> Ouvrir l'aperçu
+                <Eye className="h-3.5 w-3.5" /> {t("archNum.openPreview")}
               </Button>
               <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start" onClick={() => download(panelItem)}>
-                <Download className="h-3.5 w-3.5" /> Télécharger
+                <Download className="h-3.5 w-3.5" /> {t("archNum.download")}
               </Button>
               <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start" onClick={() => setShareItem(panelItem)}>
-                <Share2 className="h-3.5 w-3.5" /> Partager
+                <Share2 className="h-3.5 w-3.5" /> {t("archNum.share")}
               </Button>
               <Button size="sm" variant="outline" className="w-full gap-1.5 justify-start text-destructive hover:text-destructive"
                 onClick={() => { setDeleteItem(panelItem); setDeleteReason(''); setPanelItem(null); }}>
-                <Trash2 className="h-3.5 w-3.5" /> Mettre à la corbeille
+                <Trash2 className="h-3.5 w-3.5" /> {t("archNum.moveToTrash")}
               </Button>
             </div>
           </aside>
@@ -1451,11 +1451,11 @@ export default function ArchivesNumeriques() {
       {/* Nouveau dossier */}
       <Dialog open={showNewFolder} onOpenChange={setShowNewFolder}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nouveau dossier</DialogTitle></DialogHeader>
-          <Input placeholder="Nom du dossier" value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createFolder()} autoFocus />
+          <DialogHeader><DialogTitle>{t("archNum.newFolder")}</DialogTitle></DialogHeader>
+          <Input placeholder={t("archNum.folderNamePlaceholder")} value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createFolder()} autoFocus />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowNewFolder(false)}>Annuler</Button>
-            <Button onClick={createFolder} disabled={!newFolderName.trim()}>Créer</Button>
+            <Button variant="ghost" onClick={() => setShowNewFolder(false)}>{t("action.cancel")}</Button>
+            <Button onClick={createFolder} disabled={!newFolderName.trim()}>{t("archNum.create")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1466,7 +1466,7 @@ export default function ArchivesNumeriques() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-4 w-4 text-primary" />
-              Importer un fichier
+              {t("archNum.importFile")}
             </DialogTitle>
             <DialogDescription className="truncate text-xs">
               {pendingImportFile?.name}
@@ -1475,18 +1475,18 @@ export default function ArchivesNumeriques() {
           <div className="space-y-4 py-1">
             {/* Emplacement actuel */}
             <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
-              <p className="text-xs text-muted-foreground mb-0.5">Emplacement actuel</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{t("archNum.currentLocation")}</p>
               <p className="font-medium truncate">
-                {breadcrumb.length > 0 ? breadcrumb.map(b => b.name).join(' / ') : 'Racine'}
+                {breadcrumb.length > 0 ? breadcrumb.map(b => b.name).join(' / ') : t("archNum.root")}
               </p>
             </div>
             {/* Option: nouveau dossier */}
             <div className="space-y-1.5">
-              <Label className="text-sm">Créer un nouveau dossier <span className="text-muted-foreground font-normal">(optionnel)</span></Label>
+              <Label className="text-sm">{t("archNum.createNewFolder")} <span className="text-muted-foreground font-normal">{t("archNum.optional")}</span></Label>
               <div className="flex items-center gap-2">
                 <FolderPlus className="h-4 w-4 text-muted-foreground shrink-0" />
                 <Input
-                  placeholder="Nom du nouveau dossier…"
+                  placeholder={t("archNum.newFolderPlaceholder")}
                   value={importNewFolder}
                   onChange={e => setImportNewFolder(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && pendingImportFile && confirmImport()}
@@ -1494,18 +1494,18 @@ export default function ArchivesNumeriques() {
               </div>
               {importNewFolder.trim() && (
                 <p className="text-xs text-muted-foreground pl-6">
-                  Le fichier sera ajouté dans ce nouveau dossier.
+                  {t("archNum.fileAddedToNewFolder")}
                 </p>
               )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setShowImportDest(false); setPendingImportFile(null); }}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button onClick={confirmImport} disabled={!pendingImportFile}>
               <Upload className="h-4 w-4 mr-1.5" />
-              Importer
+              {t("archNum.import")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1514,11 +1514,11 @@ export default function ArchivesNumeriques() {
       {/* Renommer */}
       <Dialog open={!!renameItem} onOpenChange={o => !o && setRenameItem(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Renommer</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("archNum.rename")}</DialogTitle></DialogHeader>
           <Input value={renameValue} onChange={e => setRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && renameCommit()} autoFocus />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRenameItem(null)}>Annuler</Button>
-            <Button onClick={renameCommit} disabled={!renameValue.trim()}>Renommer</Button>
+            <Button variant="ghost" onClick={() => setRenameItem(null)}>{t("action.cancel")}</Button>
+            <Button onClick={renameCommit} disabled={!renameValue.trim()}>{t("archNum.rename")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1526,27 +1526,27 @@ export default function ArchivesNumeriques() {
       {/* Modifier (fichier) */}
       <Dialog open={!!editItem} onOpenChange={o => !o && setEditItem(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Modifier le fichier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("archNum.editFile")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Nom</Label>
+              <Label>{t("archNum.name")}</Label>
               <Input value={editName} onChange={e => setEditName(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Type de document</Label>
+              <Label>{t("archNum.docType")}</Label>
               <Select value={editDocType} onValueChange={v => setEditDocType(v as DocType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(['PDF', 'Image', 'Vidéo', 'Audio', 'Texte', 'Tableur', 'Code', 'Autre'] as DocType[]).map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {(['PDF', 'Image', 'Vidéo', 'Audio', 'Texte', 'Tableur', 'Code', 'Autre'] as DocType[]).map(dt => (
+                    <SelectItem key={dt} value={dt}>{dt}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEditItem(null)}>Annuler</Button>
-            <Button onClick={editCommit}>Enregistrer</Button>
+            <Button variant="ghost" onClick={() => setEditItem(null)}>{t("action.cancel")}</Button>
+            <Button onClick={editCommit}>{t("archNum.save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1554,10 +1554,10 @@ export default function ArchivesNumeriques() {
       {/* Déplacer */}
       <Dialog open={!!moveItem} onOpenChange={o => !o && setMoveItem(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Déplacer « {moveItem?.name} »</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("archNum.move")} « {moveItem?.name} »</DialogTitle></DialogHeader>
           <div className="space-y-1 max-h-60 overflow-y-auto">
             <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-left" onClick={() => moveCommit(null)}>
-              <Folder className="h-4 w-4 text-muted-foreground" /> Mon Drive (racine)
+              <Folder className="h-4 w-4 text-muted-foreground" /> {t("archNum.myDrive")}
             </button>
             {items.filter(i => i.type === 'folder' && i.id !== moveItem?.id && !i.isDeleted).map(f => (
               <button key={f.id} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-left" onClick={() => moveCommit(f.id)}>
@@ -1566,7 +1566,7 @@ export default function ArchivesNumeriques() {
               </button>
             ))}
           </div>
-          <DialogFooter><Button variant="ghost" onClick={() => setMoveItem(null)}>Annuler</Button></DialogFooter>
+          <DialogFooter><Button variant="ghost" onClick={() => setMoveItem(null)}>{t("action.cancel")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1583,20 +1583,20 @@ export default function ArchivesNumeriques() {
             <div className="space-y-4">
               <div className="rounded-xl bg-muted/40 border border-border h-48 flex flex-col items-center justify-center gap-2">
                 {(() => { const I = fileIconComp(previewItem); return <I className="h-14 w-14 text-muted-foreground/30" />; })()}
-                <p className="text-xs text-muted-foreground">Aperçu non disponible en mode démo</p>
+                <p className="text-xs text-muted-foreground">{t("archNum.previewUnavailable")}</p>
               </div>
               <dl className="grid grid-cols-2 gap-y-1.5 text-xs">
-                <dt className="text-muted-foreground">Type</dt><dd>{previewItem.docType}</dd>
-                <dt className="text-muted-foreground">Taille</dt><dd>{previewItem.sizeLabel}</dd>
-                <dt className="text-muted-foreground">Version</dt><dd>v{previewItem.version ?? 1}</dd>
-                <dt className="text-muted-foreground">Statut</dt>
+                <dt className="text-muted-foreground">{t("archNum.labelType")}</dt><dd>{previewItem.docType}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelSize")}</dt><dd>{previewItem.sizeLabel}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelVersion")}</dt><dd>v{previewItem.version ?? 1}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelStatus")}</dt>
                 <dd>{previewItem.statut && <span className={cn('px-1.5 py-0.5 rounded-full font-medium', STATUS_STYLES[previewItem.statut])}>{previewItem.statut}</span>}</dd>
-                <dt className="text-muted-foreground">Client</dt><dd>{previewItem.client ?? '—'}</dd>
-                <dt className="text-muted-foreground">Modifié</dt><dd>{previewItem.modifiedAt}</dd>
-                <dt className="text-muted-foreground">Propriétaire</dt><dd>{previewItem.owner}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelClient")}</dt><dd>{previewItem.client ?? '—'}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelModified")}</dt><dd>{previewItem.modifiedAt}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelOwner")}</dt><dd>{previewItem.owner}</dd>
                 {previewItem.tags && previewItem.tags.length > 0 && (
                   <>
-                    <dt className="text-muted-foreground">Étiquettes</dt>
+                    <dt className="text-muted-foreground">{t("archNum.labelTags")}</dt>
                     <dd className="flex flex-wrap gap-1">
                       {previewItem.tags.map(tag => <TagBadge key={tag} tag={tag} />)}
                     </dd>
@@ -1607,9 +1607,9 @@ export default function ArchivesNumeriques() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => previewItem && download(previewItem)}>
-              <Download className="h-4 w-4 mr-1.5" /> Télécharger
+              <Download className="h-4 w-4 mr-1.5" /> {t("archNum.download")}
             </Button>
-            <Button variant="ghost" onClick={() => setPreviewItem(null)}>Fermer</Button>
+            <Button variant="ghost" onClick={() => setPreviewItem(null)}>{t("action.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1617,7 +1617,7 @@ export default function ArchivesNumeriques() {
       {/* Informations */}
       <Dialog open={!!infoItem} onOpenChange={o => !o && setInfoItem(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Informations</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("archNum.info")}</DialogTitle></DialogHeader>
           {infoItem && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 pb-3 border-b">
@@ -1628,22 +1628,22 @@ export default function ArchivesNumeriques() {
                 <span className="font-medium text-sm leading-snug">{infoItem.name}</span>
               </div>
               <dl className="grid grid-cols-2 gap-y-2 text-xs">
-                <dt className="text-muted-foreground">Type</dt><dd>{infoItem.type === 'folder' ? 'Dossier' : infoItem.docType}</dd>
-                <dt className="text-muted-foreground">Propriétaire</dt><dd>{infoItem.owner}</dd>
-                <dt className="text-muted-foreground">Modifié le</dt><dd>{infoItem.modifiedAt}</dd>
-                {infoItem.type === 'file' && <><dt className="text-muted-foreground">Version</dt><dd>v{infoItem.version ?? 1}</dd></>}
-                {infoItem.sizeLabel && <><dt className="text-muted-foreground">Taille</dt><dd>{infoItem.sizeLabel}</dd></>}
-                {infoItem.client && <><dt className="text-muted-foreground">Client</dt><dd>{infoItem.client}</dd></>}
+                <dt className="text-muted-foreground">{t("archNum.labelType")}</dt><dd>{infoItem.type === 'folder' ? t("archNum.folder") : infoItem.docType}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelOwner")}</dt><dd>{infoItem.owner}</dd>
+                <dt className="text-muted-foreground">{t("archNum.labelModifiedOn")}</dt><dd>{infoItem.modifiedAt}</dd>
+                {infoItem.type === 'file' && <><dt className="text-muted-foreground">{t("archNum.labelVersion")}</dt><dd>v{infoItem.version ?? 1}</dd></>}
+                {infoItem.sizeLabel && <><dt className="text-muted-foreground">{t("archNum.labelSize")}</dt><dd>{infoItem.sizeLabel}</dd></>}
+                {infoItem.client && <><dt className="text-muted-foreground">{t("archNum.labelClient")}</dt><dd>{infoItem.client}</dd></>}
                 {infoItem.tags && infoItem.tags.length > 0 && (
                   <>
-                    <dt className="text-muted-foreground">Étiquettes</dt>
-                    <dd className="flex flex-wrap gap-1">{infoItem.tags.map(t => <TagBadge key={t} tag={t} />)}</dd>
+                    <dt className="text-muted-foreground">{t("archNum.labelTags")}</dt>
+                    <dd className="flex flex-wrap gap-1">{infoItem.tags.map(tag => <TagBadge key={tag} tag={tag} />)}</dd>
                   </>
                 )}
               </dl>
             </div>
           )}
-          <DialogFooter><Button variant="ghost" onClick={() => setInfoItem(null)}>Fermer</Button></DialogFooter>
+          <DialogFooter><Button variant="ghost" onClick={() => setInfoItem(null)}>{t("action.close")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1651,27 +1651,27 @@ export default function ArchivesNumeriques() {
       <Dialog open={!!shareItem} onOpenChange={o => !o && setShareItem(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> Partager</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" /> {t("archNum.share")}</DialogTitle>
             <DialogDescription>« {shareItem?.name} »</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="flex gap-2">
-              <Input placeholder="Adresse e-mail du collaborateur" className="flex-1" />
+              <Input placeholder={t("archNum.emailPlaceholder")} className="flex-1" />
               <Select defaultValue="viewer">
                 <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="viewer">Lecture</SelectItem>
-                  <SelectItem value="editor">Édition</SelectItem>
+                  <SelectItem value="viewer">{t("archNum.readAccess")}</SelectItem>
+                  <SelectItem value="editor">{t("archNum.editAccess")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="rounded-lg bg-muted/50 border border-border p-3 text-xs text-muted-foreground">
-              Actuellement : accessible uniquement par <span className="text-foreground font-medium">Me Diallo</span>
+              {t("archNum.currentAccess")} <span className="text-foreground font-medium">Me Diallo</span>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShareItem(null)}>Annuler</Button>
-            <Button onClick={() => { toast.success('Invitation envoyée'); setShareItem(null); }}>Inviter</Button>
+            <Button variant="outline" onClick={() => setShareItem(null)}>{t("action.cancel")}</Button>
+            <Button onClick={() => { toast.success(t("archNum.invitationSent")); setShareItem(null); }}>{t("archNum.invite")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1681,19 +1681,19 @@ export default function ArchivesNumeriques() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Placer dans la corbeille
+              <Trash2 className="h-5 w-5" /> {t("archNum.trashTitle")}
             </DialogTitle>
             <DialogDescription>
-              « {deleteItem?.name} » sera placé dans la corbeille. Vous pourrez le restaurer ultérieurement.
+              « {deleteItem?.name} » {t("archNum.trashDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
-            <Label>Motif (optionnel)</Label>
-            <Textarea placeholder="Précisez la raison…" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} rows={3} className="resize-none" />
+            <Label>{t("archNum.reasonLabel")}</Label>
+            <Textarea placeholder={t("archNum.reasonPlaceholder")} value={deleteReason} onChange={e => setDeleteReason(e.target.value)} rows={3} className="resize-none" />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteItem(null)}>Annuler</Button>
-            <Button variant="destructive" onClick={() => deleteItem && softDelete(deleteItem)}>Mettre à la corbeille</Button>
+            <Button variant="ghost" onClick={() => setDeleteItem(null)}>{t("action.cancel")}</Button>
+            <Button variant="destructive" onClick={() => deleteItem && softDelete(deleteItem)}>{t("archNum.moveToTrash")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1702,8 +1702,8 @@ export default function ArchivesNumeriques() {
       <Dialog open={!!bulkStatusItem} onOpenChange={o => !o && setBulkStatusItem(null)}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
-            <DialogTitle>Modifier le statut</DialogTitle>
-            <DialogDescription>{bulkStatusItem?.length} fichier(s) sélectionné(s)</DialogDescription>
+            <DialogTitle>{t("archNum.editStatus")}</DialogTitle>
+            <DialogDescription>{bulkStatusItem?.length} {t("archNum.filesSelected")}</DialogDescription>
           </DialogHeader>
           <Select value={bulkNewStatus} onValueChange={v => setBulkNewStatus(v as DocStatus)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1716,8 +1716,8 @@ export default function ArchivesNumeriques() {
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setBulkStatusItem(null)}>Annuler</Button>
-            <Button onClick={bulkStatusCommit}>Appliquer</Button>
+            <Button variant="ghost" onClick={() => setBulkStatusItem(null)}>{t("action.cancel")}</Button>
+            <Button onClick={bulkStatusCommit}>{t("archNum.apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1726,15 +1726,15 @@ export default function ArchivesNumeriques() {
       <Dialog open={showStats} onOpenChange={setShowStats}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5" /> Statistiques du Drive</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5" /> {t("archNum.statsTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Dossiers', value: items.filter(i => i.type === 'folder' && !i.isDeleted).length, color: 'text-blue-500' },
-                { label: 'Fichiers', value: items.filter(i => i.type === 'file' && !i.isDeleted).length, color: 'text-green-500' },
-                { label: 'Favoris', value: items.filter(i => i.starred && !i.isDeleted).length, color: 'text-amber-500' },
-                { label: 'Corbeille', value: trashedCount, color: 'text-destructive' },
+                { label: t("archNum.statFolders"), value: items.filter(i => i.type === 'folder' && !i.isDeleted).length, color: 'text-blue-500' },
+                { label: t("archNum.statFiles"), value: items.filter(i => i.type === 'file' && !i.isDeleted).length, color: 'text-green-500' },
+                { label: t("archNum.statFavorites"), value: items.filter(i => i.starred && !i.isDeleted).length, color: 'text-amber-500' },
+                { label: t("archNum.trash"), value: trashedCount, color: 'text-destructive' },
               ].map(stat => (
                 <div key={stat.label} className="rounded-xl border border-border bg-card p-3 flex flex-col gap-1">
                   <span className={cn('text-2xl font-bold', stat.color)}>{stat.value}</span>
@@ -1743,7 +1743,7 @@ export default function ArchivesNumeriques() {
               ))}
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Par statut</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("archNum.byStatus")}</p>
               {(['Indexé', 'En traitement', 'Erreur'] as DocStatus[]).map(s => {
                 const count = items.filter(i => i.type === 'file' && i.statut === s && !i.isDeleted).length;
                 return (
@@ -1758,7 +1758,7 @@ export default function ArchivesNumeriques() {
               })}
             </div>
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Par étiquette</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("archNum.byTag")}</p>
               <div className="flex flex-wrap gap-1.5">
                 {ALL_TAGS.map(tag => {
                   const count = items.filter(i => i.tags?.includes(tag) && !i.isDeleted).length;
@@ -1773,7 +1773,7 @@ export default function ArchivesNumeriques() {
               </div>
             </div>
           </div>
-          <DialogFooter><Button variant="ghost" onClick={() => setShowStats(false)}>Fermer</Button></DialogFooter>
+          <DialogFooter><Button variant="ghost" onClick={() => setShowStats(false)}>{t("action.close")}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1781,10 +1781,10 @@ export default function ArchivesNumeriques() {
       <Dialog open={showAudit} onOpenChange={setShowAudit}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Journal d'audit</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5" /> {t("audit.title")}</DialogTitle>
           </DialogHeader>
           {auditLog.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Aucune action enregistrée</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t("archNum.noActions")}</p>
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {auditLog.map((entry, idx) => (
@@ -1805,8 +1805,8 @@ export default function ArchivesNumeriques() {
             </div>
           )}
           <DialogFooter>
-            {auditLog.length > 0 && <Button variant="ghost" size="sm" onClick={() => setAuditLog([])}>Effacer l'historique</Button>}
-            <Button variant="ghost" onClick={() => setShowAudit(false)}>Fermer</Button>
+            {auditLog.length > 0 && <Button variant="ghost" size="sm" onClick={() => setAuditLog([])}>{t("archNum.clearHistory")}</Button>}
+            <Button variant="ghost" onClick={() => setShowAudit(false)}>{t("action.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1816,17 +1816,17 @@ export default function ArchivesNumeriques() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Keyboard className="h-5 w-5" /> Raccourcis clavier
+              <Keyboard className="h-5 w-5" /> {t("archNum.shortcuts")}
             </DialogTitle>
-            <DialogDescription>Accédez rapidement aux fonctions principales</DialogDescription>
+            <DialogDescription>{t("archNum.shortcutsDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
             {[
-              { keys: ['N'],       desc: 'Nouveau dossier' },
-              { keys: ['U'],       desc: 'Importer un fichier' },
-              { keys: ['Del'],     desc: 'Supprimer la sélection' },
-              { keys: ['Ctrl', 'A'], desc: 'Tout sélectionner' },
-              { keys: ['Esc'],     desc: 'Fermer le panneau / Désélectionner' },
+              { keys: ['N'],         desc: t("archNum.scNewFolder") },
+              { keys: ['U'],         desc: t("archNum.scImport") },
+              { keys: ['Del'],       desc: t("archNum.scDelete") },
+              { keys: ['Ctrl', 'A'], desc: t("archNum.scSelectAll") },
+              { keys: ['Esc'],       desc: t("archNum.scClose") },
             ].map(({ keys, desc }) => (
               <div key={desc} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-muted/50 transition-colors">
                 <span className="text-sm text-foreground">{desc}</span>
@@ -1844,7 +1844,7 @@ export default function ArchivesNumeriques() {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowShortcuts(false)}>Fermer</Button>
+            <Button variant="ghost" onClick={() => setShowShortcuts(false)}>{t("action.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1852,7 +1852,7 @@ export default function ArchivesNumeriques() {
       {/* Bouton flottant raccourcis */}
       <button
         className="fixed bottom-6 right-6 z-40 h-8 w-8 rounded-full border border-border bg-card shadow-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all hover:scale-110"
-        title="Raccourcis clavier"
+        title={t("archNum.shortcuts")}
         onClick={() => setShowShortcuts(true)}
       >
         <span className="text-sm font-bold leading-none">?</span>

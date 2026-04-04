@@ -10,19 +10,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { mockDocuments } from "@/data/documentsData";
 import type { DocumentVersion, DocumentStatus } from "@/types/documents";
+import { useLanguage } from "@/context/LanguageContext";
 const VersionPanel = lazy(() => import("@/components/documents/VersionPanel"));
 
 // ─── Utilitaires ──────────────────────────────────────────────
-
-function statusLabel(status: DocumentStatus): string {
-  const map: Record<DocumentStatus, string> = {
-    brouillon: "Brouillon",
-    en_revision: "En révision",
-    valide: "Validé",
-    archive: "Archivé",
-  };
-  return map[status];
-}
 
 function statusClasses(status: DocumentStatus): string {
   const map: Record<DocumentStatus, string> = {
@@ -39,6 +30,7 @@ function statusClasses(status: DocumentStatus): string {
 export default function DocumentVersionsPage() {
   const navigate = useNavigate();
   const { documentId } = useParams<{ documentId: string }>();
+  const { t } = useLanguage();
 
   const doc = mockDocuments.find((d) => d.id === documentId);
 
@@ -47,6 +39,16 @@ export default function DocumentVersionsPage() {
     navigate("/documents");
     return null;
   }
+
+  const statusLabel = (status: DocumentStatus): string => {
+    const map: Record<DocumentStatus, string> = {
+      brouillon: t("versions.statusBrouillon"),
+      en_revision: t("versions.statusEnRevision"),
+      valide: t("versions.statusValide"),
+      archive: t("versions.statusArchive"),
+    };
+    return map[status];
+  };
 
   // ── États
   const [autoSave, setAutoSave] = useState(true);
@@ -57,22 +59,22 @@ export default function DocumentVersionsPage() {
   // ── Handlers
   const handleRestore = (v: DocumentVersion) => {
     setCurrentVersionId(v.id);
-    toast.success(`Version v${v.versionLabel} restaurée comme version courante`);
+    toast.success(`Version v${v.versionLabel} ${t("versions.toastRestored")}`);
   };
 
   const handleCompare = (v1: DocumentVersion, v2: DocumentVersion) => {
-    // La comparaison est gérée en interne par VersionPanel — ce callback est informatif
-    toast.info(`Comparaison : ${v1.versionLabel} ↔ ${v2.versionLabel}`);
+    toast.info(`${t("versions.toastCompare")} ${v1.versionLabel} ↔ ${v2.versionLabel}`);
   };
 
   const handleDownload = (v: DocumentVersion) => {
-    // Délégué à VersionPanel via handleDownloadVersion interne
-    toast.info(`Téléchargement de "${v.versionLabel}" en cours...`);
+    toast.info(`"${v.versionLabel}" ${t("versions.toastDownloading")}`);
   };
 
   const handleVersionsChange = (updated: DocumentVersion[]) => {
     setVersions(updated);
   };
+
+  const versionCount = doc.versions.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,7 +86,7 @@ export default function DocumentVersionsPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour au document
+          {t("versions.backToDoc")}
         </button>
 
         {/* Titre + badge statut */}
@@ -104,8 +106,8 @@ export default function DocumentVersionsPage() {
 
         {/* Sous-titre */}
         <p className="text-sm text-muted-foreground mt-1">
-          Historique des {doc.versions.length} version
-          {doc.versions.length > 1 ? "s" : ""}
+          {t("versions.historyOf")} {versionCount}{" "}
+          {versionCount > 1 ? t("versions.versionPlural") : t("versions.versionSingular")}
         </p>
       </div>
 
@@ -122,8 +124,8 @@ export default function DocumentVersionsPage() {
                 setAutoSave((v) => !v);
                 toast.info(
                   autoSave
-                    ? "Sauvegarde automatique désactivée"
-                    : "Sauvegarde automatique activée"
+                    ? t("versions.autoSaveDisabled")
+                    : t("versions.autoSaveEnabled")
                 );
               }}
               className={cn(
@@ -139,11 +141,9 @@ export default function DocumentVersionsPage() {
               />
             </button>
             <div>
-              <p className="text-sm font-medium text-foreground">Sauvegarde automatique</p>
+              <p className="text-sm font-medium text-foreground">{t("versions.autoSaveLabel")}</p>
               <p className="text-xs text-muted-foreground">
-                {autoSave
-                  ? "Auto-save toutes les 30 secondes"
-                  : "Sauvegarde manuelle uniquement"}
+                {autoSave ? t("versions.autoSaveOn") : t("versions.autoSaveOff")}
               </p>
             </div>
           </div>
@@ -155,12 +155,12 @@ export default function DocumentVersionsPage() {
             onClick={() => setCreateModalOpen(true)}
           >
             <GitCompare className="h-4 w-4" />
-            Créer une version
+            {t("versions.createBtn")}
           </Button>
         </div>
 
         {/* Timeline des versions */}
-        <Suspense fallback={<div className="flex items-center justify-center py-16 text-sm text-muted-foreground">Chargement des versions…</div>}>
+        <Suspense fallback={<div className="flex items-center justify-center py-16 text-sm text-muted-foreground">{t("versions.loading")}</div>}>
           <VersionPanel
             versions={versions}
             currentVersionId={currentVersionId}

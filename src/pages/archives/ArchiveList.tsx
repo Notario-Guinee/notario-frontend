@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { ArchiveCard } from '@/components/archives/ArchiveCard';
 import { ArchiveCardSkeleton } from '@/components/archives/ArchiveCardSkeleton';
 import type { TypeArchive } from '@/types/archive';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function ArchiveList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [typeArchive, setTypeArchive] = useState<TypeArchive | undefined>(undefined);
   const [annee, setAnnee] = useState<number | undefined>(undefined);
@@ -31,16 +33,16 @@ export default function ArchiveList() {
 
   return (
     <InfiniteListLayout
-      title="Archives"
+      title={t("list.archives.title")}
       icon={<Archive className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher une archive…"
+      searchPlaceholder={t("list.archives.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucune archive enregistrée."
+      emptyMessage={t("list.archives.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -55,16 +57,16 @@ export default function ArchiveList() {
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
           >
-            <option value="">Tous les types</option>
-            <option value="ACTE_NOTARIE">Acte notarié</option>
-            <option value="REGISTRE">Registre</option>
-            <option value="REPERTOIRE">Répertoire</option>
-            <option value="DOSSIER_CLOTURE">Dossier clôturé</option>
-            <option value="AUTRE">Autre</option>
+            <option value="">{t("list.archives.allTypes")}</option>
+            <option value="ACTE_NOTARIE">{t("list.archives.notarialDeed")}</option>
+            <option value="REGISTRE">{t("list.archives.register")}</option>
+            <option value="REPERTOIRE">{t("list.archives.repertoire")}</option>
+            <option value="DOSSIER_CLOTURE">{t("list.archives.closedCase")}</option>
+            <option value="AUTRE">{t("list.archives.other")}</option>
           </select>
           <input
             type="number"
-            placeholder="Année"
+            placeholder={t("list.archives.year")}
             value={annee ?? ''}
             onChange={(e) => {
               const v = e.target.value;

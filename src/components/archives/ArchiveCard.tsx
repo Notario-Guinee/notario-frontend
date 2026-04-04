@@ -1,20 +1,13 @@
 import { format, parseISO } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enGB } from 'date-fns/locale';
 import { ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/context/LanguageContext';
 import type { Archive, TypeArchive } from '@/types/archive';
 
 interface ArchiveCardProps {
   archive: Archive;
 }
-
-const typeArchiveLabels: Record<TypeArchive, string> = {
-  ACTE_NOTARIE: 'Acte notarié',
-  REGISTRE: 'Registre',
-  REPERTOIRE: 'Répertoire',
-  DOSSIER_CLOTURE: 'Dossier clôturé',
-  AUTRE: 'Autre',
-};
 
 const typeArchiveColors: Record<TypeArchive, string> = {
   ACTE_NOTARIE: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
@@ -27,6 +20,17 @@ const typeArchiveColors: Record<TypeArchive, string> = {
 const MAX_KEYWORDS = 3;
 
 export function ArchiveCard({ archive }: ArchiveCardProps) {
+  const { t, lang } = useLanguage();
+  const dateLocale = lang === 'EN' ? enGB : fr;
+
+  const typeArchiveLabels: Record<TypeArchive, string> = {
+    ACTE_NOTARIE: t('archiveCard.typeActe'),
+    REGISTRE: t('archiveCard.typeRegistre'),
+    REPERTOIRE: t('archiveCard.typeRepertoire'),
+    DOSSIER_CLOTURE: t('archiveCard.typeDossier'),
+    AUTRE: t('archiveCard.typeAutre'),
+  };
+
   const shownKeywords = archive.indexMotsCles.slice(0, MAX_KEYWORDS);
   const extraCount = archive.indexMotsCles.length - MAX_KEYWORDS;
 
@@ -42,7 +46,7 @@ export function ArchiveCard({ archive }: ArchiveCardProps) {
       </div>
       <div>
         <p className="font-semibold text-sm text-foreground">{archive.titre}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">Année : {archive.annee}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{t('archiveCard.year')} {archive.annee}</p>
       </div>
       {shownKeywords.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -62,14 +66,14 @@ export function ArchiveCard({ archive }: ArchiveCardProps) {
         <p className="text-xs text-muted-foreground truncate">{archive.responsableNomComplet}</p>
         {archive.localisationPhysique && (
           <p className="text-xs text-muted-foreground truncate">
-            Localisation : {archive.localisationPhysique}
+            {t('archiveCard.location')} {archive.localisationPhysique}
           </p>
         )}
         {archive.nombrePages !== undefined && (
-          <p className="text-xs text-muted-foreground">{archive.nombrePages} pages</p>
+          <p className="text-xs text-muted-foreground">{archive.nombrePages} {t('archiveCard.pages')}</p>
         )}
         <p className="text-xs text-muted-foreground">
-          Archivé le {format(parseISO(archive.dateArchivage), 'd MMM yyyy', { locale: fr })}
+          {t('archiveCard.archivedOn')} {format(parseISO(archive.dateArchivage), 'd MMM yyyy', { locale: dateLocale })}
         </p>
       </div>
       <a
@@ -79,7 +83,7 @@ export function ArchiveCard({ archive }: ArchiveCardProps) {
         className="inline-flex items-center gap-1.5 text-xs bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded-lg font-medium transition-colors"
       >
         <ExternalLink className="h-3.5 w-3.5" />
-        Consulter
+        {t('archiveCard.view')}
       </a>
     </div>
   );

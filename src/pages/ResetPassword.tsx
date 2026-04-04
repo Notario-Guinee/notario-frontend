@@ -64,7 +64,7 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !tenantId) {
-      toast.error("Lien invalide ou expiré");
+      toast.error(t("reset.invalidLink"));
       return;
     }
     if (!allValid) {
@@ -81,7 +81,7 @@ export default function ResetPassword() {
       setSubmitted(true);
       toast.success(t("reset.success"));
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors de la réinitialisation");
+      toast.error(err instanceof Error ? err.message : t("reset.resetError"));
     } finally {
       setLoading(false);
     }
@@ -172,7 +172,7 @@ export default function ResetPassword() {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={!allValid || !confirmPassword || loading}>
-                  {loading ? "Réinitialisation..." : t("reset.submit")}
+                  {loading ? t("reset.resetting") : t("reset.submit")}
                 </Button>
               </form>
             ) : (

@@ -59,7 +59,7 @@ export function TopBar() {
       setReportSending(false);
       setShowReport(false);
       setReportMsg('');
-      toast.success('Votre rapport a été envoyé. Merci !');
+      toast.success(t('topbar.reportSent'));
     }, 1400);
   };
 
@@ -116,7 +116,7 @@ export function TopBar() {
     "/cabinet": t("nav.cabinet"),
     "/types-actions": t("nav.typesActions"),
     "/actes": t("nav.actesSignatures"),
-    "/administration": "Administration",
+    "/administration": t("nav.administration"),
   };
 
   const pageName = pathNames[location.pathname] || "Notario";
@@ -154,7 +154,7 @@ export function TopBar() {
         <button
           ref={btnRef}
           onClick={() => setShowFontPanel(v => !v)}
-          aria-label="Taille du texte"
+          aria-label={t('topbar.fontSize')}
           aria-expanded={showFontPanel}
           className={cn(
             'flex items-center gap-0.5 rounded-lg px-2 py-1.5 transition-all duration-150',
@@ -184,7 +184,7 @@ export function TopBar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
             <DropdownMenuItem onClick={() => { setLang("FR"); toast.info(t("topbar.langSwitchFR")); }}>
-              <span className="mr-2">🇫🇷</span> Français
+              <span className="mr-2">🇫🇷</span> {t("topbar.langFR")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { setLang("EN"); toast.info(t("topbar.langSwitchEN")); }}>
               <span className="mr-2">🇬🇧</span> English
@@ -221,7 +221,7 @@ export function TopBar() {
         {/* Notifications */}
         <button
           className="relative rounded-lg p-2 hover:bg-muted transition-colors"
-          aria-label="Notifications"
+          aria-label={t('topbar.notifications')}
           onClick={() => navigate("/notifications")}
         >
           <Bell className="h-5 w-5 text-muted-foreground" />
@@ -258,7 +258,7 @@ export function TopBar() {
               <HelpCircle className="mr-2 h-4 w-4" /> {t("topbar.help")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowReport(true)}>
-              <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" /> Signaler un problème
+              <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" /> {t('topbar.reportIssue')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -286,16 +286,16 @@ export function TopBar() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-foreground leading-tight">
-                  Taille du texte
+                  {t('topbar.fontSize')}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Ajustez la taille du texte selon vos besoins en cliquant sur les boutons ci-dessous.
+                  {t('topbar.fontSizeDesc')}
                 </p>
               </div>
               <button
                 onClick={() => setShowFontPanel(false)}
                 className="h-8 w-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 ml-4"
-                aria-label="Fermer"
+                aria-label={t('action.close')}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -310,7 +310,7 @@ export function TopBar() {
                     key={opt.value}
                     onClick={() => { setFontScale(opt.value); }}
                     className="flex flex-col items-center gap-2 group"
-                    aria-label={`Taille ${opt.label}`}
+                    aria-label={`${t('topbar.fontSize')} ${opt.label}`}
                     aria-pressed={isActive}
                   >
                     {/* Carré avec lettre A */}
@@ -355,7 +355,7 @@ export function TopBar() {
                   onClick={() => setFontScale(v => v === 200 ? 150 : v === 150 ? 100 : 100)}
                   disabled={fontScale === 100}
                   className="h-8 w-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted transition-all disabled:opacity-30 disabled:cursor-not-allowed text-lg font-light"
-                  aria-label="Réduire la taille"
+                  aria-label={t('topbar.fontSizeDecrease')}
                 >
                   −
                 </button>
@@ -363,7 +363,7 @@ export function TopBar() {
                   onClick={() => setFontScale(v => v === 100 ? 150 : v === 150 ? 200 : 200)}
                   disabled={fontScale === 200}
                   className="h-8 w-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted transition-all disabled:opacity-30 disabled:cursor-not-allowed text-lg font-light"
-                  aria-label="Augmenter la taille"
+                  aria-label={t('topbar.fontSizeIncrease')}
                 >
                   +
                 </button>
@@ -372,7 +372,7 @@ export function TopBar() {
                     onClick={() => setFontScale(100)}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 ml-1"
                   >
-                    Réinitialiser
+                    {t('topbar.fontSizeReset')}
                   </button>
                 )}
               </div>
@@ -391,10 +391,10 @@ export function TopBar() {
               </div>
               <div>
                 <DialogTitle className="text-lg font-semibold leading-tight">
-                  Signaler un problème technique
+                  {t('topbar.reportTitle')}
                 </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground mt-0.5">
-                  Vous rencontrez un problème avec Notario ?
+                  {t('topbar.reportDesc')}
                 </DialogDescription>
               </div>
             </div>
@@ -402,17 +402,17 @@ export function TopBar() {
 
           {/* Info box */}
           <div className="rounded-xl bg-primary/5 border border-primary/15 px-4 py-3 text-sm text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground">Vous pouvez par exemple :</p>
+            <p className="font-medium text-foreground">{t('topbar.reportCanDo')}</p>
             <ul className="list-disc list-inside space-y-0.5 text-sm">
-              <li>Nous donner votre avis sur l'application</li>
-              <li>Signaler un dysfonctionnement ou une erreur</li>
-              <li>Suggérer une amélioration</li>
+              <li>{t('topbar.reportItem1')}</li>
+              <li>{t('topbar.reportItem2')}</li>
+              <li>{t('topbar.reportItem3')}</li>
             </ul>
           </div>
 
           {/* Textarea */}
           <Textarea
-            placeholder="Décrivez le problème rencontré ou votre suggestion..."
+            placeholder={t('topbar.reportPlaceholder')}
             value={reportMsg}
             onChange={e => setReportMsg(e.target.value)}
             rows={4}
@@ -431,23 +431,23 @@ export function TopBar() {
             </div>
             <div>
               <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                Envoyer le rapport technique
+                {t('topbar.reportSendTech')}
               </p>
               <p className="text-xs text-muted-foreground">
-                Aucune information personnelle ne sera transmise dans ce rapport.
+                {t('topbar.reportNoPersonal')}
               </p>
             </div>
           </label>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowReport(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowReport(false)}>{t('action.cancel')}</Button>
             <Button
               onClick={handleSendReport}
               disabled={!reportMsg.trim() || reportSending}
               className="gap-2"
             >
               {reportSending && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />}
-              Nous envoyer un e-mail
+              {t('topbar.reportSendEmail')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { DocumentItemCard } from '@/components/documentItems/DocumentItemCard';
 import { DocumentItemCardSkeleton } from '@/components/documentItems/DocumentItemCardSkeleton';
 import type { TypeDocument } from '@/types/documentItem';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function DocumentFileList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [typeDocument, setTypeDocument] = useState<TypeDocument | undefined>(undefined);
   const debouncedSearch = useDebounce(search, 400);
@@ -30,16 +32,16 @@ export default function DocumentFileList() {
 
   return (
     <InfiniteListLayout
-      title="Documents"
+      title={t("list.documents.title")}
       icon={<FileText className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher un document…"
+      searchPlaceholder={t("list.documents.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucun document enregistré."
+      emptyMessage={t("list.documents.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -53,12 +55,12 @@ export default function DocumentFileList() {
           }}
           className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
         >
-          <option value="">Tous les types</option>
-          <option value="ACTE">Acte</option>
-          <option value="ANNEXE">Annexe</option>
-          <option value="COURRIER">Courrier</option>
-          <option value="MODELE">Modèle</option>
-          <option value="AUTRE">Autre</option>
+          <option value="">{t("list.documents.allTypes")}</option>
+          <option value="ACTE">{t("list.documents.deed")}</option>
+          <option value="ANNEXE">{t("list.documents.annex")}</option>
+          <option value="COURRIER">{t("list.documents.letter")}</option>
+          <option value="MODELE">{t("list.documents.template")}</option>
+          <option value="AUTRE">{t("list.documents.other")}</option>
         </select>
       }
     >

@@ -42,20 +42,21 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 import type { DocumentVersion } from "@/types/documents";
 
 // ─── Utilitaires ──────────────────────────────────────────────
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("fr-FR", {
+function formatDate(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
 }
 
-function formatDateTime(date: Date): string {
-  return date.toLocaleString("fr-FR", {
+function formatDateTime(date: Date, locale: string): string {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -64,27 +65,16 @@ function formatDateTime(date: Date): string {
   });
 }
 
-function formatRelative(date: Date): string {
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "à l'instant";
-  if (diffMin < 60) return `il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `il y a ${diffH}h`;
-  return `il y a ${Math.floor(diffH / 24)}j`;
-}
-
 // Extraire les paragraphes d'un HTML
 function extractParagraphs(html: string): string[] {
   const div = document.createElement("div");
   div.innerHTML = html;
   const texts: string[] = [];
   div.querySelectorAll("p, h1, h2, h3, li").forEach((el) => {
-    const t = el.textContent?.trim();
-    if (t) texts.push(t);
+    const tx = el.textContent?.trim();
+    if (tx) texts.push(tx);
   });
   if (texts.length === 0) {
-    // fallback : split sur <p>
     return html
       .split(/<\/?p[^>]*>/i)
       .map((s) => s.replace(/<[^>]+>/g, "").trim())
@@ -102,7 +92,6 @@ function computeDiff(left: string[], right: string[]): { left: DiffLine[]; right
   const rightSet = new Set(right);
   const leftSet = new Set(left);
 
-  // Pour chaque paragraphe gauche : supprimé ou inchangé
   for (const line of left) {
     if (rightSet.has(line)) {
       leftResult.push({ text: line, type: "unchanged" });
@@ -110,7 +99,6 @@ function computeDiff(left: string[], right: string[]): { left: DiffLine[]; right
       leftResult.push({ text: line, type: "removed" });
     }
   }
-  // Pour chaque paragraphe droit : ajouté ou inchangé
   for (const line of right) {
     if (leftSet.has(line)) {
       rightResult.push({ text: line, type: "unchanged" });
@@ -152,6 +140,20 @@ export default function VersionPanel({
   onCreateVersion,
   onVersionsChange,
 }: VersionPanelProps) {
+  const { t, lang } = useLanguage();
+  const locale = lang === "EN" ? "en-GB" : "fr-FR";
+
+  // ── Relative time (translated)
+  function formatRelative(date: Date): string {
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return t("vp.now");
+    if (diffMin < 60) return `${t("vp.minutesAgo")} ${diffMin} ${t("vp.min")}`.trim();
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${t("vp.minutesAgo")} ${diffH}${t("vp.hour")}`.trim();
+    return `${t("vp.minutesAgo")} ${Math.floor(diffH / 24)}${t("vp.day")}`.trim();
+  }
+
   // ── États modaux
   const [createOpen, setCreateOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<DocumentVersion | null>(null);
@@ -168,7 +170,6 @@ export default function VersionPanel({
   const [localVersions, setLocalVersions] = useState<DocumentVersion[]>(versions);
   const labelInputRef = useRef<HTMLInputElement>(null);
 
-  // Notifier le parent des changements de versions
   useEffect(() => {
     onVersionsChange?.(localVersions);
   }, [localVersions]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -181,7 +182,6 @@ export default function VersionPanel({
   const [compareRight, setCompareRight] = useState(versions[1]?.id ?? versions[0]?.id ?? "");
   const [compareNavIdx, setCompareNavIdx] = useState(0);
 
-  // Sync si externalCreateOpen change
   const isCreateOpen = externalCreateOpen !== undefined ? externalCreateOpen : createOpen;
   const handleCloseCreate = () => {
     if (onExternalCreateClose) onExternalCreateClose();
@@ -203,17 +203,13 @@ export default function VersionPanel({
   const suppressions = diff.left.filter((l) => l.type === "removed").length;
   const modifications = Math.min(insertions, suppressions);
 
-  // Nombre de "changements" pour navigation
   const changesCount = insertions + suppressions;
 
-  // Aperçu auto pour le formulaire
   const latestVersion = [...localVersions].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   )[0];
   const approxWords = latestVersion?.wordCount ?? 0;
-  const lastModified = latestVersion
-    ? formatRelative(latestVersion.createdAt)
-    : "—";
+  const lastModified = latestVersion ? formatRelative(latestVersion.createdAt) : "—";
 
   // ── Fonctions
 
@@ -231,7 +227,7 @@ export default function VersionPanel({
 </head>
 <body>
   <p style="color:#6b7280;font-size:12px;margin-bottom:2em;">
-    Version ${version.versionLabel} · Créée le ${formatDateTime(version.createdAt)} par ${version.createdBy.prenom} ${version.createdBy.nom}
+    Version ${version.versionLabel} · ${t("vp.createdOn")} ${formatDateTime(version.createdAt, locale)} ${t("vp.by")} ${version.createdBy.prenom} ${version.createdBy.nom}
   </p>
   ${version.content}
 </body>
@@ -243,7 +239,7 @@ export default function VersionPanel({
     a.download = `version_${version.versionLabel.replace(/[^a-z0-9]/gi, '_')}.html`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Version ${version.versionLabel} téléchargée`);
+    toast.success(`${version.versionLabel} ${t("vp.toastDownloaded")}`);
   };
 
   const handleSaveLabel = (versionId: string) => {
@@ -254,7 +250,7 @@ export default function VersionPanel({
     setLocalVersions(updated);
     onVersionsChange?.(updated);
     setEditingId(null);
-    toast.success("Label mis à jour");
+    toast.success(t("vp.toastLabelUpdated"));
   };
 
   const handleCreateVersion = () => {
@@ -284,7 +280,7 @@ export default function VersionPanel({
     setLocalVersions(updated);
     onCreateVersion?.(newLabel.trim(), newNote.trim(), isOfficial);
     onVersionsChange?.(updated);
-    toast.success(`Version "${newLabel}" créée`);
+    toast.success(`"${newLabel}" ${t("vp.toastCreated")}`);
     handleCloseCreate();
   };
 
@@ -293,19 +289,24 @@ export default function VersionPanel({
     onRestore(restoreTarget);
     const label = restoreTarget.versionLabel;
     setRestoreTarget(null);
-    toast.success(`Version v${label} restaurée comme version courante`);
+    toast.success(`v${label} ${t("vp.toastRestored")}`);
   };
 
   const sortedVersions = [...localVersions].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 
-  // Couleur du bullet selon type
   const bulletClass = (v: DocumentVersion) => {
     if (v.isMajorVersion) return "bg-amber-500";
     if (!v.isDraft) return "bg-primary";
     return "bg-muted-foreground";
   };
+
+  // suppress unused warning
+  void onCompare;
+  void onDownload;
+  void modifications;
+  void compareNavIdx;
 
   return (
     <>
@@ -317,7 +318,7 @@ export default function VersionPanel({
           onClick={() => setCreateOpen(true)}
         >
           <GitCompare className="h-4 w-4" />
-          Créer une version
+          {t("vp.createTitle")}
         </Button>
       )}
 
@@ -376,12 +377,12 @@ export default function VersionPanel({
                         </span>
                         {version.isMajorVersion && (
                           <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide">
-                            Version officielle
+                            {t("vp.official")}
                           </span>
                         )}
                         {isCurrent && (
                           <span className="text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 font-medium">
-                            Actuelle
+                            {t("vp.current")}
                           </span>
                         )}
                       </div>
@@ -394,15 +395,15 @@ export default function VersionPanel({
                       </div>
                       <span className="text-[10px] text-muted-foreground">
                         {version.createdBy.prenom} {version.createdBy.nom} ·{" "}
-                        {formatDateTime(version.createdAt)}
+                        {formatDateTime(version.createdAt, locale)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Bouton Nommer */}
+                  {/* Bouton Renommer */}
                   {!isEditing && (
                     <button
-                      title="Renommer"
+                      title={t("vp.rename")}
                       className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
                       onClick={() => {
                         setEditingId(version.id);
@@ -416,7 +417,7 @@ export default function VersionPanel({
 
                 {/* Résumé */}
                 <p className="text-xs text-foreground">{version.changesSummary}</p>
-                <p className="text-[10px] text-muted-foreground">{version.wordCount} mots</p>
+                <p className="text-[10px] text-muted-foreground">{version.wordCount} {t("vp.words")}</p>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 pt-0.5 flex-wrap">
@@ -427,7 +428,7 @@ export default function VersionPanel({
                     onClick={() => setViewingVersion(version)}
                   >
                     <Eye className="h-3 w-3" />
-                    Voir
+                    {t("vp.view")}
                   </Button>
                   {!isCurrent && (
                     <Button
@@ -437,7 +438,7 @@ export default function VersionPanel({
                       onClick={() => setRestoreTarget(version)}
                     >
                       <RotateCcw className="h-3 w-3" />
-                      Restaurer
+                      {t("vp.restore")}
                     </Button>
                   )}
                   <Button
@@ -453,7 +454,7 @@ export default function VersionPanel({
                     }}
                   >
                     <GitCompare className="h-3 w-3" />
-                    Comparer
+                    {t("vp.compare")}
                   </Button>
                   <Button
                     variant="outline"
@@ -462,7 +463,7 @@ export default function VersionPanel({
                     onClick={() => handleDownloadVersion(version)}
                   >
                     <Download className="h-3 w-3" />
-                    Télécharger
+                    {t("vp.download")}
                   </Button>
                 </div>
               </div>
@@ -475,15 +476,15 @@ export default function VersionPanel({
       <Dialog open={isCreateOpen} onOpenChange={(o) => !o && handleCloseCreate()}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Créer une version manuelle</DialogTitle>
+            <DialogTitle>{t("vp.createTitle")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {/* Nom */}
             <div className="space-y-1.5">
-              <Label>Nom de la version</Label>
+              <Label>{t("vp.nameLabel")}</Label>
               <Input
-                placeholder='ex: "v2.0 - Après relecture"'
+                placeholder={t("vp.namePlaceholder")}
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
               />
@@ -507,19 +508,19 @@ export default function VersionPanel({
               </button>
               <div className="space-y-0.5">
                 <Label className="cursor-pointer" onClick={() => setIsOfficial((v) => !v)}>
-                  Version officielle (notariée)
+                  {t("vp.officialLabel")}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Marque cette version comme document notarié final
+                  {t("vp.officialDesc")}
                 </p>
               </div>
             </div>
 
             {/* Note de version */}
             <div className="space-y-1.5">
-              <Label>Note de version</Label>
+              <Label>{t("vp.noteLabel")}</Label>
               <Textarea
-                placeholder="Décrivez les modifications apportées..."
+                placeholder={t("vp.notePlaceholder")}
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 className="resize-none"
@@ -529,19 +530,19 @@ export default function VersionPanel({
 
             {/* Aperçu auto */}
             <div className="bg-muted/40 rounded-lg p-3 space-y-1">
-              <p className="text-xs font-medium text-foreground">Aperçu du résumé</p>
+              <p className="text-xs font-medium text-foreground">{t("vp.previewTitle")}</p>
               <p className="text-xs text-muted-foreground">
-                ~{approxWords} mots, dernière modification {lastModified}
+                ~{approxWords} {t("vp.words")}, {t("vp.previewDesc").replace("{n}", String(approxWords))} {lastModified}
               </p>
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseCreate}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button onClick={handleCreateVersion} disabled={!newLabel.trim()}>
-              Créer la version
+              {t("vp.createBtn")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -554,21 +555,20 @@ export default function VersionPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la restauration</AlertDialogTitle>
+            <AlertDialogTitle>{t("vp.restoreTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Vous allez restaurer la version{" "}
-              <strong>{restoreTarget?.versionLabel}</strong> du{" "}
-              {restoreTarget ? formatDate(restoreTarget.createdAt) : ""}. La version
-              actuelle sera sauvegardée comme archive. Cette action est traçable et
-              réversible.
+              {t("vp.restoreDesc")}{" "}
+              <strong>{restoreTarget?.versionLabel}</strong>{" "}
+              {t("vp.restoreDesc2")}{" "}
+              {restoreTarget ? formatDate(restoreTarget.createdAt, locale) : ""}{t("vp.restoreDesc3")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setRestoreTarget(null)}>
-              Annuler
+              {t("action.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleRestoreConfirm}>
-              Restaurer
+              {t("vp.restoreBtn")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -578,13 +578,13 @@ export default function VersionPanel({
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <DialogContent className="max-w-5xl w-full">
           <DialogHeader>
-            <DialogTitle>Comparaison de versions</DialogTitle>
+            <DialogTitle>{t("vp.compareTitle")}</DialogTitle>
           </DialogHeader>
 
           {/* Sélecteurs */}
           <div className="flex items-center gap-4 mb-2 flex-wrap">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Label className="shrink-0 text-xs">Version gauche</Label>
+              <Label className="shrink-0 text-xs">{t("vp.leftVersion")}</Label>
               <Select value={compareLeft} onValueChange={setCompareLeft}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
@@ -599,7 +599,7 @@ export default function VersionPanel({
               </Select>
             </div>
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Label className="shrink-0 text-xs">Version droite</Label>
+              <Label className="shrink-0 text-xs">{t("vp.rightVersion")}</Label>
               <Select value={compareRight} onValueChange={setCompareRight}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
@@ -618,11 +618,11 @@ export default function VersionPanel({
           {/* Compteur */}
           <div className="text-xs text-muted-foreground flex items-center gap-3 mb-3 flex-wrap">
             <span className="text-foreground font-medium">
-              {changesCount} modification{changesCount > 1 ? "s" : ""}
+              {changesCount} {changesCount > 1 ? t("vp.modifications") : t("vp.modification")}
             </span>
-            <span className="text-success">{insertions} insertion{insertions > 1 ? "s" : ""}</span>
+            <span className="text-success">{insertions} {insertions > 1 ? t("vp.insertions") : t("vp.insertion")}</span>
             <span className="text-destructive">
-              {suppressions} suppression{suppressions > 1 ? "s" : ""}
+              {suppressions} {suppressions > 1 ? t("vp.suppressions") : t("vp.suppression")}
             </span>
             <div className="ml-auto flex items-center gap-1">
               <Button
@@ -658,7 +658,7 @@ export default function VersionPanel({
                 </p>
                 <p className="text-[10px] text-muted-foreground">
                   {leftVersion?.createdBy.prenom} {leftVersion?.createdBy.nom} ·{" "}
-                  {leftVersion ? formatDate(leftVersion.createdAt) : "—"}
+                  {leftVersion ? formatDate(leftVersion.createdAt, locale) : "—"}
                 </p>
               </div>
               <div className="p-3 space-y-1">
@@ -686,7 +686,7 @@ export default function VersionPanel({
                 </p>
                 <p className="text-[10px] text-muted-foreground">
                   {rightVersion?.createdBy.prenom} {rightVersion?.createdBy.nom} ·{" "}
-                  {rightVersion ? formatDate(rightVersion.createdAt) : "—"}
+                  {rightVersion ? formatDate(rightVersion.createdAt, locale) : "—"}
                 </p>
               </div>
               <div className="p-3 space-y-1">
@@ -709,7 +709,7 @@ export default function VersionPanel({
 
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setCompareOpen(false)}>
-              Fermer
+              {t("action.close")}
             </Button>
             {rightVersion && (
               <Button
@@ -719,7 +719,7 @@ export default function VersionPanel({
                 }}
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
-                Restaurer cette version
+                {t("vp.restoreThisVersion")}
               </Button>
             )}
           </DialogFooter>
@@ -731,36 +731,36 @@ export default function VersionPanel({
         <DialogContent className="max-w-4xl w-full">
           <DialogHeader>
             <DialogTitle>
-              Aperçu — {viewingVersion?.versionLabel}
+              {t("vp.previewOf")} {viewingVersion?.versionLabel}
             </DialogTitle>
           </DialogHeader>
           {viewingVersion && (
             <>
               <div className="flex items-center gap-3 text-xs text-muted-foreground border-b pb-3 mb-3 flex-wrap">
                 <span>
-                  Créée le {formatDateTime(viewingVersion.createdAt)} par{" "}
+                  {t("vp.createdOn")} {formatDateTime(viewingVersion.createdAt, locale)} {t("vp.by")}{" "}
                   {viewingVersion.createdBy.prenom} {viewingVersion.createdBy.nom}
                 </span>
                 <span className="text-muted-foreground/50">·</span>
-                <span>{viewingVersion.wordCount} mots</span>
+                <span>{viewingVersion.wordCount} {t("vp.words")}</span>
                 <span className="text-muted-foreground/50">·</span>
                 <span>{(viewingVersion.sizeBytes / 1024).toFixed(1)} Ko</span>
                 {viewingVersion.isMajorVersion && (
                   <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide text-[10px]">
-                    Version officielle
+                    {t("vp.official")}
                   </span>
                 )}
               </div>
               <div
                 className="max-h-[60vh] overflow-y-auto rounded-lg border bg-white dark:bg-zinc-950 p-8"
                 style={{ fontFamily: "serif", lineHeight: 1.7, color: "#111827" }}
-                dangerouslySetInnerHTML={{ __html: viewingVersion.content || "<p><em>Contenu vide</em></p>" }}
+                dangerouslySetInnerHTML={{ __html: viewingVersion.content || `<p><em>${t("vp.emptyContent")}</em></p>` }}
               />
             </>
           )}
           <DialogFooter className="mt-4 gap-2">
             <Button variant="outline" onClick={() => setViewingVersion(null)}>
-              Fermer
+              {t("action.close")}
             </Button>
             {viewingVersion && !sortedVersions.find(v => v.id === viewingVersion.id && v.id === currentVersionId) && (
               <Button
@@ -771,13 +771,13 @@ export default function VersionPanel({
                 }}
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
-                Restaurer
+                {t("vp.restore")}
               </Button>
             )}
             {viewingVersion && (
               <Button onClick={() => handleDownloadVersion(viewingVersion)}>
                 <Download className="h-4 w-4 mr-2" />
-                Télécharger
+                {t("vp.download")}
               </Button>
             )}
           </DialogFooter>

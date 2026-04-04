@@ -476,10 +476,10 @@ export default function AdminTenantsPage() {
   if (loadError) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-6 py-5 text-center max-w-md">
-        <p className="text-sm font-semibold text-destructive mb-1">Erreur de chargement</p>
+        <p className="text-sm font-semibold text-destructive mb-1">{fr ? "Erreur de chargement" : "Loading error"}</p>
         <p className="text-xs text-muted-foreground font-mono">{loadError}</p>
       </div>
-      <Button variant="outline" size="sm" onClick={loadList}>Réessayer</Button>
+      <Button variant="outline" size="sm" onClick={loadList}>{fr ? "Réessayer" : "Retry"}</Button>
     </div>
   );
 

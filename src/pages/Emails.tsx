@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -304,14 +305,14 @@ const MOCK_EMAILS: Email[] = [
 
 // ─── Constantes ─────────────────────────────────────────────────
 
-const FOLDERS = [
-  { id: "inbox", label: "Boîte de réception", icon: Inbox, color: "text-blue-500" },
-  { id: "starred", label: "Favoris", icon: Star, color: "text-amber-500" },
-  { id: "sent", label: "Envoyés", icon: Send, color: "text-emerald-500" },
-  { id: "drafts", label: "Brouillons", icon: FileText, color: "text-orange-400" },
-  { id: "archive", label: "Archivés", icon: Archive, color: "text-gray-500" },
-  { id: "spam", label: "Courrier indésirable", icon: AlertTriangle, color: "text-red-400" },
-  { id: "trash", label: "Corbeille", icon: Trash2, color: "text-red-500" },
+const FOLDER_IDS = [
+  { id: "inbox", icon: Inbox, color: "text-blue-500", key: "email.folderInbox" },
+  { id: "starred", icon: Star, color: "text-amber-500", key: "email.folderStarred" },
+  { id: "sent", icon: Send, color: "text-emerald-500", key: "email.folderSent" },
+  { id: "drafts", icon: FileText, color: "text-orange-400", key: "email.folderDrafts" },
+  { id: "archive", icon: Archive, color: "text-gray-500", key: "email.folderArchive" },
+  { id: "spam", icon: AlertTriangle, color: "text-red-400", key: "email.folderSpam" },
+  { id: "trash", icon: Trash2, color: "text-red-500", key: "email.folderTrash" },
 ];
 
 const LABEL_COLORS: Record<string, string> = {
@@ -325,21 +326,21 @@ const LABEL_COLORS: Record<string, string> = {
 
 // ─── Helpers ────────────────────────────────────────────────────
 
-function formatEmailDate(date: Date): string {
+function formatEmailDate(date: Date, locale: string, yesterdayLabel: string): string {
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
   if (diffDays === 0) {
-    return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   }
-  if (diffDays === 1) return "Hier";
+  if (diffDays === 1) return yesterdayLabel;
   if (diffDays < 7) {
-    return date.toLocaleDateString("fr-FR", { weekday: "short" });
+    return date.toLocaleDateString(locale, { weekday: "short" });
   }
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+  return date.toLocaleDateString(locale, { day: "2-digit", month: "short" });
 }
 
-function formatFullDate(date: Date): string {
-  return date.toLocaleDateString("fr-FR", {
+function formatFullDate(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -386,6 +387,9 @@ function AttachmentChip({ att }: { att: EmailAttachment }) {
 // ─── Composant principale ────────────────────────────────────────
 
 export default function Emails() {
+  const { t, lang } = useLanguage();
+  const locale = lang === "EN" ? "en-GB" : "fr-FR";
+  const FOLDERS = FOLDER_IDS.map(f => ({ ...f, label: t(f.key) }));
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
   const [activeFolder, setActiveFolder] = useState<EmailFolder>("inbox");
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -454,30 +458,30 @@ export default function Emails() {
   const moveToTrash = (id: string) => {
     setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: "trash", isDeleted: false } : e));
     if (selectedEmail?.id === id) setSelectedEmail(null);
-    toast.success("Email déplacé vers la corbeille");
+    toast.success(t("email.toastMovedToTrash"));
   };
 
   const archiveEmail = (id: string) => {
     setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: "archive" } : e));
     if (selectedEmail?.id === id) setSelectedEmail(null);
-    toast.success("Email archivé");
+    toast.success(t("email.toastArchived"));
   };
 
   const permanentDelete = (id: string) => {
     setEmails(prev => prev.filter(e => e.id !== id));
     if (selectedEmail?.id === id) setSelectedEmail(null);
-    toast.success("Email supprimé définitivement");
+    toast.success(t("email.toastDeletedForever"));
   };
 
   const restoreEmail = (id: string) => {
     setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: "inbox" } : e));
-    toast.success("Email restauré");
+    toast.success(t("email.toastRestored"));
   };
 
   const markSpam = (id: string) => {
     setEmails(prev => prev.map(e => e.id === id ? { ...e, folder: "spam" } : e));
     if (selectedEmail?.id === id) setSelectedEmail(null);
-    toast.info("Email signalé comme spam");
+    toast.info(t("email.toastSpam"));
   };
 
   const selectEmail = (email: Email) => {
@@ -491,7 +495,7 @@ export default function Emails() {
       setCompose({ to: "", cc: "", bcc: "", subject: "", body: "", attachments: [], showCc: false, showBcc: false });
     } else if (email) {
       const prefix = mode === "forward" ? "Tr : " : "Re : ";
-      const replyBody = `<br><br><hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"><p style="color:#6b7280;font-size:12px">De : ${email.from.name} &lt;${email.from.email}&gt;<br>Date : ${formatFullDate(email.date)}<br>Objet : ${email.subject}</p>${email.body}`;
+      const replyBody = `<br><br><hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"><p style="color:#6b7280;font-size:12px">De : ${email.from.name} &lt;${email.from.email}&gt;<br>Date : ${formatFullDate(email.date, locale)}<br>Objet : ${email.subject}</p>${email.body}`;
       setCompose({
         to: mode === "forward" ? "" : email.from.email,
         cc: mode === "replyAll" ? (email.cc?.join(", ") ?? "") : "",
@@ -507,8 +511,8 @@ export default function Emails() {
   };
 
   const handleSend = () => {
-    if (!compose.to.trim()) { toast.error("Veuillez renseigner le destinataire"); return; }
-    if (!compose.subject.trim()) { toast.error("Objet manquant"); return; }
+    if (!compose.to.trim()) { toast.error(t("email.toastNoRecipient")); return; }
+    if (!compose.subject.trim()) { toast.error(t("email.toastNoSubject")); return; }
     const newSent: Email = {
       id: `e-sent-${Date.now()}`,
       folder: "sent",
@@ -526,11 +530,11 @@ export default function Emails() {
     };
     setEmails(prev => [newSent, ...prev]);
     setShowCompose(false);
-    toast.success("Message envoyé");
+    toast.success(t("email.toastSent"));
   };
 
   const handleSaveDraft = () => {
-    toast.success("Brouillon enregistré");
+    toast.success(t("email.toastDraftSaved"));
     setShowCompose(false);
   };
 
@@ -558,7 +562,7 @@ export default function Emails() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Rechercher dans tous les dossiers..."
+            placeholder={t("email.searchPlaceholder")}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full h-8 pl-8 pr-3 text-sm bg-muted/50 border border-border rounded-lg outline-none focus:ring-1 focus:ring-primary focus:bg-background transition-colors placeholder:text-muted-foreground"
@@ -577,13 +581,13 @@ export default function Emails() {
             onClick={() => openCompose("new")}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Nouveau message
+            {t("email.newMessage")}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={() => toast.info("Synchronisation...")}
+            onClick={() => toast.info(t("email.sync"))}
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -715,14 +719,14 @@ export default function Emails() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => {
                     setEmails(prev => prev.map(e => e.folder === activeFolder ? { ...e, isRead: true } : e));
-                    toast.success("Tous marqués comme lus");
+                    toast.success(t("email.markAllRead"));
                   }}>
-                    <MailOpen className="mr-2 h-4 w-4" /> Tout marquer comme lu
+                    <MailOpen className="mr-2 h-4 w-4" /> {t("action.markAllRead")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
                     filteredEmails.forEach(e => archiveEmail(e.id));
                   }}>
-                    <Archive className="mr-2 h-4 w-4" /> Tout archiver
+                    <Archive className="mr-2 h-4 w-4" /> {t("email.archive")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -731,10 +735,10 @@ export default function Emails() {
             {/* Onglets filtre */}
             <div className="flex gap-1">
               {[
-                { id: "all", label: "Tous" },
-                { id: "unread", label: "Non lus" },
-                { id: "starred", label: "Favoris" },
-                { id: "attachments", label: "Pièces jointes" },
+                { id: "all", label: t("email.filterAll") },
+                { id: "unread", label: t("email.filterUnread") },
+                { id: "starred", label: t("email.folderStarred") },
+                { id: "attachments", label: t("email.filterAttachments") },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -758,10 +762,10 @@ export default function Emails() {
               <div className="flex flex-col items-center justify-center h-full py-16 text-center px-4">
                 <Mail className="h-12 w-12 text-muted-foreground/30 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">
-                  {searchQuery ? "Aucun résultat" : "Dossier vide"}
+                  {searchQuery ? t("email.noResults") : t("email.emptyFolder")}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {searchQuery ? "Essayez avec d'autres mots-clés" : "Aucun message dans ce dossier"}
+                  {searchQuery ? t("email.noResultsHint") : t("email.emptyFolderHint")}
                 </p>
               </div>
             ) : (
@@ -797,7 +801,7 @@ export default function Emails() {
                           }
                         </span>
                         <span className="text-[10px] text-muted-foreground shrink-0">
-                          {formatEmailDate(email.date)}
+                          {formatEmailDate(email.date, locale, t("email.yesterday"))}
                         </span>
                       </div>
                       <p className={cn("text-xs mb-1 truncate", !email.isRead ? "font-medium text-foreground" : "text-foreground/80")}>
@@ -841,20 +845,20 @@ export default function Emails() {
           <div className="flex-1 flex flex-col overflow-hidden bg-background">
             {/* Barre d'actions */}
             <div className="h-12 border-b border-border flex items-center px-4 gap-2 shrink-0 bg-card">
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedEmail(null)} title="Fermer">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedEmail(null)} title={t("email.close")}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
 
               <div className="w-px h-5 bg-border" />
 
               <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => openCompose("reply", selectedEmail)}>
-                <Reply className="h-3.5 w-3.5" /> Répondre
+                <Reply className="h-3.5 w-3.5" /> {t("email.reply")}
               </Button>
               <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => openCompose("replyAll", selectedEmail)}>
-                <ReplyAll className="h-3.5 w-3.5" /> Rép. à tous
+                <ReplyAll className="h-3.5 w-3.5" /> {t("email.replyAll")}
               </Button>
               <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-xs" onClick={() => openCompose("forward", selectedEmail)}>
-                <Forward className="h-3.5 w-3.5" /> Transférer
+                <Forward className="h-3.5 w-3.5" /> {t("email.forward")}
               </Button>
 
               <div className="w-px h-5 bg-border mx-1" />
@@ -863,7 +867,7 @@ export default function Emails() {
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                title={selectedEmail.isStarred ? "Retirer des favoris" : "Ajouter aux favoris"}
+                title={selectedEmail.isStarred ? t("email.removeStar") : t("email.addStar")}
                 onClick={() => toggleStar(selectedEmail.id)}
               >
                 <Star className={cn("h-4 w-4", selectedEmail.isStarred ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
@@ -873,7 +877,7 @@ export default function Emails() {
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                title={selectedEmail.isFlagged ? "Retirer le drapeau" : "Marquer d'un drapeau"}
+                title={selectedEmail.isFlagged ? t("email.removeFlag") : t("email.addFlag")}
                 onClick={() => toggleFlag(selectedEmail.id)}
               >
                 <Flag className={cn("h-4 w-4", selectedEmail.isFlagged ? "fill-red-400 text-red-400" : "text-muted-foreground")} />
@@ -883,7 +887,7 @@ export default function Emails() {
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 text-muted-foreground"
-                title="Archiver"
+                title={t("email.archive")}
                 onClick={() => archiveEmail(selectedEmail.id)}
               >
                 <Archive className="h-4 w-4" />
@@ -893,7 +897,7 @@ export default function Emails() {
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                title={activeFolder === "trash" ? "Supprimer définitivement" : "Supprimer"}
+                title={activeFolder === "trash" ? t("email.deleteForever") : t("email.delete")}
                 onClick={() => activeFolder === "trash" ? permanentDelete(selectedEmail.id) : moveToTrash(selectedEmail.id)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -914,25 +918,25 @@ export default function Emails() {
                       }
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => markSpam(selectedEmail.id)}>
-                      <AlertTriangle className="mr-2 h-4 w-4" /> Signaler comme spam
+                      <AlertTriangle className="mr-2 h-4 w-4" /> {t("email.toastSpam")}
                     </DropdownMenuItem>
                     {activeFolder === "trash" && (
                       <DropdownMenuItem onClick={() => restoreEmail(selectedEmail.id)}>
-                        <CornerUpRight className="mr-2 h-4 w-4" /> Restaurer
+                        <CornerUpRight className="mr-2 h-4 w-4" /> {t("email.toastRestored")}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => {
-                      toast.success("En-tête copié");
+                      toast.success(t("email.toastHeaderCopied"));
                     }}>
-                      <MoveRight className="mr-2 h-4 w-4" /> Déplacer vers...
+                      <MoveRight className="mr-2 h-4 w-4" /> {t("action.view")}...
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => window.print()}>
-                      <Printer className="mr-2 h-4 w-4" /> Imprimer
+                      <Printer className="mr-2 h-4 w-4" /> {t("action.export")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => permanentDelete(selectedEmail.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Supprimer définitivement
+                      <Trash2 className="mr-2 h-4 w-4" /> {t("email.deleteForever")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -959,7 +963,7 @@ export default function Emails() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatFullDate(selectedEmail.date)}
+                          {formatFullDate(selectedEmail.date, locale)}
                         </span>
                       </div>
                     </div>
@@ -1044,10 +1048,10 @@ export default function Emails() {
           {/* En-tête */}
           <div className="flex items-center justify-between px-4 py-3 bg-gray-800 dark:bg-gray-900 rounded-t-xl shrink-0">
             <span className="text-sm font-medium text-white">
-              {composeMode === "new" ? "Nouveau message"
-                : composeMode === "reply" ? "Répondre"
-                : composeMode === "replyAll" ? "Répondre à tous"
-                : "Transférer"}
+              {composeMode === "new" ? t("email.newMessage")
+                : composeMode === "reply" ? t("email.reply")
+                : composeMode === "replyAll" ? t("email.replyAll")
+                : t("email.forward")}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -1119,7 +1123,7 @@ export default function Emails() {
                 type="text"
                 value={compose.subject}
                 onChange={e => setCompose(c => ({ ...c, subject: e.target.value }))}
-                placeholder="Objet du message"
+                placeholder={t("email.subjectPlaceholder")}
                 className="flex-1 py-2.5 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground font-medium"
               />
             </div>
@@ -1128,9 +1132,9 @@ export default function Emails() {
           {/* Toolbar mise en forme */}
           <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-border shrink-0 overflow-x-auto">
             {[
-              { icon: Bold, title: "Gras", cmd: "bold" },
-              { icon: Italic, title: "Italique", cmd: "italic" },
-              { icon: Underline, title: "Souligné", cmd: "underline" },
+              { icon: Bold, title: t("email.boldBtn"), cmd: "bold" },
+              { icon: Italic, title: t("email.italicBtn"), cmd: "italic" },
+              { icon: Underline, title: t("email.underlineBtn"), cmd: "underline" },
             ].map(({ icon: Icon, title, cmd }) => (
               <button
                 key={cmd}
@@ -1143,9 +1147,9 @@ export default function Emails() {
             ))}
             <div className="w-px h-5 bg-border mx-1" />
             {[
-              { icon: AlignLeft, title: "Gauche", cmd: "justifyLeft" },
-              { icon: AlignCenter, title: "Centre", cmd: "justifyCenter" },
-              { icon: AlignRight, title: "Droite", cmd: "justifyRight" },
+              { icon: AlignLeft, title: t("email.alignLeft"), cmd: "justifyLeft" },
+              { icon: AlignCenter, title: t("email.alignCenter"), cmd: "justifyCenter" },
+              { icon: AlignRight, title: t("email.alignRight"), cmd: "justifyRight" },
             ].map(({ icon: Icon, title, cmd }) => (
               <button
                 key={cmd}
@@ -1158,17 +1162,17 @@ export default function Emails() {
             ))}
             <div className="w-px h-5 bg-border mx-1" />
             <button
-              title="Liste"
+              title={t("email.listBtn")}
               onMouseDown={e => { e.preventDefault(); document.execCommand("insertUnorderedList", false); }}
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <List className="h-3.5 w-3.5" />
             </button>
             <button
-              title="Lien"
+              title={t("email.linkBtn")}
               onMouseDown={e => {
                 e.preventDefault();
-                const url = window.prompt("URL :");
+                const url = window.prompt(t("email.urlPrompt"));
                 if (url) document.execCommand("createLink", false, url);
               }}
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -1214,7 +1218,7 @@ export default function Emails() {
                 onClick={handleSend}
               >
                 <Send className="h-3.5 w-3.5" />
-                Envoyer
+                {t("email.send")}
               </Button>
               <Button
                 variant="ghost"
@@ -1222,12 +1226,12 @@ export default function Emails() {
                 className="h-8 text-muted-foreground"
                 onClick={handleSaveDraft}
               >
-                Enregistrer
+                {t("email.saveDraft")}
               </Button>
             </div>
             <div className="flex items-center gap-1">
               <button
-                title="Joindre un fichier"
+                title={t("email.attachFile")}
                 onClick={() => composeAttachRef.current?.click()}
                 className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
@@ -1245,13 +1249,13 @@ export default function Emails() {
                 }}
               />
               <button
-                title="Étiquette"
+                title={t("email.labelBtn")}
                 className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <Tag className="h-4 w-4" />
               </button>
               <button
-                title="Supprimer le brouillon"
+                title={t("email.deleteDraft")}
                 onClick={() => setShowCompose(false)}
                 className="h-8 w-8 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
               >

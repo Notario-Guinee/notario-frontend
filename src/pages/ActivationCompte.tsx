@@ -20,40 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-
-// ── Règles de validation du mot de passe ─────────────────────────────────────
-// Chaque règle expose un id, un label affiché et une fonction de test.
-const PASSWORD_RULES = [
-  {
-    id: "length",
-    label: "12 caractères minimum",
-    test: (p: string) => p.length >= 12,
-  },
-  {
-    id: "upper",
-    label: "Une majuscule (A–Z)",
-    test: (p: string) => /[A-Z]/.test(p),
-  },
-  {
-    id: "digit",
-    label: "Un chiffre (0–9)",
-    test: (p: string) => /\d/.test(p),
-  },
-  {
-    id: "special",
-    label: "Un caractère spécial (!@#…)",
-    test: (p: string) => /[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~]/.test(p),
-  },
-];
-
-// ── Calcul de la force en fonction du nombre de critères validés ──────────────
-function getStrength(password: string, score: number) {
-  if (!password) return null;
-  if (score === 1) return { label: "Faible",    barClass: "w-1/4 bg-destructive",  textClass: "text-destructive" };
-  if (score === 2) return { label: "Moyen",     barClass: "w-2/4 bg-orange-400",   textClass: "text-orange-400" };
-  if (score === 3) return { label: "Fort",      barClass: "w-3/4 bg-blue-500",     textClass: "text-blue-500" };
-  return             { label: "Très fort",  barClass: "w-full bg-success",     textClass: "text-success" };
-}
+import { useLanguage } from "@/context/LanguageContext";
 
 // ── Simulation d'appel API : validation du token ─────────────────────────────
 // Remplacer par un vrai appel fetch / Supabase en production.
@@ -77,8 +44,26 @@ type Phase = "loading" | "error" | "form" | "success";
 export default function ActivationCompte() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { t } = useLanguage();
   // Lecture du token depuis l'URL (?token=...)
   const token = searchParams.get("token") ?? "";
+
+  // ── Règles de validation (labels traduits) ────────────────────────────────
+  const PASSWORD_RULES = [
+    { id: "length", label: t("activation.ruleLength"), test: (p: string) => p.length >= 12 },
+    { id: "upper",  label: t("activation.ruleUpper"),  test: (p: string) => /[A-Z]/.test(p) },
+    { id: "digit",  label: t("activation.ruleDigit"),  test: (p: string) => /\d/.test(p) },
+    { id: "special",label: t("activation.ruleSpecial"),test: (p: string) => /[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~]/.test(p) },
+  ];
+
+  // ── Calcul de la force en fonction du nombre de critères validés ──────────
+  const getStrength = (password: string, score: number) => {
+    if (!password) return null;
+    if (score === 1) return { label: t("activation.strengthWeak"),     barClass: "w-1/4 bg-destructive",  textClass: "text-destructive" };
+    if (score === 2) return { label: t("activation.strengthMedium"),   barClass: "w-2/4 bg-orange-400",   textClass: "text-orange-400" };
+    if (score === 3) return { label: t("activation.strengthStrong"),   barClass: "w-3/4 bg-blue-500",     textClass: "text-blue-500" };
+    return             { label: t("activation.strengthVeryStrong"), barClass: "w-full bg-success",     textClass: "text-success" };
+  };
 
   // ── Phase globale du flux ─────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>("loading");
@@ -122,9 +107,9 @@ export default function ActivationCompte() {
     try {
       await activateAccount(token, password);
       setPhase("success");
-      toast.success("Votre compte a été activé avec succès !");
+      toast.success(t("activation.toastSuccess"));
     } catch {
-      toast.error("Une erreur est survenue. Veuillez réessayer.");
+      toast.error(t("activation.toastError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -146,7 +131,7 @@ export default function ActivationCompte() {
           {/* ── Header ── */}
           <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 p-8 text-center">
             <UserCheck className="h-12 w-12 text-white/90 mx-auto mb-3" />
-            <h1 className="text-2xl font-bold text-white">Activation de votre compte</h1>
+            <h1 className="text-2xl font-bold text-white">{t("activation.pageTitle")}</h1>
             <p className="text-white/70 text-sm mt-1">Notario — Cabinet notarial</p>
           </div>
 
@@ -159,7 +144,7 @@ export default function ActivationCompte() {
               <div className="flex flex-col items-center gap-4 py-8">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">
-                  Vérification du lien d'activation…
+                  {t("activation.loading")}
                 </p>
               </div>
             )}
@@ -177,15 +162,13 @@ export default function ActivationCompte() {
                   <AlertTriangle className="h-8 w-8 text-destructive" />
                 </div>
                 <h2 className="text-lg font-semibold text-foreground">
-                  Lien invalide ou expiré
+                  {t("activation.invalidTitle")}
                 </h2>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Ce lien d'activation n'est plus valide. Il a peut-être déjà été
-                  utilisé ou a expiré. Contactez votre administrateur pour en recevoir
-                  un nouveau.
+                  {t("activation.invalidDesc")}
                 </p>
                 <Button variant="outline" onClick={() => navigate("/login")}>
-                  Retour à la connexion
+                  {t("activation.backToLogin")}
                 </Button>
               </motion.div>
             )}
@@ -200,7 +183,7 @@ export default function ActivationCompte() {
                 {tokenInfo && (
                   <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3">
                     <p className="text-sm font-medium text-foreground">
-                      Bienvenue, {tokenInfo.nom}
+                      {t("activation.welcome")} {tokenInfo.nom}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {tokenInfo.email}
@@ -209,13 +192,13 @@ export default function ActivationCompte() {
                 )}
 
                 <p className="text-sm text-muted-foreground">
-                  Définissez votre mot de passe pour activer votre accès à Notario.
+                  {t("activation.setPasswordDesc")}
                 </p>
 
                 {/* ── Champ : Nouveau mot de passe ── */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">
-                    Nouveau mot de passe
+                    {t("activation.newPassword")}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -246,7 +229,7 @@ export default function ActivationCompte() {
                         />
                       </div>
                       <p className={`text-[11px] font-medium ${strength.textClass}`}>
-                        Force : {strength.label}
+                        {t("activation.strength")} {strength.label}
                       </p>
                     </div>
                   )}
@@ -271,7 +254,7 @@ export default function ActivationCompte() {
                 {/* ── Champ : Confirmation ── */}
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-foreground">
-                    Confirmer le mot de passe
+                    {t("activation.confirmPassword")}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -297,13 +280,13 @@ export default function ActivationCompte() {
                   {/* Feedback correspondance */}
                   {confirm && !matches && (
                     <p className="text-xs text-destructive">
-                      Les mots de passe ne correspondent pas.
+                      {t("activation.noMatch")}
                     </p>
                   )}
                   {matches && (
                     <p className="text-xs text-success flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      Les mots de passe correspondent.
+                      {t("activation.match")}
                     </p>
                   )}
                 </div>
@@ -317,12 +300,12 @@ export default function ActivationCompte() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Activation en cours…
+                      {t("activation.activating")}
                     </>
                   ) : (
                     <>
                       <ShieldCheck className="h-4 w-4 mr-2" />
-                      Activer mon compte
+                      {t("activation.activateBtn")}
                     </>
                   )}
                 </Button>
@@ -341,16 +324,15 @@ export default function ActivationCompte() {
                 <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto">
                   <CheckCircle2 className="h-8 w-8 text-success" />
                 </div>
-                <h2 className="text-lg font-semibold text-foreground">Compte activé !</h2>
+                <h2 className="text-lg font-semibold text-foreground">{t("activation.successTitle")}</h2>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                  Votre compte a été activé avec succès. Vous pouvez maintenant vous
-                  connecter avec votre nouveau mot de passe.
+                  {t("activation.successDesc")}
                 </p>
                 <Button
                   onClick={() => navigate("/login")}
                   className="mt-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  Se connecter
+                  {t("activation.signIn")}
                 </Button>
               </motion.div>
             )}

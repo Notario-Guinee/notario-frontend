@@ -29,18 +29,9 @@ import { toast } from "sonner";
 import { mockDocuments } from "@/data/documentsData";
 import type { DocumentCollaborator, DocumentRole, DocumentStatus } from "@/types/documents";
 import InviteCollaboratorModal from "@/components/documents/InviteCollaboratorModal";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ─── Helpers ───────────────────────────────────────────────────
-
-function statusLabel(status: DocumentStatus): string {
-  const map: Record<DocumentStatus, string> = {
-    brouillon: "Brouillon",
-    en_revision: "En révision",
-    valide: "Validé",
-    archive: "Archivé",
-  };
-  return map[status];
-}
 
 function statusClasses(status: DocumentStatus): string {
   const map: Record<DocumentStatus, string> = {
@@ -50,16 +41,6 @@ function statusClasses(status: DocumentStatus): string {
     archive: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
   };
   return map[status];
-}
-
-function roleLabel(role: DocumentRole): string {
-  const map: Record<DocumentRole, string> = {
-    lecteur: "Lecteur",
-    commentateur: "Commentateur",
-    editeur: "Éditeur",
-    proprietaire: "Propriétaire",
-  };
-  return map[role];
 }
 
 function roleBadgeClass(role: DocumentRole): string {
@@ -72,24 +53,13 @@ function roleBadgeClass(role: DocumentRole): string {
   return map[role];
 }
 
-function formatDate(date: Date | undefined): string {
+function formatDate(date: Date | undefined, locale: string): string {
   if (!date) return "—";
-  return date.toLocaleDateString("fr-FR", {
+  return date.toLocaleDateString(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function formatRelative(date: Date | undefined): string {
-  if (!date) return "—";
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "à l'instant";
-  if (diffMin < 60) return `il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `il y a ${diffH}h`;
-  return `il y a ${Math.floor(diffH / 24)}j`;
 }
 
 // ─── Invitation en attente (mock) ──────────────────────────────
@@ -115,6 +85,8 @@ const PENDING_MOCK: PendingInvite[] = [
 export default function DocumentCollaboratorsPage() {
   const navigate = useNavigate();
   const { documentId } = useParams<{ documentId: string }>();
+  const { t, lang } = useLanguage();
+  const locale = lang === "EN" ? "en-GB" : "fr-FR";
 
   const doc = mockDocuments.find((d) => d.id === documentId);
 
@@ -122,6 +94,26 @@ export default function DocumentCollaboratorsPage() {
     navigate("/documents");
     return null;
   }
+
+  const statusLabel = (status: DocumentStatus): string => {
+    const map: Record<DocumentStatus, string> = {
+      brouillon: t("collab.statusBrouillon"),
+      en_revision: t("collab.statusEnRevision"),
+      valide: t("collab.statusValide"),
+      archive: t("collab.statusArchive"),
+    };
+    return map[status];
+  };
+
+  const roleLabel = (role: DocumentRole): string => {
+    const map: Record<DocumentRole, string> = {
+      lecteur: t("collab.roleLecteur"),
+      commentateur: t("collab.roleCommentateur"),
+      editeur: t("collab.roleEditeur"),
+      proprietaire: t("collab.roleProprietaire"),
+    };
+    return map[role];
+  };
 
   // ── États
   const [collaborators, setCollaborators] = useState<DocumentCollaborator[]>(
@@ -135,21 +127,21 @@ export default function DocumentCollaboratorsPage() {
     setCollaborators((prev) =>
       prev.map((c) => (c.id === collaboratorId ? { ...c, role: newRole } : c))
     );
-    toast.success("Rôle mis à jour");
+    toast.success(t("collab.toastRoleUpdated"));
   };
 
   const handleRevoke = (collaboratorId: string) => {
     setCollaborators((prev) => prev.filter((c) => c.id !== collaboratorId));
-    toast.success("Accès révoqué");
+    toast.success(t("collab.toastRevoked"));
   };
 
   const handleResend = (invite: PendingInvite) => {
-    toast.success(`Invitation relancée à ${invite.email}`);
+    toast.success(`${invite.email}`);
   };
 
   const handleCancelInvite = (inviteId: string) => {
     setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
-    toast.info("Invitation annulée");
+    toast.info(t("collab.toastCancelled"));
   };
 
   // ── KPIs
@@ -166,14 +158,14 @@ export default function DocumentCollaboratorsPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour au document
+          {t("collab.backToDoc")}
         </button>
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="font-heading text-xl text-foreground font-semibold">
-                Collaborateurs — {doc.title}
+                {t("collab.pageTitle")} — {doc.title}
               </h1>
               <span
                 className={cn(
@@ -185,7 +177,7 @@ export default function DocumentCollaboratorsPage() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Gérez les accès et les rôles des collaborateurs
+              {t("collab.pageDesc")}
             </p>
           </div>
 
@@ -195,7 +187,7 @@ export default function DocumentCollaboratorsPage() {
             onClick={() => setInviteOpen(true)}
           >
             <UserPlus className="h-4 w-4" />
-            Inviter
+            {t("collab.invite")}
           </Button>
         </div>
       </div>
@@ -206,35 +198,35 @@ export default function DocumentCollaboratorsPage() {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-card border border-border rounded-lg p-4 text-center">
             <p className="text-2xl font-heading font-bold text-foreground">{totalCollaborators}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total collaborateurs</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("collab.totalCollaborators")}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4 text-center">
             <p className="text-2xl font-heading font-bold text-emerald-600">{online}</p>
-            <p className="text-xs text-muted-foreground mt-1">En ligne</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("collab.online")}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-4 text-center">
             <p className="text-2xl font-heading font-bold text-amber-600">{pendingCount}</p>
-            <p className="text-xs text-muted-foreground mt-1">Invitations en attente</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("collab.pendingInvites")}</p>
           </div>
         </div>
 
         {/* Table collaborateurs */}
         <div>
           <h2 className="font-heading text-base font-semibold text-foreground mb-3">
-            Collaborateurs actifs
+            {t("collab.activeCollaborators")}
           </h2>
           <div className="rounded-lg border border-border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Collaborateur</TableHead>
-                  <TableHead>Rôle</TableHead>
-                  <TableHead>Invité par</TableHead>
-                  <TableHead>Invité le</TableHead>
-                  <TableHead>Dernier accès</TableHead>
-                  <TableHead>Dernière modif.</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="w-[60px]">Actions</TableHead>
+                  <TableHead>{t("collab.colCollaborator")}</TableHead>
+                  <TableHead>{t("collab.colRole")}</TableHead>
+                  <TableHead>{t("collab.colInvitedBy")}</TableHead>
+                  <TableHead>{t("collab.colInvitedAt")}</TableHead>
+                  <TableHead>{t("collab.colLastView")}</TableHead>
+                  <TableHead>{t("collab.colLastEdit")}</TableHead>
+                  <TableHead>{t("collab.colStatus")}</TableHead>
+                  <TableHead className="w-[60px]">{t("collab.colActions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -280,17 +272,17 @@ export default function DocumentCollaboratorsPage() {
 
                     {/* Invité le */}
                     <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(collab.invitedAt)}
+                      {formatDate(collab.invitedAt, locale)}
                     </TableCell>
 
                     {/* Dernier accès */}
                     <TableCell className="text-xs text-muted-foreground">
-                      {formatRelative(collab.lastViewedAt)}
+                      {collab.lastViewedAt?.toLocaleDateString(locale) ?? "—"}
                     </TableCell>
 
                     {/* Dernière modif */}
                     <TableCell className="text-xs text-muted-foreground">
-                      {formatRelative(collab.lastEditAt)}
+                      {collab.lastEditAt?.toLocaleDateString(locale) ?? "—"}
                     </TableCell>
 
                     {/* Statut */}
@@ -298,10 +290,10 @@ export default function DocumentCollaboratorsPage() {
                       {collab.isOnline ? (
                         <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          En ligne
+                          {t("collab.statusOnline")}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Hors ligne</span>
+                        <span className="text-xs text-muted-foreground">{t("collab.statusOffline")}</span>
                       )}
                     </TableCell>
 
@@ -319,7 +311,7 @@ export default function DocumentCollaboratorsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Modifier le rôle</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>{t("collab.editRole")}</DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                               {(["lecteur", "commentateur", "editeur"] as DocumentRole[]).map(
                                 (r) => (
@@ -336,17 +328,17 @@ export default function DocumentCollaboratorsPage() {
                           </DropdownMenuSub>
                           <DropdownMenuItem
                             onClick={() =>
-                              toast.info(`Activité de ${collab.user.prenom} ${collab.user.nom}`)
+                              toast.info(`${t("collab.activityOf")} ${collab.user.prenom} ${collab.user.nom}`)
                             }
                           >
-                            Voir l'activité
+                            {t("collab.viewActivity")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => handleRevoke(collab.id)}
                           >
-                            Révoquer l'accès
+                            {t("collab.revokeAccess")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -362,16 +354,16 @@ export default function DocumentCollaboratorsPage() {
         {pendingInvites.length > 0 && (
           <div>
             <h2 className="font-heading text-base font-semibold text-foreground mb-3">
-              Invitations en attente
+              {t("collab.pendingInvites")}
             </h2>
             <div className="rounded-lg border border-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Rôle</TableHead>
-                    <TableHead>Expire le</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{t("collab.colEmail")}</TableHead>
+                    <TableHead>{t("collab.colRole")}</TableHead>
+                    <TableHead>{t("collab.colExpires")}</TableHead>
+                    <TableHead>{t("collab.colActions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -389,7 +381,7 @@ export default function DocumentCollaboratorsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {formatDate(invite.expiresAt)}
+                        {formatDate(invite.expiresAt, locale)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -400,7 +392,7 @@ export default function DocumentCollaboratorsPage() {
                             onClick={() => handleResend(invite)}
                           >
                             <RefreshCw className="h-3 w-3" />
-                            Relancer
+                            {t("collab.resend")}
                           </Button>
                           <Button
                             variant="ghost"
@@ -408,7 +400,7 @@ export default function DocumentCollaboratorsPage() {
                             className="h-7 text-xs text-destructive hover:text-destructive"
                             onClick={() => handleCancelInvite(invite.id)}
                           >
-                            Annuler
+                            {t("collab.cancel")}
                           </Button>
                         </div>
                       </TableCell>

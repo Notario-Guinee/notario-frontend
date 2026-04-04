@@ -69,23 +69,23 @@ const fadeUp = {
 
 // ─── Utilitaires ──────────────────────────────────────────────
 
-function formatRelativeTime(date: Date): string {
+function formatRelativeTime(date: Date, t: (k: string) => string): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffH = Math.floor(diffMs / 3600000);
   const diffD = Math.floor(diffH / 24);
-  if (diffH < 1) return "il y a moins d'1h";
-  if (diffH < 24) return `il y a ${diffH}h`;
-  if (diffD === 1) return "hier";
-  return `il y a ${diffD}j`;
+  if (diffH < 1) return t("docs.justNow");
+  if (diffH < 24) return `${t("docs.minutesAgo")} ${diffH}${t("docs.hoursSuffix")}`.trim();
+  if (diffD === 1) return t("docs.dayAgo");
+  return `${t("docs.daysAgo")} ${diffD}${t("docs.daysSuffix")}`.trim();
 }
 
-function statusLabel(status: DocumentStatus): string {
+function statusLabel(status: DocumentStatus, t: (k: string) => string): string {
   const map: Record<DocumentStatus, string> = {
-    brouillon: "Brouillon",
-    en_revision: "En révision",
-    valide: "Validé",
-    archive: "Archivé",
+    brouillon: t("collab.statusBrouillon"),
+    en_revision: t("collab.statusEnRevision"),
+    valide: t("collab.statusValide"),
+    archive: t("collab.statusArchive"),
   };
   return map[status];
 }
@@ -100,14 +100,14 @@ function statusClasses(status: DocumentStatus): string {
   return map[status];
 }
 
-function typeLabel(type: DocumentType): string {
+function typeLabel(type: DocumentType, t: (k: string) => string): string {
   const map: Record<DocumentType, string> = {
-    contrat: "Contrat",
-    acte: "Acte",
-    courrier: "Courrier",
-    attestation: "Attestation",
-    note: "Note",
-    autre: "Autre",
+    contrat: t("docs.typeContrat"),
+    acte: t("docs.typeActe"),
+    courrier: t("docs.typeCourrier"),
+    attestation: t("docs.typeAttestation"),
+    note: t("docs.typeNote"),
+    autre: t("docs.typeAutre"),
   };
   return map[type];
 }
@@ -163,6 +163,7 @@ function DocumentCard({
   onToggleSelect?: () => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const onlineCollabs = doc.collaborators.filter((c) => c.isOnline);
 
   return (
@@ -194,7 +195,7 @@ function DocumentCard({
           {doc.dossierRef}
         </button>
         <span className={cn("text-xs rounded px-2 py-0.5 font-medium", typeClasses(doc.type))}>
-          {typeLabel(doc.type)}
+          {typeLabel(doc.type, t)}
         </span>
       </div>
 
@@ -205,7 +206,7 @@ function DocumentCard({
         </h3>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <span className={cn("text-xs rounded px-2 py-0.5 font-medium", statusClasses(doc.status))}>
-            {statusLabel(doc.status)}
+            {statusLabel(doc.status, t)}
           </span>
           <span className="text-xs text-muted-foreground">v{doc.currentVersion.versionLabel}</span>
         </div>
@@ -220,7 +221,7 @@ function DocumentCard({
           {doc.updatedBy.initiales}
         </div>
         <span className="truncate">
-          Modifié par {doc.updatedBy.prenom} {doc.updatedBy.nom} · {formatRelativeTime(doc.updatedAt)}
+          {t("docs.modifiedBy")} {doc.updatedBy.prenom} {doc.updatedBy.nom} · {formatRelativeTime(doc.updatedAt, t)}
         </span>
       </div>
 
@@ -297,6 +298,7 @@ function DocumentListView({
   onToggleSelect?: (id: string) => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -341,12 +343,12 @@ function DocumentListView({
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn("text-xs rounded px-2 py-0.5 font-medium", typeClasses(doc.type))}>
-                    {typeLabel(doc.type)}
+                    {typeLabel(doc.type, t)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   <span className={cn("text-xs rounded px-2 py-0.5 font-medium", statusClasses(doc.status))}>
-                    {statusLabel(doc.status)}
+                    {statusLabel(doc.status, t)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">
@@ -375,7 +377,7 @@ function DocumentListView({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">
-                  {formatRelativeTime(doc.updatedAt)}
+                  {formatRelativeTime(doc.updatedAt, t)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
@@ -680,7 +682,7 @@ export default function DocumentsPage() {
         documentId: id,
         versionNumber: 1,
         versionLabel: '1.0',
-        content: `<h2>${newDocForm.title.trim()}</h2><p>Commencez à rédiger votre document ici...</p>`,
+        content: `<h2>${newDocForm.title.trim()}</h2><p>${t("docs.startWriting")}</p>`,
         contentSnapshot: '',
         createdAt: now,
         createdBy: userMamadou,
@@ -831,10 +833,10 @@ export default function DocumentsPage() {
         {/* Filtre dossier */}
         <Select value={filterDossier} onValueChange={setFilterDossier}>
           <SelectTrigger className="h-9 w-[160px]">
-            <SelectValue placeholder="Tous les dossiers" />
+            <SelectValue placeholder={t("docs.allFolders")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les dossiers</SelectItem>
+            <SelectItem value="all">{t("docs.allFolders")}</SelectItem>
             {dossiers.map((ref) => (
               <SelectItem key={ref} value={ref}>{ref}</SelectItem>
             ))}
@@ -844,30 +846,30 @@ export default function DocumentsPage() {
         {/* Filtre type */}
         <Select value={filterType} onValueChange={setFilterType}>
           <SelectTrigger className="h-9 w-[150px]">
-            <SelectValue placeholder="Tous les types" />
+            <SelectValue placeholder={t("docs.allTypes")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les types</SelectItem>
-            <SelectItem value="contrat">Contrat</SelectItem>
-            <SelectItem value="acte">Acte</SelectItem>
-            <SelectItem value="courrier">Courrier</SelectItem>
-            <SelectItem value="attestation">Attestation</SelectItem>
-            <SelectItem value="note">Note</SelectItem>
-            <SelectItem value="autre">Autre</SelectItem>
+            <SelectItem value="all">{t("docs.allTypes")}</SelectItem>
+            <SelectItem value="contrat">{t("docs.typeContrat")}</SelectItem>
+            <SelectItem value="acte">{t("docs.typeActe")}</SelectItem>
+            <SelectItem value="courrier">{t("docs.typeCourrier")}</SelectItem>
+            <SelectItem value="attestation">{t("docs.typeAttestation")}</SelectItem>
+            <SelectItem value="note">{t("docs.typeNote")}</SelectItem>
+            <SelectItem value="autre">{t("docs.typeAutre")}</SelectItem>
           </SelectContent>
         </Select>
 
         {/* Filtre statut */}
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="h-9 w-[150px]">
-            <SelectValue placeholder="Tous les statuts" />
+            <SelectValue placeholder={t("docs.allStatuses")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tous les statuts</SelectItem>
-            <SelectItem value="brouillon">Brouillon</SelectItem>
-            <SelectItem value="en_revision">En révision</SelectItem>
-            <SelectItem value="valide">Validé</SelectItem>
-            <SelectItem value="archive">Archivé</SelectItem>
+            <SelectItem value="all">{t("docs.allStatuses")}</SelectItem>
+            <SelectItem value="brouillon">{t("collab.statusBrouillon")}</SelectItem>
+            <SelectItem value="en_revision">{t("collab.statusEnRevision")}</SelectItem>
+            <SelectItem value="valide">{t("collab.statusValide")}</SelectItem>
+            <SelectItem value="archive">{t("collab.statusArchive")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -875,29 +877,29 @@ export default function DocumentsPage() {
         {viewMode === 'folders' ? (
           <Select value={sortBy} onValueChange={(v: typeof sortBy) => setSortBy(v)}>
             <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="Trier par..." />
+              <SelectValue placeholder={t("docs.sortBy")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="date_desc">Plus récent d'abord</SelectItem>
-              <SelectItem value="date_asc">Plus ancien d'abord</SelectItem>
-              <SelectItem value="name_asc">Nom A → Z</SelectItem>
-              <SelectItem value="name_desc">Nom Z → A</SelectItem>
-              <SelectItem value="docs_desc">Plus de documents</SelectItem>
-              <SelectItem value="docs_asc">Moins de documents</SelectItem>
+              <SelectItem value="date_desc">{t("docs.sortRecentFirst")}</SelectItem>
+              <SelectItem value="date_asc">{t("docs.sortOldestFirst")}</SelectItem>
+              <SelectItem value="name_asc">{t("docs.sortNameAZ")}</SelectItem>
+              <SelectItem value="name_desc">{t("docs.sortNameZA")}</SelectItem>
+              <SelectItem value="docs_desc">{t("docs.sortMoreDocs")}</SelectItem>
+              <SelectItem value="docs_asc">{t("docs.sortLessDocs")}</SelectItem>
             </SelectContent>
           </Select>
         ) : (
           <Select value={docSortBy} onValueChange={(v: typeof docSortBy) => setDocSortBy(v)}>
             <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue placeholder="Trier par..." />
+              <SelectValue placeholder={t("docs.sortBy")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="date_desc">Plus récent d'abord</SelectItem>
-              <SelectItem value="date_asc">Plus ancien d'abord</SelectItem>
-              <SelectItem value="title_asc">Titre A → Z</SelectItem>
-              <SelectItem value="title_desc">Titre Z → A</SelectItem>
-              <SelectItem value="status">Par statut</SelectItem>
-              <SelectItem value="version">Version la plus récente</SelectItem>
+              <SelectItem value="date_desc">{t("docs.sortRecentFirst")}</SelectItem>
+              <SelectItem value="date_asc">{t("docs.sortOldestFirst")}</SelectItem>
+              <SelectItem value="title_asc">{t("docs.sortTitleAZ")}</SelectItem>
+              <SelectItem value="title_desc">{t("docs.sortTitleZA")}</SelectItem>
+              <SelectItem value="status">{t("docs.sortByStatus")}</SelectItem>
+              <SelectItem value="version">{t("docs.sortLatestVersion")}</SelectItem>
             </SelectContent>
           </Select>
         )}
@@ -912,7 +914,7 @@ export default function DocumentsPage() {
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setViewMode("folders")}
-            title="Vue dossiers"
+            title={t("docs.viewFolders")}
           >
             <FolderOpen className="h-3.5 w-3.5" />
           </button>
@@ -924,7 +926,7 @@ export default function DocumentsPage() {
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setViewMode("grid")}
-            title="Vue grille"
+            title={t("docs.viewGrid")}
           >
             <Grid3X3 className="h-3.5 w-3.5" />
           </button>
@@ -936,7 +938,7 @@ export default function DocumentsPage() {
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setViewMode("list")}
-            title="Vue liste"
+            title={t("docs.viewList")}
           >
             <List className="h-3.5 w-3.5" />
           </button>
@@ -971,7 +973,7 @@ export default function DocumentsPage() {
                         });
                       }}
                       onDoubleClick={() => navigate(`/documents/dossier/${group.dossierId}`)}
-                      title="Clic pour sélectionner · Double-clic pour ouvrir le dossier"
+                      title={t("docs.folderClickHint")}
                     >
                       {/* Étoile favori */}
                       {meta.isStarred && (
@@ -1047,7 +1049,7 @@ export default function DocumentsPage() {
                           {meta.customName ?? group.dossierRef}
                         </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {group.docs.length} doc{group.docs.length > 1 ? 's' : ''}{group.docs.length > 0 ? ` · ${formatRelativeTime(new Date(Math.max(...group.docs.map(d => d.updatedAt.getTime()))))}` : ''}
+                          {group.docs.length} doc{group.docs.length > 1 ? 's' : ''}{group.docs.length > 0 ? ` · ${formatRelativeTime(new Date(Math.max(...group.docs.map(d => d.updatedAt.getTime()))), t)}` : ''}
                         </p>
                       </div>
                     </div>
@@ -1161,25 +1163,25 @@ export default function DocumentsPage() {
       <Dialog open={showNewDocModal} onOpenChange={setShowNewDocModal}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Nouveau document</DialogTitle>
+            <DialogTitle>{t("docs.newDocTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Titre du document</Label>
+              <Label>{t("docs.docTitleLabel")}</Label>
               <Input
-                placeholder="Ex: Acte de vente — Parcelle 12-A"
+                placeholder={t("docs.docTitlePlaceholder")}
                 value={newDocForm.title}
                 onChange={(e) => setNewDocForm({ ...newDocForm, title: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Dossier</Label>
+              <Label>{t("docs.folderLabel")}</Label>
               <div className="relative">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     className="pl-9 pr-8"
-                    placeholder="Rechercher par numéro de dossier..."
+                    placeholder={t("docs.folderSearchPlaceholder")}
                     value={newDocForm.dossier ? newDocForm.dossier : folderSearch}
                     onChange={(e) => {
                       if (newDocForm.dossier) {
@@ -1217,7 +1219,7 @@ export default function DocumentsPage() {
                         </button>
                       ))}
                     {[...dossiers, ...customFolders.map(f => f.name)].filter(ref => !folderSearch || ref.toLowerCase().includes(folderSearch.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">Aucun dossier trouvé</div>
+                      <div className="px-3 py-2 text-sm text-muted-foreground">{t("docs.noFolderFound")}</div>
                     )}
                   </div>
                 )}
@@ -1226,12 +1228,12 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-1.5 mt-1">
                   <FolderOpen className="h-3.5 w-3.5 text-amber-500" />
                   <span className="text-xs font-medium text-foreground font-mono">{newDocForm.dossier}</span>
-                  <span className="text-xs text-emerald-600">✓ Sélectionné</span>
+                  <span className="text-xs text-emerald-600">{t("docs.selected")}</span>
                 </div>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Type de document</Label>
+              <Label>{t("archNum.docType")}</Label>
               <Select
                 value={newDocForm.type}
                 onValueChange={(v) => setNewDocForm({ ...newDocForm, type: v as DocumentType })}
@@ -1240,17 +1242,17 @@ export default function DocumentsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="acte">Acte</SelectItem>
-                  <SelectItem value="contrat">Contrat</SelectItem>
-                  <SelectItem value="courrier">Courrier</SelectItem>
-                  <SelectItem value="attestation">Attestation</SelectItem>
-                  <SelectItem value="note">Note</SelectItem>
-                  <SelectItem value="autre">Autre</SelectItem>
+                  <SelectItem value="acte">{t("docs.typeActe")}</SelectItem>
+                  <SelectItem value="contrat">{t("docs.typeContrat")}</SelectItem>
+                  <SelectItem value="courrier">{t("docs.typeCourrier")}</SelectItem>
+                  <SelectItem value="attestation">{t("docs.typeAttestation")}</SelectItem>
+                  <SelectItem value="note">{t("docs.typeNote")}</SelectItem>
+                  <SelectItem value="autre">{t("docs.typeAutre")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Statut initial</Label>
+              <Label>{t("docs.initialStatus")}</Label>
               <Select
                 value={newDocForm.status}
                 onValueChange={(v) => setNewDocForm({ ...newDocForm, status: v as DocumentStatus })}
@@ -1259,20 +1261,20 @@ export default function DocumentsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="brouillon">Brouillon</SelectItem>
-                  <SelectItem value="en_revision">En révision</SelectItem>
-                  <SelectItem value="valide">Validé</SelectItem>
-                  <SelectItem value="archive">Archivé</SelectItem>
+                  <SelectItem value="brouillon">{t("collab.statusBrouillon")}</SelectItem>
+                  <SelectItem value="en_revision">{t("collab.statusEnRevision")}</SelectItem>
+                  <SelectItem value="valide">{t("collab.statusValide")}</SelectItem>
+                  <SelectItem value="archive">{t("collab.statusArchive")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewDocModal(false)}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button onClick={handleCreateDocument} disabled={!newDocForm.title.trim()}>
-              Créer le document
+              {t("docs.createDoc")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1281,9 +1283,9 @@ export default function DocumentsPage() {
       {/* ─── Modal Renommer dossier ───────────────────────────── */}
       <Dialog open={!!renamingFolder} onOpenChange={o => !o && setRenamingFolder(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Renommer le dossier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("docs.renameFolder")}</DialogTitle></DialogHeader>
           <div className="py-2">
-            <Label className="text-xs text-muted-foreground">Nom du dossier</Label>
+            <Label className="text-xs text-muted-foreground">{t("docs.folderNameLabel")}</Label>
             <Input
               value={renameValue}
               onChange={e => setRenameValue(e.target.value)}
@@ -1292,22 +1294,22 @@ export default function DocumentsPage() {
                 if (e.key === 'Enter' && renameValue.trim()) {
                   updateFolderMeta(renamingFolder!.dossierId, { customName: renameValue.trim() });
                   setRenamingFolder(null);
-                  toast.success('Dossier renommé');
+                  toast.success(t("docs.folderRenamed"));
                 }
               }}
               autoFocus
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenamingFolder(null)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setRenamingFolder(null)}>{t("action.cancel")}</Button>
             <Button
               disabled={!renameValue.trim()}
               onClick={() => {
                 updateFolderMeta(renamingFolder!.dossierId, { customName: renameValue.trim() });
                 setRenamingFolder(null);
-                toast.success('Dossier renommé');
+                toast.success(t("docs.folderRenamed"));
               }}
-            >Renommer</Button>
+            >{t("archNum.rename")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1315,7 +1317,7 @@ export default function DocumentsPage() {
       {/* ─── Modal Couleur dossier ────────────────────────────── */}
       <Dialog open={!!coloringFolder} onOpenChange={o => !o && setColoringFolder(null)}>
         <DialogContent className="max-w-xs">
-          <DialogHeader><DialogTitle>Couleur du dossier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("docs.folderColor")}</DialogTitle></DialogHeader>
           <div className="py-2">
             <div className="grid grid-cols-5 gap-3">
               {FOLDER_COLORS.map(c => (
@@ -1333,12 +1335,12 @@ export default function DocumentsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setColoringFolder(null)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setColoringFolder(null)}>{t("action.cancel")}</Button>
             <Button onClick={() => {
               updateFolderMeta(coloringFolder!.dossierId, { color: coloringFolder!.currentColor });
               setColoringFolder(null);
-              toast.success('Couleur mise à jour');
-            }}>Appliquer</Button>
+              toast.success(t("docs.colorUpdated"));
+            }}>{t("archNum.apply")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1347,21 +1349,21 @@ export default function DocumentsPage() {
       <AlertDialog open={!!deletingFolder} onOpenChange={o => !o && setDeletingFolder(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">Supprimer le dossier ?</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">{t("docs.deleteFolderTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Le dossier <strong>{deletingFolder?.ref}</strong> et ses {dossierGroups.find(g => g.dossierId === deletingFolder?.dossierId)?.docs.length ?? 0} document(s) seront supprimés définitivement. Cette action est irréversible.
+              {t("docs.folderLabel")} <strong>{deletingFolder?.ref}</strong> {t("docs.deleteFolderDesc")} {dossierGroups.find(g => g.dossierId === deletingFolder?.dossierId)?.docs.length ?? 0} {t("docs.deleteFolderDesc2")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t("action.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                toast.success(`Dossier ${deletingFolder?.ref} supprimé`);
+                toast.success(`${t("docs.folderLabel")} ${deletingFolder?.ref} ${t("docs.folderDeleted")}`);
                 setDeletingFolder(null);
               }}
             >
-              Supprimer définitivement
+              {t("docs.deleteForever")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1370,10 +1372,10 @@ export default function DocumentsPage() {
       {/* ─── Modal Partager dossier ───────────────────────────── */}
       <Dialog open={!!sharingFolder} onOpenChange={o => !o && setSharingFolder(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Partager le dossier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("docs.shareFolder")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Lien du dossier</Label>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">{t("docs.folderLink")}</Label>
               <div className="flex gap-2">
                 <Input
                   value={`${window.location.origin}/documents/dossier/${sharingFolder?.dossierId ?? ''}`}
@@ -1382,20 +1384,20 @@ export default function DocumentsPage() {
                 />
                 <Button size="sm" variant="outline" onClick={() => {
                   navigator.clipboard.writeText(`${window.location.origin}/documents/dossier/${sharingFolder?.dossierId ?? ''}`);
-                  toast.success('Lien copié !');
-                }}>Copier</Button>
+                  toast.success(t("docs.linkCopied"));
+                }}>{t("docs.copy")}</Button>
               </div>
             </div>
             <div className="border-t border-border pt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Envoyer par email</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">{t("docs.sendByEmail")}</p>
               <div className="flex gap-2">
                 <Input placeholder="email@exemple.com" className="text-sm" />
-                <Button size="sm" onClick={() => toast.success('Invitation envoyée')}>Envoyer</Button>
+                <Button size="sm" onClick={() => toast.success(t("docs.invitationSent"))}>{t("docs.send")}</Button>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSharingFolder(null)}>Fermer</Button>
+            <Button variant="outline" onClick={() => setSharingFolder(null)}>{t("action.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1403,10 +1405,10 @@ export default function DocumentsPage() {
       {/* ─── Modal Nouveau dossier ────────────────────────────── */}
       <Dialog open={showNewFolderModal} onOpenChange={o => !o && setShowNewFolderModal(false)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Nouveau dossier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("archNum.newFolder")}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1.5">
-              <Label>Numéro / Nom du dossier</Label>
+              <Label>{t("docs.folderNumberLabel")}</Label>
               <Input
                 placeholder="Ex: N-2025-110"
                 value={newFolderName}
@@ -1420,13 +1422,13 @@ export default function DocumentsPage() {
                     setFolderMetas(prev => ({ ...prev, [id]: { dossierId: id, color: newFolderColor } }));
                     setShowNewFolderModal(false);
                     setNewFolderName('');
-                    toast.success(`Dossier "${id}" créé`);
+                    toast.success(`"${id}" ${t("docs.folderCreated")}`);
                   }
                 }}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Couleur</Label>
+              <Label>{t("docs.color")}</Label>
               <div className="flex flex-wrap gap-2">
                 {FOLDER_COLORS.map(c => (
                   <button
@@ -1449,12 +1451,12 @@ export default function DocumentsPage() {
                 <rect x="0" y="12" width="48" height="28" rx="3" fill={newFolderColor} opacity="0.4"/>
               </svg>
               <span className="text-sm font-mono font-semibold text-foreground truncate">
-                {newFolderName || 'Nom du dossier'}
+                {newFolderName || t("docs.folderPreviewPlaceholder")}
               </span>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewFolderModal(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowNewFolderModal(false)}>{t("action.cancel")}</Button>
             <Button
               disabled={!newFolderName.trim()}
               onClick={() => {
@@ -1464,11 +1466,11 @@ export default function DocumentsPage() {
                 setFolderMetas(prev => ({ ...prev, [id]: { dossierId: id, color: newFolderColor } }));
                 setShowNewFolderModal(false);
                 setNewFolderName('');
-                toast.success(`Dossier "${id}" créé`);
+                toast.success(`"${id}" ${t("docs.folderCreated")}`);
               }}
             >
               <Folder className="h-4 w-4 mr-2" />
-              Créer le dossier
+              {t("docs.createFolder")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1478,10 +1480,10 @@ export default function DocumentsPage() {
       <Dialog open={showImportModal} onOpenChange={o => { if (!o) { setShowImportModal(false); setImportFile(null); setImportPreview(''); setImportTitle(''); setImportTargetFolder(null); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="font-heading">Importer un document</DialogTitle>
+            <DialogTitle className="font-heading">{t("docs.importDoc")}</DialogTitle>
             {importTargetFolder && (
               <p className="text-xs text-muted-foreground">
-                Import dans le dossier : <span className="font-medium text-foreground">{importTargetFolder}</span>
+                {t("docs.importInFolder")} <span className="font-medium text-foreground">{importTargetFolder}</span>
               </p>
             )}
           </DialogHeader>
@@ -1508,8 +1510,8 @@ export default function DocumentsPage() {
                     <Upload className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">Glisser-déposer un fichier</p>
-                    <p className="text-xs text-muted-foreground mt-1">ou cliquer pour parcourir</p>
+                    <p className="font-medium text-foreground">{t("docs.dragDrop")}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("docs.orClick")}</p>
                   </div>
                   <div className="flex gap-2 flex-wrap justify-center">
                     {['.docx', '.doc', '.pdf', '.txt', '.html'].map(ext => (
@@ -1539,13 +1541,13 @@ export default function DocumentsPage() {
                 </div>
 
                 <div>
-                  <Label className="text-xs font-medium text-muted-foreground">Titre du document</Label>
-                  <Input value={importTitle} onChange={e => setImportTitle(e.target.value)} className="mt-1.5" placeholder="Nom du document..." />
+                  <Label className="text-xs font-medium text-muted-foreground">{t("docs.docTitleLabel")}</Label>
+                  <Input value={importTitle} onChange={e => setImportTitle(e.target.value)} className="mt-1.5" placeholder={t("docs.docNamePlaceholder")} />
                 </div>
 
                 {importPreview && !importPreview.includes('<iframe') && (
                   <div>
-                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Aperçu du contenu</Label>
+                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("docs.contentPreview")}</Label>
                     <div
                       className="border border-border rounded-lg p-3 bg-white dark:bg-gray-900 max-h-48 overflow-y-auto text-sm"
                       dangerouslySetInnerHTML={{ __html: importPreview }}
@@ -1554,7 +1556,7 @@ export default function DocumentsPage() {
                 )}
                 {importPreview.includes('<iframe') && (
                   <div>
-                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">Aperçu PDF</Label>
+                    <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">{t("docs.pdfPreview")}</Label>
                     <div className="border border-border rounded-lg overflow-hidden" style={{ height: '300px' }}
                       dangerouslySetInnerHTML={{ __html: importPreview }}
                     />
@@ -1566,14 +1568,14 @@ export default function DocumentsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview(''); setImportTitle(''); setImportTargetFolder(null); }}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button
               className="bg-primary text-primary-foreground"
               disabled={!importFile || !importTitle.trim()}
               onClick={handleImportCreate}
             >
-              <Plus className="mr-2 h-4 w-4" /> Créer le document
+              <Plus className="mr-2 h-4 w-4" /> {t("docs.createDoc")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -91,23 +91,23 @@ import type {
 
 // ─── Utilitaires ──────────────────────────────────────────────
 
-function formatRelativeTime(date: Date): string {
+function formatRelativeTime(date: Date, t: (k: string) => string): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffH = Math.floor(diffMs / 3600000);
   const diffD = Math.floor(diffH / 24);
-  if (diffH < 1) return "il y a moins d'1h";
-  if (diffH < 24) return `il y a ${diffH}h`;
-  if (diffD === 1) return "hier";
-  return `il y a ${diffD}j`;
+  if (diffH < 1) return `${t("editor.minutesAgo")} ${t("editor.minutesSuffix")}`.trim() || t("editor.justNow");
+  if (diffH < 24) return `${t("editor.minutesAgo")} ${diffH}${t("editor.minutesSuffix")}`.trim();
+  if (diffD === 1) return t("editor.justNow");
+  return `${t("editor.minutesAgo")} ${diffD}${t("editor.minutesSuffix")}`.trim();
 }
 
-function statusLabel(status: DocumentStatus): string {
+function statusLabel(status: DocumentStatus, t: (k: string) => string): string {
   const map: Record<DocumentStatus, string> = {
-    brouillon: "Brouillon",
-    en_revision: "En révision",
-    valide: "Validé",
-    archive: "Archivé",
+    brouillon: t("editor.statusDraft"),
+    en_revision: t("editor.statusRevision"),
+    valide: t("editor.statusValidated"),
+    archive: t("editor.statusArchived"),
   };
   return map[status];
 }
@@ -141,9 +141,10 @@ const PRESET_COLORS = [
   '#b71c1c','#880e4f','#4a148c','#311b92','#1a237e','#0d47a1','#004d40','#1b5e20','#f57f17','#bf360c',
 ];
 
-function ColorPalette({ currentColor, onSelect, onCustom }: { currentColor: string; onSelect: (c: string) => void; onCustom: (c: string) => void }) {
+function ColorPalette({ currentColor, onSelect, onCustom, customLabel }: { currentColor: string; onSelect: (c: string) => void; onCustom: (c: string) => void; customLabel?: string }) {
   const [customColor, setCustomColor] = useState(currentColor);
   const customInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useLanguage();
 
   return (
     <div className="p-3 space-y-3 w-[220px]">
@@ -165,7 +166,7 @@ function ColorPalette({ currentColor, onSelect, onCustom }: { currentColor: stri
       </div>
       {/* Divider */}
       <div className="border-t border-border pt-2">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Personnalisé</p>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{customLabel ?? t("editor.custom")}</p>
         <div className="flex items-center gap-2">
           <div
             className="h-7 w-7 rounded-full border-2 border-border shrink-0"
@@ -174,7 +175,7 @@ function ColorPalette({ currentColor, onSelect, onCustom }: { currentColor: stri
           <button
             onMouseDown={(e) => { e.preventDefault(); customInputRef.current?.click(); }}
             className="flex items-center justify-center h-7 w-7 border-2 border-dashed border-border rounded-full text-muted-foreground hover:text-foreground hover:border-primary transition-colors text-lg leading-none"
-            title="Choisir une couleur personnalisée"
+            title={customLabel ?? t("editor.customColor")}
           >+</button>
           <input
             ref={customInputRef}
@@ -233,7 +234,7 @@ function TablePicker({ onSelect }: { onSelect: (rows: number, cols: number) => v
   return (
     <div className="p-2 space-y-1">
       <p className="text-xs text-muted-foreground mb-2">
-        {hovered ? `${hovered.r} × ${hovered.c}` : "Choisir la taille du tableau"}
+        {hovered ? `${hovered.r} × ${hovered.c}` : "Table size"}
       </p>
       <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${MAX}, 1fr)` }}>
         {Array.from({ length: MAX }, (_, r) =>
@@ -405,7 +406,7 @@ export default function DocumentEditorPage() {
           setLastSaveTime(new Date());
           setLastSaved(new Date());
           setIsDirty(false);
-          toast.info("Document sauvegardé automatiquement", { duration: 2000 });
+          toast.info(t("editor.autoSaved"), { duration: 2000 });
         }, 800);
       }
     }, 30000);
@@ -608,7 +609,7 @@ export default function DocumentEditorPage() {
     const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const newHtml = html.replace(new RegExp(escaped, "gi"), replaceText);
     editorRef.current.innerHTML = newHtml;
-    toast.success("Remplacement effectué");
+    toast.success(t("editor.replaceDone"));
   }, [findText, replaceText]);
 
   // ─── Sauvegarde ─────────────────────────────────────────────
@@ -620,7 +621,7 @@ export default function DocumentEditorPage() {
       setLastSaveTime(new Date());
       setLastSaved(new Date());
       setIsDirty(false);
-      toast.success("Document sauvegardé");
+      toast.success(t("editor.savedToast"));
     }, 600);
   };
 
@@ -630,7 +631,7 @@ export default function DocumentEditorPage() {
     const content = editorRef.current?.innerHTML ?? "";
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      toast.error("Impossible d'ouvrir la fenêtre d'impression");
+      toast.error(t("editor.printError"));
       return;
     }
     printWindow.document.write(`<!DOCTYPE html>
@@ -735,7 +736,7 @@ export default function DocumentEditorPage() {
     };
     setComments((prev) => [newComment, ...prev]);
     setNewCommentText("");
-    toast.success("Commentaire ajouté");
+    toast.success(t("editor.commentAdded"));
   };
 
   const handleReplyToComment = (commentId: string) => {
@@ -757,7 +758,7 @@ export default function DocumentEditorPage() {
     );
     setReplyTexts((prev) => ({ ...prev, [commentId]: "" }));
     setShowReplyFor(null);
-    toast.success("Réponse ajoutée");
+    toast.success(t("editor.replyAdded"));
   };
 
   // ─── Collaborateurs ──────────────────────────────────────────
@@ -779,13 +780,13 @@ export default function DocumentEditorPage() {
       {/* ═══ Bannière verrouillage ════════════════════════════ */}
       {isReadOnly && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 shrink-0">
-          <span className="font-semibold">Document verrouillé</span>
+          <span className="font-semibold">{t("editor.docLocked")}</span>
           <span>—</span>
           <span>
-            Ce document est en lecture seule. Il a été verrouillé par{" "}
+            {t("editor.docLockedBy")}{" "}
             {doc.lockedBy
               ? `${doc.lockedBy.prenom} ${doc.lockedBy.nom}`
-              : "le propriétaire"}
+              : t("editor.docLockedByOwner")}
             .
           </span>
         </div>
@@ -816,7 +817,7 @@ export default function DocumentEditorPage() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="flex-1 min-w-0 bg-transparent border-none outline-none font-heading text-base text-foreground placeholder:text-muted-foreground"
-          placeholder="Titre du document"
+          placeholder={t("editor.titlePlaceholder")}
         />
 
         {/* Badge statut cliquable */}
@@ -828,22 +829,22 @@ export default function DocumentEditorPage() {
                 statusClasses(status)
               )}
             >
-              {statusLabel(status)}
+              {statusLabel(status, t)}
               <ChevronDown className="h-3 w-3" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setStatus("brouillon")}>
-              Brouillon
+              {t("editor.statusDraft")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setStatus("en_revision")}>
-              En révision
+              {t("editor.statusRevision")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setStatus("valide")}>
-              Validé
+              {t("editor.statusValidated")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setStatus("archive")}>
-              Archivé
+              {t("editor.statusArchived")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -854,13 +855,13 @@ export default function DocumentEditorPage() {
         {saveStatus === "saving" && (
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <LoaderCircle className="h-3 w-3 animate-spin" />
-            Sauvegarde...
+            {t("editor.saving")}
           </span>
         )}
         {saveStatus === "saved" && (
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <CircleCheck className="h-3 w-3 text-emerald-500" />
-            Sauvegardé à{" "}
+            {t("editor.savedAt")}{" "}
             {lastSaveTime.toLocaleTimeString("fr-FR", {
               hour: "2-digit",
               minute: "2-digit",
@@ -870,7 +871,7 @@ export default function DocumentEditorPage() {
         {saveStatus === "unsaved" && (
           <span className="text-xs text-amber-500 flex items-center gap-1">
             <CircleAlert className="h-3 w-3" />
-            Modifications non sauvegardées
+            {t("editor.unsaved")}
           </span>
         )}
 
@@ -881,14 +882,14 @@ export default function DocumentEditorPage() {
           onClick={handleSave}
         >
           <Save className="h-3.5 w-3.5" />
-          Sauvegarder
+          {t("editor.save")}
         </Button>
 
         {/* Exporter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1 h-8">
-              Exporter
+              {t("editor.export")}
               <ChevronDown className="h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>
@@ -903,7 +904,7 @@ export default function DocumentEditorPage() {
               <Code className="mr-2 h-4 w-4" /> HTML
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={handleExportText}>
-              <AlignLeft className="mr-2 h-4 w-4" /> Texte brut
+              <AlignLeft className="mr-2 h-4 w-4" /> {t("editor.plainText")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -932,10 +933,10 @@ export default function DocumentEditorPage() {
       {/* ═══ Toolbar Row 2 ════════════════════════════════════ */}
       <div className="h-10 border-b border-border bg-background flex items-center px-4 gap-0.5 overflow-x-auto shrink-0">
         {/* Undo / Redo */}
-        <ToolbarBtn onClick={() => execCmd("undo")} title="Annuler">
+        <ToolbarBtn onClick={() => execCmd("undo")} title={t("editor.undo")}>
           <Undo className="h-3.5 w-3.5" />
         </ToolbarBtn>
-        <ToolbarBtn onClick={() => execCmd("redo")} title="Rétablir">
+        <ToolbarBtn onClick={() => execCmd("redo")} title={t("editor.redo")}>
           <Redo className="h-3.5 w-3.5" />
         </ToolbarBtn>
 
@@ -948,24 +949,24 @@ export default function DocumentEditorPage() {
               className="h-7 px-2 rounded flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
               onMouseDown={(e) => e.preventDefault()}
             >
-              Styles <ChevronDown className="h-3 w-3" />
+              {t("editor.styles")} <ChevronDown className="h-3 w-3" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem onSelect={() => insertBlock("h1")}>
-              Titre 1
+              {t("editor.heading1")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => insertBlock("h2")}>
-              Titre 2
+              {t("editor.heading2")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => insertBlock("h3")}>
-              Titre 3
+              {t("editor.heading3")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => insertBlock("p")}>
-              Corps
+              {t("editor.body")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => insertBlock("blockquote")}>
-              Citation
+              {t("editor.quote")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1048,49 +1049,49 @@ export default function DocumentEditorPage() {
         {/* Formatage texte */}
         <ToolbarBtn
           onClick={() => execCmd("bold")}
-          title="Gras"
+          title={t("editor.bold")}
           active={!!activeFormats.bold}
         >
           <Bold className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("italic")}
-          title="Italique"
+          title={t("editor.italic")}
           active={!!activeFormats.italic}
         >
           <Italic className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("underline")}
-          title="Souligné"
+          title={t("editor.underline")}
           active={!!activeFormats.underline}
         >
           <Underline className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("strikeThrough")}
-          title="Barré"
+          title={t("editor.strikethrough")}
           active={!!activeFormats.strikeThrough}
         >
           <Strikethrough className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("superscript")}
-          title="Exposant"
+          title={t("editor.superscript")}
           active={!!activeFormats.superscript}
         >
           <Superscript className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("subscript")}
-          title="Indice"
+          title={t("editor.subscript")}
           active={!!activeFormats.subscript}
         >
           <Subscript className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("removeFormat")}
-          title="Effacer le formatage"
+          title={t("editor.clearFormat")}
         >
           <Eraser className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -1102,7 +1103,7 @@ export default function DocumentEditorPage() {
           <DropdownMenuTrigger asChild>
             <button
               onMouseDown={e => e.preventDefault()}
-              title="Couleur du texte"
+              title={t("editor.textColor")}
               className="h-7 w-7 rounded flex flex-col items-center justify-center hover:bg-muted transition-colors"
             >
               <span className="text-[11px] font-bold text-foreground leading-none">A</span>
@@ -1114,6 +1115,7 @@ export default function DocumentEditorPage() {
               currentColor={textColor}
               onSelect={(c) => { setTextColor(c); restoreEditorSelection(); document.execCommand('foreColor', false, c); saveEditorSelection(); }}
               onCustom={(c) => { setTextColor(c); restoreEditorSelection(); document.execCommand('foreColor', false, c); saveEditorSelection(); }}
+              customLabel={t("editor.custom")}
             />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1123,7 +1125,7 @@ export default function DocumentEditorPage() {
           <DropdownMenuTrigger asChild>
             <button
               onMouseDown={e => e.preventDefault()}
-              title="Couleur de surlignage"
+              title={t("editor.highlightColor")}
               className="h-7 w-7 rounded flex flex-col items-center justify-center hover:bg-muted transition-colors"
             >
               <Highlighter className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1135,6 +1137,7 @@ export default function DocumentEditorPage() {
               currentColor={highlightColor}
               onSelect={(c) => { setHighlightColor(c); restoreEditorSelection(); document.execCommand('hiliteColor', false, c); saveEditorSelection(); }}
               onCustom={(c) => { setHighlightColor(c); restoreEditorSelection(); document.execCommand('hiliteColor', false, c); saveEditorSelection(); }}
+              customLabel={t("editor.custom")}
             />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1144,28 +1147,28 @@ export default function DocumentEditorPage() {
         {/* Alignements */}
         <ToolbarBtn
           onClick={() => execCmd("justifyLeft")}
-          title="Aligner à gauche"
+          title={t("editor.alignLeft")}
           active={!!activeFormats.justifyLeft}
         >
           <AlignLeft className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("justifyCenter")}
-          title="Centrer"
+          title={t("editor.alignCenter")}
           active={!!activeFormats.justifyCenter}
         >
           <AlignCenter className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("justifyRight")}
-          title="Aligner à droite"
+          title={t("editor.alignRight")}
           active={!!activeFormats.justifyRight}
         >
           <AlignRight className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("justifyFull")}
-          title="Justifier"
+          title={t("editor.justify")}
           active={!!activeFormats.justifyFull}
         >
           <AlignJustify className="h-3.5 w-3.5" />
@@ -1176,14 +1179,14 @@ export default function DocumentEditorPage() {
         {/* Listes */}
         <ToolbarBtn
           onClick={() => execCmd("insertUnorderedList")}
-          title="Liste à puces"
+          title={t("editor.bulletList")}
           active={!!activeFormats.insertUnorderedList}
         >
           <List className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("insertOrderedList")}
-          title="Liste numérotée"
+          title={t("editor.numberedList")}
           active={!!activeFormats.insertOrderedList}
         >
           <ListOrdered className="h-3.5 w-3.5" />
@@ -1194,13 +1197,13 @@ export default function DocumentEditorPage() {
         {/* Indentation */}
         <ToolbarBtn
           onClick={() => execCmd("indent")}
-          title="Augmenter le retrait"
+          title={t("editor.indentMore")}
         >
           <IndentIncrease className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn
           onClick={() => execCmd("outdent")}
-          title="Diminuer le retrait"
+          title={t("editor.indentLess")}
         >
           <IndentDecrease className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -1213,13 +1216,13 @@ export default function DocumentEditorPage() {
             <button
               onMouseDown={(e) => e.preventDefault()}
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Espacement des lignes"
+              title={t("editor.lineSpacing")}
             >
               <AlignVerticalSpaceAround className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <div className="px-2 pt-1.5 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Interligne</div>
+            <div className="px-2 pt-1.5 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t("editor.lineSpacingLabel")}</div>
             {[
               { value: "1", label: "Simple (1)" },
               { value: "1.15", label: "1.15" },
@@ -1238,7 +1241,7 @@ export default function DocumentEditorPage() {
         {/* Règle horizontale */}
         <ToolbarBtn
           onClick={() => execCmd("insertHorizontalRule")}
-          title="Insérer une règle horizontale"
+          title={t("editor.insertHRule")}
         >
           <Minus className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -1252,7 +1255,7 @@ export default function DocumentEditorPage() {
                 saveEditorSelection();
               }}
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Insérer un tableau"
+              title={t("editor.insertTable")}
             >
               <Table className="h-3.5 w-3.5" />
             </button>
@@ -1274,7 +1277,7 @@ export default function DocumentEditorPage() {
               execCmd("createLink", url);
             }
           }}
-          title="Insérer un lien"
+          title={t("editor.insertLink")}
         >
           <Link2 className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -1283,7 +1286,7 @@ export default function DocumentEditorPage() {
         <>
           <ToolbarBtn
             onClick={() => imageInputRef.current?.click()}
-            title="Insérer une image"
+            title={t("editor.insertImage")}
           >
             <ImageIcon className="h-3.5 w-3.5" />
           </ToolbarBtn>
@@ -1314,7 +1317,7 @@ export default function DocumentEditorPage() {
             setIsPanelOpen(true);
             setPanelTab("commentaires");
           }}
-          title="Commentaires"
+          title={t("editor.comments")}
         >
           <MessageSquare className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -1322,20 +1325,20 @@ export default function DocumentEditorPage() {
         {/* Trouver & Remplacer */}
         <ToolbarBtn
           onClick={() => setShowFindReplace(true)}
-          title="Trouver et remplacer"
+          title={t("editor.findReplace")}
         >
           <Search className="h-3.5 w-3.5" />
         </ToolbarBtn>
 
         {/* Imprimer */}
-        <ToolbarBtn onClick={() => setShowPrintPreview(true)} title="Imprimer / Aperçu avant impression">
+        <ToolbarBtn onClick={() => setShowPrintPreview(true)} title={t("editor.print")}>
           <Printer className="h-3.5 w-3.5" />
         </ToolbarBtn>
 
         {/* Filigrane */}
         <ToolbarBtn
           onClick={() => setShowWatermarkModal(true)}
-          title="Filigrane"
+          title={t("editor.watermark")}
           active={watermark.enabled}
         >
           <Stamp className="h-3.5 w-3.5" />
@@ -1348,40 +1351,40 @@ export default function DocumentEditorPage() {
             <button
               onMouseDown={e => e.preventDefault()}
               className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Plus d'options"
+              title={t("editor.moreOptions")}
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem onSelect={() => { restoreEditorSelection(); execCmd('removeFormat'); }}>
-              <Eraser className="mr-2 h-4 w-4" /> Effacer le formatage
+              <Eraser className="mr-2 h-4 w-4" /> {t("editor.clearFormat")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { restoreEditorSelection(); execCmd('insertHorizontalRule'); }}>
-              <Minus className="mr-2 h-4 w-4" /> Règle horizontale
+              <Minus className="mr-2 h-4 w-4" /> {t("editor.horizontalRule")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => { restoreEditorSelection(); execCmd('subscript'); }}>
-              <Subscript className="mr-2 h-4 w-4" /> Indice (X₂)
+              <Subscript className="mr-2 h-4 w-4" /> {t("editor.subscriptLabel")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { restoreEditorSelection(); execCmd('superscript'); }}>
-              <Superscript className="mr-2 h-4 w-4" /> Exposant (X²)
+              <Superscript className="mr-2 h-4 w-4" /> {t("editor.superscriptLabel")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setShowTableModal(true)}>
-              <Table className="mr-2 h-4 w-4" /> Insérer un tableau
+              <Table className="mr-2 h-4 w-4" /> {t("editor.insertTableMenu")}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setShowFindReplace(true)}>
-              <Search className="mr-2 h-4 w-4" /> Trouver & Remplacer
+              <Search className="mr-2 h-4 w-4" /> {t("editor.findReplaceMenu")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setShowPrintPreview(true)}>
-              <Printer className="mr-2 h-4 w-4" /> Aperçu avant impression
+              <Printer className="mr-2 h-4 w-4" /> {t("editor.printPreviewMenu")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setShowWatermarkModal(true)}>
               <Stamp className="mr-2 h-4 w-4" />
-              {watermark.enabled ? "Modifier le filigrane" : "Ajouter un filigrane"}
+              {watermark.enabled ? t("editor.editWatermark") : t("editor.addWatermark")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1461,7 +1464,7 @@ export default function DocumentEditorPage() {
           className="absolute top-0 cursor-col-resize z-10"
           style={{ left: `calc(50% - 397px + ${leftMargin + leftIndent}px)` }}
           onMouseDown={(e) => { e.preventDefault(); setIsDraggingRuler('leftIndent'); }}
-          title="Retrait gauche"
+          title={t("editor.leftIndent")}
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <polygon points="5,2 9,8 1,8" fill="#1a73e8" />
@@ -1473,7 +1476,7 @@ export default function DocumentEditorPage() {
           className="absolute bottom-0 cursor-col-resize z-10"
           style={{ left: `calc(50% - 397px + ${leftMargin}px - 5px)` }}
           onMouseDown={(e) => { e.preventDefault(); setIsDraggingRuler('leftMargin'); }}
-          title="Marge gauche"
+          title={t("editor.leftMargin")}
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <polygon points="5,8 9,2 1,2" fill="#1a73e8" />
@@ -1485,7 +1488,7 @@ export default function DocumentEditorPage() {
           className="absolute bottom-0 cursor-col-resize z-10"
           style={{ right: `calc(50% - 397px + ${rightMargin}px - 5px)` }}
           onMouseDown={(e) => { e.preventDefault(); setIsDraggingRuler('rightMargin'); }}
-          title="Marge droite"
+          title={t("editor.rightMargin")}
         >
           <svg width="10" height="10" viewBox="0 0 10 10">
             <polygon points="5,8 9,2 1,2" fill="#1a73e8" />
@@ -1566,7 +1569,7 @@ export default function DocumentEditorPage() {
               className="absolute right-0 cursor-row-resize z-10"
               style={{ top: topMargin - 5 }}
               onMouseDown={(e) => { e.preventDefault(); setIsDraggingVerticalRuler('topMargin'); }}
-              title="Marge supérieure"
+              title={t("editor.topMargin")}
             >
               <svg width="10" height="10" viewBox="0 0 10 10">
                 <polygon points="2,5 8,1 8,9" fill="#1a73e8" />
@@ -1578,7 +1581,7 @@ export default function DocumentEditorPage() {
               className="absolute right-0 cursor-row-resize z-10"
               style={{ bottom: bottomMargin - 5 }}
               onMouseDown={(e) => { e.preventDefault(); setIsDraggingVerticalRuler('bottomMargin'); }}
-              title="Marge inférieure"
+              title={t("editor.bottomMargin")}
             >
               <svg width="10" height="10" viewBox="0 0 10 10">
                 <polygon points="2,5 8,1 8,9" fill="#1a73e8" />
@@ -1678,10 +1681,10 @@ export default function DocumentEditorPage() {
 
             {/* Footer */}
             <div className="mt-3 text-center text-xs text-muted-foreground">
-              {wordCount} mots · Dernière sauvegarde{" "}
+              {wordCount} {t("editor.wordCount")} · {t("editor.lastSaved")}{" "}
               {minutesSaved === 0
-                ? "à l'instant"
-                : `il y a ${minutesSaved} min`}
+                ? t("editor.justNow")
+                : `${minutesSaved} ${t("editor.minutesSuffix")}`}
             </div>
           </div>
         </div>
@@ -1710,7 +1713,13 @@ export default function DocumentEditorPage() {
                   )}
                 >
                   {tab === "activite"
-                    ? "Activité"
+                    ? t("editor.activityHistory").split(" ")[0]
+                    : tab === "collaborateurs"
+                    ? t("editor.collaboratorsPlural").charAt(0).toUpperCase() + t("editor.collaboratorsPlural").slice(1)
+                    : tab === "commentaires"
+                    ? t("editor.comments").charAt(0).toUpperCase() + t("editor.comments").slice(1)
+                    : tab === "versions"
+                    ? t("editor.versionsPlural").charAt(0).toUpperCase() + t("editor.versionsPlural").slice(1)
                     : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
@@ -1722,8 +1731,7 @@ export default function DocumentEditorPage() {
               {panelTab === "collaborateurs" && (
                 <div className="p-4 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {collaborators.length} collaborateur
-                    {collaborators.length > 1 ? "s" : ""}
+                    {collaborators.length} {collaborators.length > 1 ? t("editor.collaboratorsPlural") : t("editor.collaborators")}
                   </p>
 
                   {collaborators.map((collab) => (
@@ -1751,13 +1759,13 @@ export default function DocumentEditorPage() {
                         </div>
                         {collab.isOnline ? (
                           <p className="text-xs text-muted-foreground italic">
-                            En train de modifier...
+                            {t("editor.editing")}
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground">
-                            Vu{" "}
+                            {t("editor.seenAt")}{" "}
                             {collab.lastViewedAt
-                              ? formatRelativeTime(collab.lastViewedAt)
+                              ? formatRelativeTime(collab.lastViewedAt, t)
                               : "—"}
                           </p>
                         )}
@@ -1786,7 +1794,7 @@ export default function DocumentEditorPage() {
                               );
                             }}
                           >
-                            Lecteur
+                            {t("editor.reader")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => {
@@ -1799,7 +1807,7 @@ export default function DocumentEditorPage() {
                               );
                             }}
                           >
-                            Commentateur
+                            {t("editor.commenter")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => {
@@ -1812,7 +1820,7 @@ export default function DocumentEditorPage() {
                               );
                             }}
                           >
-                            Éditeur
+                            {t("editor.editor")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -1821,7 +1829,7 @@ export default function DocumentEditorPage() {
                               handleRevokeCollaborator(collab.id)
                             }
                           >
-                            Révoquer l'accès
+                            {t("editor.revokeAccess")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1836,7 +1844,7 @@ export default function DocumentEditorPage() {
                     onClick={() => setShowInviteModal(true)}
                   >
                     <UserPlus className="h-3.5 w-3.5" />
-                    Inviter un collaborateur
+                    {t("editor.inviteCollaborator")}
                   </Button>
                 </div>
               )}
@@ -1857,9 +1865,11 @@ export default function DocumentEditorPage() {
                             : "bg-muted text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        {f === "resolus"
-                          ? "Résolus"
-                          : f.charAt(0).toUpperCase() + f.slice(1)}
+                        {f === "tous"
+                          ? t("editor.commentFilter.all")
+                          : f === "ouverts"
+                          ? t("editor.commentFilter.open")
+                          : t("editor.commentFilter.resolved")}
                       </button>
                     ))}
                   </div>
@@ -1867,7 +1877,7 @@ export default function DocumentEditorPage() {
                   {/* Zone de nouveau commentaire */}
                   <div className="border border-border rounded-lg p-2 space-y-2">
                     <Textarea
-                      placeholder="Ajouter un commentaire..."
+                      placeholder={t("editor.addComment")}
                       value={newCommentText}
                       onChange={(e) => setNewCommentText(e.target.value)}
                       className="resize-none text-xs min-h-[60px]"
@@ -1880,7 +1890,7 @@ export default function DocumentEditorPage() {
                         className="h-6 text-xs px-2"
                         onClick={() => setNewCommentText("")}
                       >
-                        Annuler
+                        {t("editor.cancel")}
                       </Button>
                       <Button
                         size="sm"
@@ -1888,7 +1898,7 @@ export default function DocumentEditorPage() {
                         onClick={handleAddComment}
                         disabled={!newCommentText.trim()}
                       >
-                        Publier
+                        {t("editor.publish")}
                       </Button>
                     </div>
                   </div>
@@ -1923,7 +1933,7 @@ export default function DocumentEditorPage() {
                               {comment.author.prenom} {comment.author.nom}
                             </span>
                             <span className="text-[10px] text-muted-foreground ml-1">
-                              · {formatRelativeTime(comment.createdAt)}
+                              · {formatRelativeTime(comment.createdAt, t)}
                             </span>
                           </div>
                         </div>
@@ -1960,7 +1970,7 @@ export default function DocumentEditorPage() {
                         {showReplyFor === comment.id && (
                           <div className="space-y-1.5 pl-3 border-l-2 border-primary/30">
                             <Textarea
-                              placeholder="Votre réponse..."
+                              placeholder={t("editor.yourReply")}
                               value={replyTexts[comment.id] ?? ""}
                               onChange={(e) =>
                                 setReplyTexts((prev) => ({
@@ -1978,7 +1988,7 @@ export default function DocumentEditorPage() {
                                 className="h-6 text-xs px-2"
                                 onClick={() => setShowReplyFor(null)}
                               >
-                                Annuler
+                                {t("editor.cancel")}
                               </Button>
                               <Button
                                 size="sm"
@@ -1990,7 +2000,7 @@ export default function DocumentEditorPage() {
                                   !(replyTexts[comment.id] ?? "").trim()
                                 }
                               >
-                                Répondre
+                                {t("editor.reply")}
                               </Button>
                             </div>
                           </div>
@@ -2009,7 +2019,7 @@ export default function DocumentEditorPage() {
                                 )
                               }
                             >
-                              Répondre
+                              {t("editor.reply")}
                             </button>
                             <span className="text-muted-foreground">·</span>
                             <button
@@ -2019,7 +2029,7 @@ export default function DocumentEditorPage() {
                               }
                             >
                               <CheckCheck className="h-3 w-3" />
-                              Résoudre
+                              {t("editor.resolve")}
                             </button>
                           </div>
                         )}
@@ -2032,7 +2042,7 @@ export default function DocumentEditorPage() {
               {panelTab === "activite" && (
                 <div className="p-4 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    Historique des modifications
+                    {t("editor.activityHistory")}
                   </p>
 
                   <div className="space-y-2">
@@ -2099,7 +2109,7 @@ export default function DocumentEditorPage() {
                                 )}
                               />
                               <span className="text-[10px] text-muted-foreground">
-                                {formatRelativeTime(change.timestamp)}
+                                {formatRelativeTime(change.timestamp, t)}
                               </span>
                             </div>
                           </div>
@@ -2114,7 +2124,7 @@ export default function DocumentEditorPage() {
                     size="sm"
                     className="w-full gap-2 mt-2"
                   >
-                    Exporter CSV
+                    {t("editor.exportCsv")}
                   </Button>
                 </div>
               )}
@@ -2124,8 +2134,7 @@ export default function DocumentEditorPage() {
                 <div className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      {panelVersions.length} version
-                      {panelVersions.length > 1 ? "s" : ""}
+                      {panelVersions.length} {panelVersions.length > 1 ? t("editor.versionsPlural") : t("editor.versions")}
                     </p>
                     <Button
                       size="sm"
@@ -2136,10 +2145,10 @@ export default function DocumentEditorPage() {
                       }}
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Voir tout
+                      {t("editor.viewAll")}
                     </Button>
                   </div>
-                  <Suspense fallback={<div className="flex items-center justify-center py-8 text-xs text-muted-foreground">Chargement…</div>}>
+                  <Suspense fallback={<div className="flex items-center justify-center py-8 text-xs text-muted-foreground">{t("editor.loading")}</div>}>
                     <VersionPanel
                       versions={panelVersions}
                       currentVersionId={currentVersionId}
@@ -2177,11 +2186,11 @@ export default function DocumentEditorPage() {
       <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Inviter un collaborateur</DialogTitle>
+            <DialogTitle>{t("editor.inviteTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Adresse e-mail</Label>
+              <Label>{t("editor.emailLabel")}</Label>
               <Input
                 type="email"
                 placeholder="prenom.nom@cabinet.gn"
@@ -2190,15 +2199,15 @@ export default function DocumentEditorPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Rôle</Label>
+              <Label>{t("editor.roleLabel")}</Label>
               <Select value={inviteRole} onValueChange={setInviteRole}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lecteur">Lecteur</SelectItem>
-                  <SelectItem value="commentateur">Commentateur</SelectItem>
-                  <SelectItem value="editeur">Éditeur</SelectItem>
+                  <SelectItem value="lecteur">{t("editor.reader")}</SelectItem>
+                  <SelectItem value="commentateur">{t("editor.commenter")}</SelectItem>
+                  <SelectItem value="editeur">{t("editor.editor")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2208,7 +2217,7 @@ export default function DocumentEditorPage() {
               variant="outline"
               onClick={() => setShowInviteModal(false)}
             >
-              Annuler
+              {t("editor.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -2218,7 +2227,7 @@ export default function DocumentEditorPage() {
               }}
               disabled={!inviteEmail.trim()}
             >
-              Envoyer l'invitation
+              {t("editor.sendInvite")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2228,12 +2237,12 @@ export default function DocumentEditorPage() {
       <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Partager le document</DialogTitle>
+            <DialogTitle>{t("editor.shareTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
               <Label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                Lien du document
+                {t("editor.docLink")}
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -2246,16 +2255,16 @@ export default function DocumentEditorPage() {
                   variant="outline"
                   onClick={() => {
                     navigator.clipboard.writeText(shareUrl);
-                    toast.success("Lien copié !");
+                    toast.success(t("editor.linkCopied"));
                   }}
                 >
-                  Copier
+                  {t("editor.copy")}
                 </Button>
               </div>
             </div>
             <div className="border-t border-border pt-3">
               <p className="text-xs text-muted-foreground mb-2">
-                Ouvrir dans un nouvel onglet
+                {t("editor.openNewTab")}
               </p>
               <Button
                 variant="outline"
@@ -2263,8 +2272,7 @@ export default function DocumentEditorPage() {
                 className="w-full gap-2"
                 onClick={() => window.open(window.location.href, "_blank")}
               >
-                <ExternalLink className="h-4 w-4" /> Ouvrir dans un nouvel
-                onglet
+                <ExternalLink className="h-4 w-4" /> {t("editor.openNewTab")}
               </Button>
             </div>
           </div>
@@ -2273,7 +2281,7 @@ export default function DocumentEditorPage() {
               variant="outline"
               onClick={() => setShowShareModal(false)}
             >
-              Fermer
+              {t("editor.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2286,10 +2294,10 @@ export default function DocumentEditorPage() {
           <div className="h-14 bg-gray-800 flex items-center justify-between px-6 shrink-0">
             <div className="flex items-center gap-3">
               <button onClick={() => setShowPrintPreview(false)} className="text-white/80 hover:text-white flex items-center gap-2 text-sm">
-                <ArrowLeft className="h-4 w-4" /> Fermer l'aperçu
+                <ArrowLeft className="h-4 w-4" /> {t("editor.closePreview")}
               </button>
             </div>
-            <span className="text-white font-medium text-sm">{title} — Aperçu avant impression</span>
+            <span className="text-white font-medium text-sm">{title} — {t("editor.printPreviewTitle")}</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
@@ -2303,7 +2311,7 @@ export default function DocumentEditorPage() {
                 }}
                 className="bg-primary text-primary-foreground px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-primary/90"
               >
-                <Printer className="h-4 w-4" /> Imprimer
+                <Printer className="h-4 w-4" /> {t("editor.printBtn")}
               </button>
             </div>
           </div>
@@ -2322,15 +2330,15 @@ export default function DocumentEditorPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Stamp className="h-4 w-4" />
-              Filigrane du document
+              {t("editor.watermarkTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Toggle activer */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div>
-                <p className="text-sm font-medium">Activer le filigrane</p>
-                <p className="text-xs text-muted-foreground">Afficher en superposition sur le document</p>
+                <p className="text-sm font-medium">{t("editor.enableWatermark")}</p>
+                <p className="text-xs text-muted-foreground">{t("editor.watermarkOverlay")}</p>
               </div>
               <button
                 onClick={() => setWatermark((w) => ({ ...w, enabled: !w.enabled }))}
@@ -2350,7 +2358,7 @@ export default function DocumentEditorPage() {
 
             {/* Texte */}
             <div className="space-y-1.5">
-              <Label>Texte du filigrane</Label>
+              <Label>{t("editor.watermarkText")}</Label>
               <Input
                 value={watermark.text}
                 onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
@@ -2362,7 +2370,7 @@ export default function DocumentEditorPage() {
             {/* Couleur + Taille */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Couleur</Label>
+                <Label>{t("editor.color")}</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -2374,7 +2382,7 @@ export default function DocumentEditorPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Taille — {watermark.fontSize}px</Label>
+                <Label>{t("editor.size")} — {watermark.fontSize}px</Label>
                 <input
                   type="range" min="24" max="120" step="4"
                   value={watermark.fontSize}
@@ -2387,7 +2395,7 @@ export default function DocumentEditorPage() {
             {/* Opacité */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Opacité</Label>
+                <Label>{t("editor.opacity")}</Label>
                 <span className="text-xs text-muted-foreground">{watermark.opacity}%</span>
               </div>
               <input
@@ -2401,7 +2409,7 @@ export default function DocumentEditorPage() {
             {/* Rotation */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Rotation</Label>
+                <Label>{t("editor.rotation")}</Label>
                 <span className="text-xs text-muted-foreground">{watermark.rotation}°</span>
               </div>
               <input
@@ -2419,7 +2427,7 @@ export default function DocumentEditorPage() {
 
             {/* Aperçu */}
             <div className="space-y-1.5">
-              <Label>Aperçu</Label>
+              <Label>{t("editor.preview")}</Label>
               <div className="border border-border rounded-lg h-24 bg-white dark:bg-gray-900 overflow-hidden flex items-center justify-center relative">
                 <div
                   style={{
@@ -2445,21 +2453,21 @@ export default function DocumentEditorPage() {
                 onClick={() => setWatermark((w) => ({ ...w, enabled: false }))}
                 className="text-destructive border-destructive/30 hover:bg-destructive/5 mr-auto"
               >
-                Supprimer
+                {t("editor.removeWatermark")}
               </Button>
             )}
             <Button variant="outline" onClick={() => setShowWatermarkModal(false)}>
-              Fermer
+              {t("editor.close")}
             </Button>
             <Button
               onClick={() => {
                 setWatermark((w) => ({ ...w, enabled: true }));
                 setShowWatermarkModal(false);
-                toast.success("Filigrane appliqué");
+                toast.success(t("editor.watermarkApplied"));
               }}
               disabled={!watermark.text.trim()}
             >
-              Appliquer
+              {t("editor.applyWatermark")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2469,21 +2477,21 @@ export default function DocumentEditorPage() {
       <Dialog open={showFindReplace} onOpenChange={setShowFindReplace}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Trouver et remplacer</DialogTitle>
+            <DialogTitle>{t("editor.findReplaceTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label>Chercher</Label>
+              <Label>{t("editor.findLabel")}</Label>
               <Input
-                placeholder="Texte à rechercher..."
+                placeholder={t("editor.findPlaceholder")}
                 value={findText}
                 onChange={(e) => setFindText(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Remplacer par</Label>
+              <Label>{t("editor.replaceLabel")}</Label>
               <Input
-                placeholder="Texte de remplacement..."
+                placeholder={t("editor.replacePlaceholder")}
                 value={replaceText}
                 onChange={(e) => setReplaceText(e.target.value)}
               />
@@ -2494,13 +2502,13 @@ export default function DocumentEditorPage() {
               variant="outline"
               onClick={() => setShowFindReplace(false)}
             >
-              Fermer
+              {t("editor.close")}
             </Button>
             <Button
               onClick={handleReplaceAll}
               disabled={!findText.trim()}
             >
-              Remplacer tout
+              {t("editor.replaceAll")}
             </Button>
           </DialogFooter>
         </DialogContent>

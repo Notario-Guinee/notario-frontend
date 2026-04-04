@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { FactureCard } from '@/components/factures/FactureCard';
 import { FactureCardSkeleton } from '@/components/factures/FactureCardSkeleton';
 import type { StatutFacture } from '@/types/facture';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function FactureList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [statut, setStatut] = useState<StatutFacture | undefined>(undefined);
   const debouncedSearch = useDebounce(search, 400);
@@ -30,16 +32,16 @@ export default function FactureList() {
 
   return (
     <InfiniteListLayout
-      title="Factures"
+      title={t("list.factures.title")}
       icon={<Receipt className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher une facture…"
+      searchPlaceholder={t("list.factures.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucune facture enregistrée."
+      emptyMessage={t("list.factures.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -53,12 +55,12 @@ export default function FactureList() {
           }}
           className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
         >
-          <option value="">Tous les statuts</option>
-          <option value="BROUILLON">Brouillon</option>
-          <option value="ENVOYEE">Envoyée</option>
-          <option value="PAYEE">Payée</option>
-          <option value="EN_RETARD">En retard</option>
-          <option value="ANNULEE">Annulée</option>
+          <option value="">{t("list.factures.allStatuses")}</option>
+          <option value="BROUILLON">{t("list.factures.draft")}</option>
+          <option value="ENVOYEE">{t("list.factures.sent")}</option>
+          <option value="PAYEE">{t("list.factures.paid")}</option>
+          <option value="EN_RETARD">{t("list.factures.overdue")}</option>
+          <option value="ANNULEE">{t("list.factures.cancelled")}</option>
         </select>
       }
     >

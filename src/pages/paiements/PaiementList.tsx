@@ -7,8 +7,10 @@ import { InfiniteListLayout } from '@/components/ui/InfiniteListLayout';
 import { PaiementCard } from '@/components/paiements/PaiementCard';
 import { PaiementCardSkeleton } from '@/components/paiements/PaiementCardSkeleton';
 import type { ModePaiement, StatutPaiement } from '@/types/paiement';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function PaiementList() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [modePaiement, setModePaiement] = useState<ModePaiement | undefined>(undefined);
   const [statut, setStatut] = useState<StatutPaiement | undefined>(undefined);
@@ -31,16 +33,16 @@ export default function PaiementList() {
 
   return (
     <InfiniteListLayout
-      title="Paiements"
+      title={t("list.paiements.title")}
       icon={<CreditCard className="h-5 w-5" />}
       totalElements={totalElements}
-      searchPlaceholder="Rechercher un paiement…"
+      searchPlaceholder={t("list.paiements.searchPlaceholder")}
       search={search}
       onSearchChange={setSearch}
       isLoading={isLoading}
       isError={isError}
       isEmpty={!isLoading && items.length === 0}
-      emptyMessage="Aucun paiement enregistré."
+      emptyMessage={t("list.paiements.emptyMessage")}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={!!hasNextPage}
       sentinelRef={sentinelRef}
@@ -55,7 +57,7 @@ export default function PaiementList() {
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
           >
-            <option value="">Tous les modes</option>
+            <option value="">{t("list.paiements.allModes")}</option>
             <option value="ESPECES">Espèces</option>
             <option value="VIREMENT">Virement</option>
             <option value="CHEQUE">Chèque</option>
@@ -71,11 +73,11 @@ export default function PaiementList() {
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
           >
-            <option value="">Tous les statuts</option>
-            <option value="EN_ATTENTE">En attente</option>
-            <option value="CONFIRME">Confirmé</option>
-            <option value="ECHEC">Échec</option>
-            <option value="REMBOURSE">Remboursé</option>
+            <option value="">{t("list.paiements.allStatuses")}</option>
+            <option value="EN_ATTENTE">{t("list.paiements.pending")}</option>
+            <option value="CONFIRME">{t("list.paiements.confirmed")}</option>
+            <option value="ECHEC">{t("list.paiements.failed")}</option>
+            <option value="REMBOURSE">{t("list.paiements.refunded")}</option>
           </select>
         </>
       }

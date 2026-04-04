@@ -46,37 +46,16 @@ import { DocumentCard } from '@/components/documents/DocumentCard';
 import { DocumentKPICard } from '@/components/documents/DocumentKPICard';
 import { CollaboratorAvatar } from '@/components/documents/CollaboratorAvatar';
 import type { NotarioDocument, DocumentType, DocumentCollaborator } from '@/types/documents';
+import { useLanguage } from '@/context/LanguageContext';
 
 // ─── Utilitaires ──────────────────────────────────────────────
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('fr-FR', {
+function formatDate(date: Date, locale: string): string {
+  return date.toLocaleDateString(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   });
-}
-
-function typeLabel(type: DocumentType): string {
-  const map: Record<DocumentType, string> = {
-    contrat: 'Contrat',
-    acte: 'Acte',
-    courrier: 'Courrier',
-    attestation: 'Attestation',
-    note: 'Note',
-    autre: 'Autre',
-  };
-  return map[type];
-}
-
-function roleLabel(role: string): string {
-  const map: Record<string, string> = {
-    proprietaire: 'Propriétaire',
-    editeur: 'Éditeur',
-    commentateur: 'Commentateur',
-    lecteur: 'Lecteur',
-  };
-  return map[role] ?? role;
 }
 
 // ─── Page ─────────────────────────────────────────────────────
@@ -84,6 +63,30 @@ function roleLabel(role: string): string {
 export default function DossierDocumentsPage() {
   const { dossierId } = useParams<{ dossierId: string }>();
   const navigate = useNavigate();
+  const { t, lang } = useLanguage();
+  const locale = lang === "EN" ? "en-GB" : "fr-FR";
+
+  const typeLabel = (type: DocumentType): string => {
+    const map: Record<DocumentType, string> = {
+      contrat: t("dossierDoc.typeContrat"),
+      acte: t("dossierDoc.typeActe"),
+      courrier: t("dossierDoc.typeCourrier"),
+      attestation: t("dossierDoc.typeAttestation"),
+      note: t("dossierDoc.typeNote"),
+      autre: t("dossierDoc.typeAutre"),
+    };
+    return map[type];
+  };
+
+  const roleLabel = (role: string): string => {
+    const map: Record<string, string> = {
+      proprietaire: t("collab.roleProprietaire"),
+      editeur: t("collab.roleEditeur"),
+      commentateur: t("collab.roleCommentateur"),
+      lecteur: t("collab.roleLecteur"),
+    };
+    return map[role] ?? role;
+  };
 
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -179,20 +182,19 @@ export default function DossierDocumentsPage() {
             <FileText className="h-10 w-10 text-muted-foreground" />
           </div>
           <h2 className="font-heading text-xl font-semibold text-foreground">
-            Aucun document pour ce dossier
+            {t("dossierDoc.noDocsTitle")}
           </h2>
           <p className="text-sm text-muted-foreground max-w-xs">
-            Ce dossier ne contient pas encore de documents. Créez le premier document pour
-            commencer.
+            {t("dossierDoc.noDocsDesc")}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/dossiers')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour aux dossiers
+              {t("dossierDoc.backToCases")}
             </Button>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Nouveau document
+              {t("dossierDoc.newDocument")}
             </Button>
           </div>
         </div>
@@ -201,20 +203,20 @@ export default function DossierDocumentsPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Nouveau document</DialogTitle>
+              <DialogTitle>{t("dossierDoc.newDocument")}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="doc-title-empty">Titre</Label>
+                <Label htmlFor="doc-title-empty">{t("dossierDoc.titleLabel")}</Label>
                 <Input
                   id="doc-title-empty"
-                  placeholder="Ex : Acte de vente — parcelle 12"
+                  placeholder={t("dossierDoc.titlePlaceholder")}
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="doc-type-empty">Type de document</Label>
+                <Label htmlFor="doc-type-empty">{t("dossierDoc.typeLabel")}</Label>
                 <Select
                   value={newType}
                   onValueChange={v => setNewType(v as DocumentType)}
@@ -223,19 +225,19 @@ export default function DossierDocumentsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="acte">Acte</SelectItem>
-                    <SelectItem value="contrat">Contrat</SelectItem>
-                    <SelectItem value="courrier">Courrier</SelectItem>
-                    <SelectItem value="attestation">Attestation</SelectItem>
-                    <SelectItem value="note">Note</SelectItem>
-                    <SelectItem value="autre">Autre</SelectItem>
+                    <SelectItem value="acte">{t("dossierDoc.typeActe")}</SelectItem>
+                    <SelectItem value="contrat">{t("dossierDoc.typeContrat")}</SelectItem>
+                    <SelectItem value="courrier">{t("dossierDoc.typeCourrier")}</SelectItem>
+                    <SelectItem value="attestation">{t("dossierDoc.typeAttestation")}</SelectItem>
+                    <SelectItem value="note">{t("dossierDoc.typeNote")}</SelectItem>
+                    <SelectItem value="autre">{t("dossierDoc.typeAutre")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                Annuler
+                {t("action.cancel")}
               </Button>
               <Button
                 disabled={!newTitle.trim()}
@@ -255,7 +257,7 @@ export default function DossierDocumentsPage() {
                       documentId: id,
                       versionNumber: 1,
                       versionLabel: '1.0',
-                      content: `<h2>${newTitle.trim()}</h2><p>Commencez à rédiger votre document ici...</p>`,
+                      content: `<h2>${newTitle.trim()}</h2><p>${t("docs.startWriting")}</p>`,
                       contentSnapshot: '',
                       createdAt: now,
                       createdBy: userMamadou,
@@ -287,7 +289,7 @@ export default function DossierDocumentsPage() {
                   navigate(`/documents/${id}`);
                 }}
               >
-                Créer
+                {t("action.create")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -312,7 +314,7 @@ export default function DossierDocumentsPage() {
             <ChevronRight className="h-3 w-3 shrink-0" />
             <span className="font-mono text-primary">{dossierRef}</span>
             <ChevronRight className="h-3 w-3 shrink-0" />
-            <span className="text-foreground">Documents</span>
+            <span className="text-foreground">{t("nav.documents")}</span>
           </nav>
 
           {/* Titre */}
@@ -323,7 +325,7 @@ export default function DossierDocumentsPage() {
           {/* Sous-titre type */}
           {firstDoc && (
             <p className="text-sm text-muted-foreground">
-              {typeLabel(firstDoc.type)} · {docs.length} document{docs.length > 1 ? 's' : ''}
+              {typeLabel(firstDoc.type)} · {docs.length} {docs.length > 1 ? t("dossierDoc.documents") : t("dossierDoc.document")}
             </p>
           )}
         </div>
@@ -332,15 +334,15 @@ export default function DossierDocumentsPage() {
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Button variant="ghost" size="sm" onClick={() => navigate('/dossiers')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour aux dossiers
+            {t("dossierDoc.backToCases")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Upload className="h-4 w-4 mr-2" />
-            Importer
+            {t("dossierDoc.import")}
           </Button>
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Nouveau document
+            {t("dossierDoc.newDocument")}
           </Button>
         </div>
       </div>
@@ -348,21 +350,21 @@ export default function DossierDocumentsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <DocumentKPICard
-          title="Total documents"
+          title={t("dossierDoc.totalDocuments")}
           value={docs.length}
           icon={FileText}
           color="primary"
         />
         <DocumentKPICard
-          title="Collaborateurs"
+          title={t("dossierDoc.collaborators")}
           value={uniqueCollaborators.length}
           icon={Users}
           color="secondary"
-          subtitle="Uniques sur le dossier"
+          subtitle={t("dossierDoc.collaboratorsSubtitle")}
         />
         <DocumentKPICard
-          title="Dernière modification"
-          value={lastModified ? formatDate(lastModified) : '—'}
+          title={t("dossierDoc.lastModified")}
+          value={lastModified ? formatDate(lastModified, locale) : '—'}
           icon={Clock}
           color="warning"
         />
@@ -375,7 +377,7 @@ export default function DossierDocumentsPage() {
           {activeDocs.length > 0 && (
             <section className="flex flex-col gap-3">
               <h2 className="font-heading text-base font-semibold text-foreground">
-                Documents actifs{' '}
+                {t("dossierDoc.activeDocs")}{' '}
                 <span className="text-sm font-normal text-muted-foreground">
                   ({activeDocs.length})
                 </span>
@@ -414,7 +416,7 @@ export default function DossierDocumentsPage() {
                   ) : (
                     <ChevronDown className="h-4 w-4 shrink-0" />
                   )}
-                  Documents archivés ({archivedDocs.length})
+                  {t("dossierDoc.archivedDocs")} ({archivedDocs.length})
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -433,7 +435,7 @@ export default function DossierDocumentsPage() {
                       />
                       <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-2">
                         <span className="text-[9px] bg-black/60 text-white rounded px-1.5 py-0.5">
-                          Double-clic pour ouvrir
+                          {t("dossierDoc.dblClickOpen")}
                         </span>
                       </div>
                     </div>
@@ -453,10 +455,10 @@ export default function DossierDocumentsPage() {
             className="rounded-xl border border-border bg-card p-4 shadow-card"
           >
             <h3 className="font-heading text-sm font-semibold text-foreground mb-3">
-              Équipe du dossier
+              {t("dossierDoc.caseTeam")}
             </h3>
             {uniqueCollaborators.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Aucun collaborateur</p>
+              <p className="text-xs text-muted-foreground">{t("dossierDoc.noCollaborators")}</p>
             ) : (
               <ul className="flex flex-col gap-2.5">
                 {uniqueCollaborators.map(c => (
@@ -490,7 +492,7 @@ export default function DossierDocumentsPage() {
       <Dialog open={showImportModal} onOpenChange={o => { if (!o) { setShowImportModal(false); setImportFile(null); setImportPreview(''); setImportTitle(''); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Importer un document dans {dossierRef}</DialogTitle>
+            <DialogTitle>{t("dossierDoc.importTitle")} {dossierRef}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             {/* Zone drag & drop */}
@@ -514,8 +516,8 @@ export default function DossierDocumentsPage() {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-foreground">Glissez un fichier ici ou cliquez</p>
-                  <p className="text-xs text-muted-foreground">Formats acceptés : .docx, .doc, .pdf, .txt, .html</p>
+                  <p className="text-sm font-medium text-foreground">{t("dossierDoc.dropHere")}</p>
+                  <p className="text-xs text-muted-foreground">{t("dossierDoc.acceptedFormats")}</p>
                 </>
               )}
             </div>
@@ -525,26 +527,26 @@ export default function DossierDocumentsPage() {
             {/* Titre */}
             {importFile && (
               <div className="flex flex-col gap-1.5">
-                <Label>Titre du document</Label>
-                <Input value={importTitle} onChange={e => setImportTitle(e.target.value)} placeholder="Nom du document" />
+                <Label>{t("dossierDoc.docTitleLabel")}</Label>
+                <Input value={importTitle} onChange={e => setImportTitle(e.target.value)} placeholder={t("dossierDoc.namePlaceholder")} />
               </div>
             )}
 
             {/* Aperçu contenu */}
             {importPreview && (
               <div className="flex flex-col gap-1.5">
-                <Label>Aperçu du contenu</Label>
+                <Label>{t("dossierDoc.contentPreview")}</Label>
                 <Textarea value={importPreview} readOnly rows={5} className="resize-none font-mono text-xs bg-muted/30" />
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowImportModal(false); setImportFile(null); setImportPreview(''); setImportTitle(''); }}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button disabled={!importFile || !importTitle.trim()} onClick={handleImportCreate}>
               <Upload className="h-4 w-4 mr-2" />
-              Importer et éditer
+              {t("dossierDoc.importAndEdit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -554,20 +556,20 @@ export default function DossierDocumentsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nouveau document</DialogTitle>
+            <DialogTitle>{t("dossierDoc.newDocument")}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-title">Titre</Label>
+              <Label htmlFor="doc-title">{t("dossierDoc.titleLabel")}</Label>
               <Input
                 id="doc-title"
-                placeholder="Ex : Acte de vente — parcelle 12"
+                placeholder={t("dossierDoc.titlePlaceholder")}
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="doc-type">Type de document</Label>
+              <Label htmlFor="doc-type">{t("dossierDoc.typeLabel")}</Label>
               <Select
                 value={newType}
                 onValueChange={v => setNewType(v as DocumentType)}
@@ -576,19 +578,19 @@ export default function DossierDocumentsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="acte">Acte</SelectItem>
-                  <SelectItem value="contrat">Contrat</SelectItem>
-                  <SelectItem value="courrier">Courrier</SelectItem>
-                  <SelectItem value="attestation">Attestation</SelectItem>
-                  <SelectItem value="note">Note</SelectItem>
-                  <SelectItem value="autre">Autre</SelectItem>
+                  <SelectItem value="acte">{t("dossierDoc.typeActe")}</SelectItem>
+                  <SelectItem value="contrat">{t("dossierDoc.typeContrat")}</SelectItem>
+                  <SelectItem value="courrier">{t("dossierDoc.typeCourrier")}</SelectItem>
+                  <SelectItem value="attestation">{t("dossierDoc.typeAttestation")}</SelectItem>
+                  <SelectItem value="note">{t("dossierDoc.typeNote")}</SelectItem>
+                  <SelectItem value="autre">{t("dossierDoc.typeAutre")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Annuler
+              {t("action.cancel")}
             </Button>
             <Button
               disabled={!newTitle.trim()}
@@ -608,7 +610,7 @@ export default function DossierDocumentsPage() {
                     documentId: id,
                     versionNumber: 1,
                     versionLabel: '1.0',
-                    content: `<h2>${newTitle.trim()}</h2><p>Commencez à rédiger votre document ici...</p>`,
+                    content: `<h2>${newTitle.trim()}</h2><p>${t("docs.startWriting")}</p>`,
                     contentSnapshot: '',
                     createdAt: now,
                     createdBy: userMamadou,
@@ -635,12 +637,12 @@ export default function DossierDocumentsPage() {
                 setDialogOpen(false);
                 setNewTitle('');
                 import('sonner').then(({ toast }) => {
-                  toast.success(`Document "${newDoc.title}" créé`);
+                  toast.success(`Document "${newDoc.title}" ${t("action.create").toLowerCase()}`)
                 });
                 navigate(`/documents/${id}`);
               }}
             >
-              Créer
+              {t("action.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
