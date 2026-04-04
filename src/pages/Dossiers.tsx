@@ -70,7 +70,7 @@ function SearchCombobox({
   const [q, setQ]       = useState("");
   // Reset search when closed
   useEffect(() => { if (!open) setQ(""); }, [open]);
-  const filtered = options.filter(o => o.toLowerCase().includes(q.toLowerCase()));
+  const filtered = options.filter(o => typeof o === "string" && o.toLowerCase().includes(q.toLowerCase()));
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -2155,7 +2155,7 @@ const getEventLabel = (type: string, fr: boolean): string => {
               <div className="space-y-2">
                 <Label>{fr ? "Acte spécifique *" : "Specific act *"}</Label>
                 <SearchCombobox
-                  options={categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []}
+                  options={(categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => a.label)}
                   value={form.typeActe}
                   onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}
                   placeholder={fr ? "Sélectionner un acte" : "Select an act"}
@@ -2286,7 +2286,7 @@ const getEventLabel = (type: string, fr: boolean): string => {
               <div className="space-y-2">
                 <Label>{fr ? "Acte spécifique" : "Specific act"}</Label>
                 <SearchCombobox
-                  options={categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []}
+                  options={(categoriesActes.find(c => c.label === form.categorieActe)?.actes ?? []).map(a => a.label)}
                   value={form.typeActe}
                   onValueChange={v => setForm(f => ({ ...f, typeActe: v }))}
                   placeholder={fr ? "Sélectionner un acte" : "Select an act"}
