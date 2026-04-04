@@ -470,10 +470,19 @@ const handleCreate = () => {
     });
   };
 
-  const saveCategory = (idx: number, label: string) => {
-    // Renommage local uniquement (les catégories sont des codes fixes côté backend)
+  const saveCategory = async (idx: number, label: string) => {
     if (!label.trim()) return;
-    setCatalogue(prev => prev.map((c, i) => i === idx ? { ...c, label: label.trim() } : c));
+    const cat = categories[idx];
+    if (cat?.id) {
+      try {
+        await categorieActeService.update(cat.id, { libelle: label.trim() });
+        await loadCatalogue();
+        toast.success(fr ? "Catégorie modifiée" : "Category updated");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        toast.error(msg || (fr ? "Erreur lors de la modification" : "Error updating category"));
+      }
+    }
     setEditingCat(null);
   };
 
