@@ -15,16 +15,18 @@ import { useAuth } from "@/context/AuthContext";
 
 type PortalType = "admin" | "tenant" | "client";
 
-/** Extrait le tenant depuis le sous-domaine. En dev (localhost), retourne "tenant-demo-1". */
+const IS_DEV = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const DEV_TENANTS = ["tenant-demo-1", "tenant-demo-2", "tenant-demo-3"];
+
 function getTenantFromHostname(): string {
   const host = window.location.hostname;
-  if (host === "localhost" || host === "127.0.0.1") return "tenant-demo-1";
   const parts = host.split(".");
   return parts.length >= 3 ? parts[0] : "tenant-demo-1";
 }
 
-function getTenantId(portal: PortalType): string {
+function resolveTenantId(portal: PortalType, devTenant: string): string {
   if (portal === "admin") return "global-admin";
+  if (IS_DEV) return devTenant;
   return getTenantFromHostname();
 }
 
@@ -45,6 +47,7 @@ export default function LoginTenant() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedTenant, setSelectedTenant] = useState("tenant-demo-1");
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -54,7 +57,7 @@ export default function LoginTenant() {
     setLoading(true);
     setError("");
     try {
-      await login(email, password, getTenantId(portal));
+      await login(email, password, resolveTenantId(portal, selectedTenant));
       navigate(getDashboardPath(portal));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("login.connectionError"));
@@ -188,6 +191,21 @@ export default function LoginTenant() {
                 </button>
               </div>
             </div>
+
+            {IS_DEV && portal !== "admin" && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Tenant (dev uniquement)</label>
+                <select
+                  value={selectedTenant}
+                  onChange={(e) => setSelectedTenant(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                >
+                  {DEV_TENANTS.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {error && (
               <div className="text-red-500 text-xs bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2">

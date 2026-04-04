@@ -2,6 +2,9 @@
 // Client HTTP de base — gère l'authentification JWT et le parsing des réponses
 // ─────────────────────────────────────────────────────────────────────────────
 
+// URL de base de l'API - utilise le proxy Vite (vide = même origine)
+const API_BASE_URL = '';
+
 interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -43,21 +46,50 @@ function authHeaders(extra?: Record<string, string>): HeadersInit {
 }
 
 async function parseResponse<T>(res: Response): Promise<T> {
-  const json: ApiResponse<T> = await res.json();
-  if (!res.ok || !json.success) {
-    throw new Error(json.message || `Erreur ${res.status}`);
+  // Réponse vide (ex: DELETE 204)
+  const text = await res.text();
+  if (!text) {
+    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+    return undefined as T;
   }
-  return json.data;
+
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+    return text as unknown as T;
+  }
+
+  // ── Cas 1 : enveloppe { success, data, message } ──────────────────────────
+  if (
+    json !== null &&
+    typeof json === "object" &&
+    "success" in json
+  ) {
+    const wrapped = json as ApiResponse<T>;
+    if (!res.ok || !wrapped.success) {
+      throw new Error(wrapped.message || `Erreur ${res.status}`);
+    }
+    return wrapped.data;
+  }
+
+  // ── Cas 2 : réponse directe (Page<T>, T[], T) ─────────────────────────────
+  if (!res.ok) {
+    const err = json as { message?: string };
+    throw new Error(err?.message || `Erreur ${res.status}`);
+  }
+  return json as T;
 }
 
 export const apiClient = {
   get: async <T>(url: string, extra?: Record<string, string>): Promise<T> => {
-    const res = await fetch(url, { headers: authHeaders(extra) });
+    const res = await fetch(`${API_BASE_URL}${url}`, { headers: authHeaders(extra) });
     return parseResponse<T>(res);
   },
 
   post: async <T>(url: string, body?: unknown, extra?: Record<string, string>): Promise<T> => {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
       method: "POST",
       headers: authHeaders(extra),
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -66,7 +98,7 @@ export const apiClient = {
   },
 
   put: async <T>(url: string, body?: unknown, extra?: Record<string, string>): Promise<T> => {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
       method: "PUT",
       headers: authHeaders(extra),
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -75,7 +107,7 @@ export const apiClient = {
   },
 
   patch: async <T>(url: string, body?: unknown, extra?: Record<string, string>): Promise<T> => {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
       method: "PATCH",
       headers: authHeaders(extra),
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -84,7 +116,7 @@ export const apiClient = {
   },
 
   delete: async <T>(url: string, extra?: Record<string, string>): Promise<T> => {
-    const res = await fetch(url, {
+    const res = await fetch(`${API_BASE_URL}${url}`, {
       method: "DELETE",
       headers: authHeaders(extra),
     });
