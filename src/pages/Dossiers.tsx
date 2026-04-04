@@ -106,8 +106,7 @@ function SearchCombobox({
       </PopoverContent>
     </Popover>
   );
-// ── Mapping des libellés UI vers codes API ──
-
+}
 
 // ── Mapping des libellés UI vers codes API ──
 function mapDtoToLocal(dto: DossierDto): Dossier {
@@ -264,6 +263,7 @@ export default function Dossiers() {
   const [notairesList, setNotairesList] = useState<User[]>([]);
   const [clercsList, setClercsList] = useState<User[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueCategorie[]>([]);
+  const categoriesActes = catalogue;
 
   // Generate facture modal
   const [showFactureModal, setShowFactureModal] = useState(false);

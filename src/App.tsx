@@ -12,7 +12,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
-import { LanguageProvider } from "@/context/LanguageContext";
 import { RoleProvider } from "@/context/RoleContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DossierTabsProvider } from "@/context/DossierTabsContext";
@@ -124,7 +123,6 @@ function ClientRoute({ children }: { children: React.ReactNode }) {
 // ─── Composant racine ───
 const App = () => (
   <ThemeProvider>
-    <LanguageProvider>
     {/* AuthProvider ajouté pour gérer l'authentification JWT avec le backend */}
     <AuthProvider>
     <RoleProvider>
@@ -212,7 +210,6 @@ const App = () => (
     </SidebarProvider>
     </RoleProvider>
     </AuthProvider>
-    </LanguageProvider>
   </ThemeProvider>
 );
 
