@@ -1,19 +1,20 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-interface User {
+interface AuthUser {
   id: number;
   nom: string;
   prenom: string;
   email: string;
   role: string;
   actif: boolean;
-  nomComplet: string;
-  initiales: string;
+  nomComplet?: string;
+  initiales?: string;
   telephone?: string | null;
   dateNaissance?: string | null;
   lieuNaissance?: string | null;
   adresse?: string | null;
   photoUrl?: string | null;
+  nomCabinet?: string | null;
 }
 
 interface ApiResponse<T> {
@@ -23,23 +24,46 @@ interface ApiResponse<T> {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string, tenantId?: string) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (ancienMotDePasse: string, nouveauMotDePasse: string) => Promise<void>;
+  updateProfile: (payload: Partial<AuthUser>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Décode le tenant_id depuis un JWT (même utilitaire que apiClient) */
+function tenantFromJwt(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.tenantId ?? payload.tenant_id ?? payload.tenant ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Headers auth + tenant pour les appels fetch bruts */
+function bearerHeaders(token: string, extra?: Record<string, string>): Record<string, string> {
+  const tenantId = tenantFromJwt(token);
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+    ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+    ...extra,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Récupère le profil utilisateur avec le token stocké
-  const fetchMe = async (token: string): Promise<User> => {
+  const fetchMe = async (token: string): Promise<AuthUser> => {
     const res = await fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: bearerHeaders(token),
     });
 
     if (!res.ok) {
@@ -47,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(body.message || `Erreur /auth/me (${res.status})`);
     }
 
-    const data: ApiResponse<User> = await res.json();
+    const data: ApiResponse<AuthUser> = await res.json();
     if (!data.success) throw new Error(data.message || "Non authentifié");
     return data.data;
   };
@@ -99,15 +123,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       await fetch("/api/auth/logout", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: bearerHeaders(token),
       }).catch(() => {}); // Ignore si le backend échoue
     }
     localStorage.removeItem("accessToken");
     setUser(null);
   };
 
+  // Rafraîchissement silencieux du token via POST /api/auth/refresh
+  const refreshAccessToken = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: bearerHeaders(token),
+      });
+      if (!res.ok) throw new Error("Refresh failed");
+      const data: ApiResponse<{ accessToken: string }> = await res.json();
+      if (data.success && data.data.accessToken) {
+        localStorage.setItem("accessToken", data.data.accessToken);
+      }
+    } catch {
+      localStorage.removeItem("accessToken");
+      setUser(null);
+    }
+  };
+
+  // Changement de mot de passe via POST /api/auth/change-password
+  const changePassword = async (ancienMotDePasse: string, nouveauMotDePasse: string) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) throw new Error("Non authentifié");
+    const res = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: bearerHeaders(token),
+      body: JSON.stringify({ ancienMotDePasse, nouveauMotDePasse }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Erreur ${res.status}`);
+    }
+  };
+
+  // Rafraîchissement automatique du token (toutes les 14 minutes)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(refreshAccessToken, 14 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Mise à jour du profil utilisateur via PUT /api/auth/profile
+  const updateProfile = async (payload: Partial<AuthUser>) => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) throw new Error("Non authentifié");
+    const res = await fetch("/api/auth/profile", {
+      method: "PUT",
+      headers: bearerHeaders(token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.message || `Erreur ${res.status}`);
+    }
+    // Rafraîchir le profil local
+    const userData = await fetchMe(token);
+    setUser(userData);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, logout, changePassword, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -4,37 +4,35 @@
 // filtrage, création, modification, archivage
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
-import { cn, searchMatch } from "@/lib/utils";
-import { Plus, Search, Edit, Archive, Trash2, ArchiveRestore } from "lucide-react";
+import { useState, useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { Plus, Search, Edit, Archive, Trash2, ArchiveRestore, Lock, Unlock, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useInfiniteUsers } from "@/hooks/useInfiniteUsers";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createUser, updateUser, deleteUser, activateUser, deactivateUser, lockAccount, unlockAccount, getUserStatistics, getUserRoleDistribution, resetUserPassword } from "@/api/users";
+import type { User, UserRole } from "@/types/user";
 
-// Interface utilisateur avec champs facultatifs
-interface User {
-  id: string; code: string; nom: string; prenom: string; telephone: string;
-  email: string; role: string; statut: string; photo?: string;
-  permissions: string[];
-  // Champs facultatifs
-  dateNaissance?: string;
-  lieuNaissance?: string;
-  adresse?: string;
-}
+const ROLE_LABELS: Record<UserRole, string> = {
+  GERANT: 'Gérant',
+  STANDARD: 'Standard',
+  STANDARD: 'Standard',
+  ADMIN: 'Admin',
+};
 
-// Données initiales des utilisateurs
-const initialUsers: User[] = [
-  { id: "1", code: "USR-001", nom: "Diallo", prenom: "Mamadou", telephone: "+224 622 11 22 33", email: "m.diallo@notario.gn", role: "Gérant", statut: "Actif", permissions: ["all"], dateNaissance: "1975-05-15", lieuNaissance: "Conakry", adresse: "Quartier Almamya, Kaloum" },
-  { id: "2", code: "USR-002", nom: "Keita", prenom: "Aissata", telephone: "+224 628 44 55 66", email: "a.keita@notario.gn", role: "Notaire", statut: "Actif", permissions: ["dossiers", "actes", "clients"] },
-  { id: "3", code: "USR-003", nom: "Diallo", prenom: "Boubacar", telephone: "+224 664 77 88 99", email: "b.diallo@notario.gn", role: "Comptable", statut: "Actif", permissions: ["factures", "paiements"] },
-  { id: "4", code: "USR-004", nom: "Bah", prenom: "Fatoumata", telephone: "+224 621 33 44 55", email: "f.bah@notario.gn", role: "Standard", statut: "Actif", permissions: ["dossiers:view"] },
-  { id: "5", code: "USR-005", nom: "Camara", prenom: "Sékou", telephone: "+224 625 66 77 88", email: "s.camara@notario.gn", role: "Standard", statut: "Archivé", permissions: [] },
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'GERANT', label: 'Notaire' },
+  { value: 'STANDARD', label: 'Clerc' },
+  { value: 'STANDARD', label: 'Stagiaire' },
+  { value: 'ADMIN', label: 'Admin' },
 ];
 
 // Liste des modules disponibles pour les droits d'accès
@@ -42,77 +40,194 @@ const allModules = ["Clients", "Dossiers", "Actes", "Factures", "Paiements", "Ar
 
 export default function Utilisateurs() {
   const { t } = useLanguage();
-  const [users, setUsers] = useState(initialUsers);
+  const queryClient = useQueryClient();
+
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState("Tous");
-  const [filterStatut, setFilterStatut] = useState("Tous");
+  const debouncedSearch = useDebounce(search, 400);
+  const [filterRole, setFilterRole] = useState<string>("Tous");
+  const [filterStatut, setFilterStatut] = useState<string>("Tous");
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [archiving, setArchiving] = useState<User | null>(null);
   const [deleting, setDeleting] = useState<User | null>(null);
   const [unarchiving, setUnarchiving] = useState<User | null>(null);
+
   // Formulaire avec champs facultatifs
   const [form, setForm] = useState({
-    nom: "", prenom: "", email: "", telephone: "", role: "Standard",
+    nom: "", prenom: "", email: "", telephone: "", role: "STANDARD" as UserRole,
     dateNaissance: "", lieuNaissance: "", adresse: "",
+    password: "", confirmPassword: "",
   });
-  const [page, setPage] = useState(1);
+  const [page, _setPage] = useState(1);
   const perPage = 20;
 
-  // Filtrage des utilisateurs
-  const filtered = users.filter(u => {
-    const matchSearch = !search || [u.nom, u.prenom, u.email, u.telephone, u.code, u.role].some(f => searchMatch(f, search));
-    const matchRole = filterRole === "Tous" || u.role === filterRole;
-    const matchStatut = filterStatut === "Tous" || u.statut === filterStatut;
-    return matchSearch && matchRole && matchStatut;
+  // Chargement des utilisateurs depuis l'API
+  const { data, isLoading } = useInfiniteUsers({
+    search: debouncedSearch || undefined,
+    size: 100,
+    sortBy: 'createdAt',
+    sortDir: 'desc',
+  });
+
+  const allUsers: User[] = useMemo(
+    () => (data?.pages.flatMap(p => p.content) ?? []).filter(Boolean),
+    [data],
+  );
+
+  // Filtrage client-side (rôle + statut)
+  const filtered = useMemo(() => allUsers.filter(u => {
+    const matchRole = filterRole === "Tous" || ROLE_LABELS[u.role] === filterRole;
+    const matchStatut = filterStatut === "Tous" ||
+      (filterStatut === "Actif" && u.actif) ||
+      (filterStatut === "Archivé" && !u.actif);
+    return matchRole && matchStatut;
+  }), [allUsers, filterRole, filterStatut]);
+
+  // Pagination locale
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+
+  // Mutations CRUD
+  const createMutation = useMutation({
+    mutationFn: createUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowNew(false);
+      setForm({ nom: "", prenom: "", email: "", telephone: "", role: "STANDARD", dateNaissance: "", lieuNaissance: "", adresse: "", password: "", confirmPassword: "" });
+      toast.success(t("users.toastAdded"));
+    },
+    onError: () => toast.error("Erreur lors de la création de l'utilisateur"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string | number; data: Parameters<typeof updateUser>[1] }) =>
+      updateUser(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setEditing(null);
+      toast.success(t("users.toastUpdated"));
+    },
+    onError: () => toast.error("Erreur lors de la modification"),
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: deactivateUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setArchiving(null);
+      toast.success(t("users.toastArchived"));
+    },
+    onError: () => toast.error("Erreur lors de l'archivage"),
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: activateUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setUnarchiving(null);
+      toast.success(t("users.toastUnarchived") || "Utilisateur réactivé");
+    },
+    onError: () => toast.error("Erreur lors de la réactivation"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleting(null);
+      toast.success(t("users.toastDeleted") || "Utilisateur supprimé");
+    },
+    onError: () => toast.error("Erreur lors de la suppression"),
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: lockAccount,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success("Compte verrouillé");
+    },
+    onError: () => toast.error("Erreur lors du verrouillage"),
+  });
+
+  const unlockMutation = useMutation({
+    mutationFn: unlockAccount,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success("Compte déverrouillé");
+    },
+    onError: () => toast.error("Erreur lors du déverrouillage"),
+  });
+
+  // Statistiques utilisateurs depuis l'API
+  const { data: userStats } = useQuery({
+    queryKey: ['users', 'statistics'],
+    queryFn: getUserStatistics,
+    staleTime: 60_000,
+  });
+
+  // Distribution des rôles
+  const { data: roleDistribution } = useQuery({
+    queryKey: ['users', 'statistics', 'roles'],
+    queryFn: getUserRoleDistribution,
+    staleTime: 60_000,
+  });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: resetUserPassword,
+    onSuccess: () => toast.success("Email de réinitialisation envoyé"),
+    onError: () => toast.error("Erreur lors de la réinitialisation"),
   });
 
   // Création d'un nouvel utilisateur
   const handleCreate = () => {
-    const code = `USR-${String(users.length + 1).padStart(3, "0")}`;
-    setUsers(prev => [...prev, {
-      id: String(Date.now()), code, nom: form.nom, prenom: form.prenom,
-      telephone: form.telephone, email: form.email, role: form.role,
-      statut: "Actif", permissions: [],
+    if (!form.nom || !form.prenom || !form.email || !form.password) return;
+    if (form.password !== form.confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas");
+      return;
+    }
+    createMutation.mutate({
+      nom: form.nom, prenom: form.prenom, email: form.email,
+      telephone: form.telephone || undefined, role: form.role,
+      password: form.password, confirmPassword: form.confirmPassword,
       dateNaissance: form.dateNaissance || undefined,
       lieuNaissance: form.lieuNaissance || undefined,
       adresse: form.adresse || undefined,
-    }]);
-    setShowNew(false);
-    setForm({ nom: "", prenom: "", email: "", telephone: "", role: "Standard", dateNaissance: "", lieuNaissance: "", adresse: "" });
-    toast.success(t("users.toastAdded"));
+      actif: true,
+    });
   };
 
   // Mise à jour d'un utilisateur
   const handleUpdate = () => {
     if (!editing) return;
-    setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
-    setEditing(null);
-    toast.success(t("users.toastUpdated"));
+    updateMutation.mutate({
+      id: editing.id,
+      data: {
+        nom: editing.nom, prenom: editing.prenom, email: editing.email,
+        telephone: editing.telephone || undefined,
+        dateNaissance: editing.dateNaissance || undefined,
+        lieuNaissance: editing.lieuNaissance || undefined,
+        adresse: editing.adresse || undefined,
+        role: editing.role,
+      },
+    });
   };
 
-  // Archivage d'un utilisateur
+  // Archivage (désactivation) d'un utilisateur
   const handleArchive = () => {
     if (!archiving) return;
-    setUsers(prev => prev.map(u => u.id === archiving.id ? { ...u, statut: "Archivé" } : u));
-    setArchiving(null);
-    toast.success(t("users.toastArchived"));
+    deactivateMutation.mutate(archiving.id);
   };
 
-  // Désarchivage d'un utilisateur
+  // Désarchivage (activation) d'un utilisateur
   const handleUnarchive = () => {
     if (!unarchiving) return;
-    setUsers(prev => prev.map(u => u.id === unarchiving.id ? { ...u, statut: "Actif" } : u));
-    setUnarchiving(null);
-    toast.success(t("users.toastUnarchived") || `${unarchiving.prenom} ${unarchiving.nom} réactivé`);
+    activateMutation.mutate(unarchiving.id);
   };
 
   // Suppression définitive d'un utilisateur
   const handleDelete = () => {
     if (!deleting) return;
-    setUsers(prev => prev.filter(u => u.id !== deleting.id));
-    setDeleting(null);
-    toast.success(t("users.toastDeleted") || `${deleting.prenom} ${deleting.nom} supprimé`);
+    deleteMutation.mutate(deleting.id);
   };
 
   return (
@@ -127,6 +242,33 @@ export default function Utilisateurs() {
         </div>
       </div>
 
+      {/* Statistiques utilisateurs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: t("users.allStatuses") === "Tous" ? "Total" : "Total", value: userStats?.total ?? allUsers.length },
+          { label: "Actifs", value: userStats?.actifs ?? allUsers.filter(u => u.actif).length },
+          { label: "Archivés", value: userStats?.inactifs ?? allUsers.filter(u => !u.actif).length },
+          { label: "Verrouillés", value: userStats?.verrouilles ?? allUsers.filter(u => u.compteVerrouille).length },
+        ].map((kpi, i) => (
+          <div key={i} className="rounded-lg border border-border bg-card p-3 text-center">
+            <p className="font-heading text-lg font-bold text-foreground">{kpi.value}</p>
+            <p className="text-xs text-muted-foreground">{kpi.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Distribution par rôle */}
+      {roleDistribution && Object.keys(roleDistribution).length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {Object.entries(roleDistribution).map(([role, count]) => (
+            <div key={role} className="rounded-lg border border-border bg-card px-4 py-2 text-center">
+              <p className="text-sm font-bold text-foreground">{count as number}</p>
+              <p className="text-[11px] text-muted-foreground">{ROLE_LABELS[role as UserRole] || role}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Filtres de recherche */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -135,7 +277,7 @@ export default function Utilisateurs() {
         </div>
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
           <option value="Tous">{t("users.allRoles")}</option>
-          {["Gérant", "Notaire", "Comptable", "Standard"].map(r => <option key={r}>{r}</option>)}
+          {ROLE_OPTIONS.map(r => <option key={r.value} value={r.label}>{r.label}</option>)}
         </select>
         <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
           <option value="Tous">{t("users.allStatuses")}</option>
@@ -148,40 +290,42 @@ export default function Utilisateurs() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {[t("users.colUser"), "Code", t("users.colPhone"), t("users.colRole"), t("users.colStatus"), t("users.colActions")].map(h => (
+              {[t("users.colUser"), t("users.colPhone"), t("users.colRole"), t("users.colStatus"), t("users.colActions")].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtered.map((u, i) => (
+            {isLoading && (
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground text-sm">Chargement...</td></tr>
+            )}
+            {paginated.map((u, i) => (
               <motion.tr key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
                 className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 font-heading text-xs font-bold text-primary">{u.prenom[0]}{u.nom[0]}</div>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 font-heading text-xs font-bold text-primary">{(u.prenom?.[0] ?? "?")}{(u.nom?.[0] ?? "?")}</div>
                     <div>
                       <p className="text-sm font-medium text-foreground">{u.prenom} {u.nom}</p>
                       <p className="text-xs text-muted-foreground">{u.email}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{u.code}</td>
-                <td className="px-4 py-3 text-sm text-muted-foreground">{u.telephone}</td>
+                <td className="px-4 py-3 text-sm text-muted-foreground">{u.telephone ?? '-'}</td>
                 <td className="px-4 py-3">
                   <span className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                    u.role === "Gérant" ? "bg-primary/15 text-primary border-primary/30" :
-                    u.role === "Notaire" ? "bg-secondary/15 text-secondary border-secondary/30" :
+                    u.role === "ADMIN" ? "bg-primary/15 text-primary border-primary/30" :
+                    u.role === "GERANT" ? "bg-secondary/15 text-secondary border-secondary/30" :
                     "bg-muted text-muted-foreground border-border"
-                  )}>{u.role}</span>
+                  )}>{ROLE_LABELS[u.role]}</span>
                 </td>
-                <td className="px-4 py-3"><StatusBadge status={u.statut} /></td>
+                <td className="px-4 py-3"><StatusBadge status={u.actif ? "Actif" : "Archivé"} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" title={t("users.edit") || "Modifier"} onClick={() => setEditing({ ...u })}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    {u.statut !== "Archivé" ? (
+                    {u.actif ? (
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning" title={t("users.archive") || "Archiver"} onClick={() => setArchiving(u)}>
                         <Archive className="h-4 w-4" />
                       </Button>
@@ -190,8 +334,20 @@ export default function Utilisateurs() {
                         <ArchiveRestore className="h-4 w-4" />
                       </Button>
                     )}
+                    {u.compteVerrouille ? (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-600" title="Déverrouiller" onClick={() => unlockMutation.mutate(u.id)}>
+                        <Unlock className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-orange-500" title="Verrouiller" onClick={() => lockMutation.mutate(u.id)}>
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title={t("users.delete") || "Supprimer"} onClick={() => setDeleting(u)}>
                       <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500" title="Réinitialiser MDP" onClick={() => resetPasswordMutation.mutate(u.email)}>
+                      <KeyRound className="h-4 w-4" />
                     </Button>
                   </div>
                 </td>
@@ -215,12 +371,16 @@ export default function Utilisateurs() {
               <div><label className="text-xs font-medium text-muted-foreground">{t("users.lastName")} *</label><Input value={form.nom} onChange={e => setForm(p => ({ ...p, nom: e.target.value }))} className="mt-1" /></div>
             </div>
             <div><label className="text-xs font-medium text-muted-foreground">Email *</label><Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="mt-1" /></div>
-            <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")} *</label><Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} className="mt-1" /></div>
+            <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")}</label><Input value={form.telephone} onChange={e => setForm(p => ({ ...p, telephone: e.target.value }))} className="mt-1" /></div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">{t("users.role")}</label>
-              <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                {["Standard", "Notaire", "Comptable"].map(r => <option key={r}>{r}</option>)}
+              <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value as UserRole }))} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-xs font-medium text-muted-foreground">Mot de passe *</label><Input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">Confirmer MDP *</label><Input type="password" value={form.confirmPassword} onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))} className="mt-1" /></div>
             </div>
 
             {/* Champs facultatifs */}
@@ -241,24 +401,12 @@ export default function Utilisateurs() {
                 <Input value={form.adresse} onChange={e => setForm(p => ({ ...p, adresse: e.target.value }))} placeholder={t("users.addressPlaceholder")} className="mt-1" />
               </div>
             </div>
-
-            {/* Droits d'accès aux modules */}
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-2 block">{t("users.moduleRights")}</label>
-              <div className="grid grid-cols-2 gap-2">
-                {allModules.map(m => (
-                  <label key={m} className="flex items-center gap-2 rounded-lg border border-border p-2 cursor-pointer hover:bg-muted/30">
-                    <input type="checkbox" defaultChecked className="rounded border-border" />
-                    <span className="text-xs text-foreground">{m}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>{t("users.cancel")}</Button>
-            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate} disabled={!form.nom || !form.prenom || !form.email}>
-              {t("users.add")}
+            <Button className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90" onClick={handleCreate}
+              disabled={!form.nom || !form.prenom || !form.email || !form.password || createMutation.isPending}>
+              {createMutation.isPending ? "En cours..." : t("users.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -278,12 +426,10 @@ export default function Utilisateurs() {
                 <div><label className="text-xs font-medium text-muted-foreground">{t("users.lastName")}</label><Input value={editing.nom} onChange={e => setEditing({ ...editing, nom: e.target.value })} className="mt-1" /></div>
               </div>
               <div><label className="text-xs font-medium text-muted-foreground">Email</label><Input value={editing.email} onChange={e => setEditing({ ...editing, email: e.target.value })} className="mt-1" /></div>
-              <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")}</label><Input value={editing.telephone} onChange={e => setEditing({ ...editing, telephone: e.target.value })} className="mt-1" /></div>
+              <div><label className="text-xs font-medium text-muted-foreground">{t("users.phone")}</label><Input value={editing.telephone ?? ""} onChange={e => setEditing({ ...editing, telephone: e.target.value })} className="mt-1" /></div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">{t("users.role")}</label>
-                <select value={editing.role} onChange={e => setEditing({ ...editing, role: e.target.value })} className="mt-1 w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                  {["Standard", "Notaire", "Comptable", "Gérant"].map(r => <option key={r}>{r}</option>)}
-                </select>
+                <label className="text-xs font-medium text-muted-foreground">{t("users.role")} (non modifiable)</label>
+                <p className="mt-1 h-10 flex items-center px-3 rounded-lg border border-border bg-muted text-sm text-muted-foreground">{ROLE_LABELS[editing.role]}</p>
               </div>
 
               {/* Champs facultatifs en édition */}
@@ -365,7 +511,7 @@ export default function Utilisateurs() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive">Supprimer cet utilisateur ?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{deleting?.prenom} {deleting?.nom}</strong> ({deleting?.code}) sera définitivement supprimé. Cette action est irréversible.
+              <strong>{deleting?.prenom} {deleting?.nom}</strong> sera définitivement supprimé. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

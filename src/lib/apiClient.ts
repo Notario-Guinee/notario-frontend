@@ -43,7 +43,19 @@ function authHeaders(extra?: Record<string, string>): HeadersInit {
 }
 
 async function parseResponse<T>(res: Response): Promise<T> {
-  const json: ApiResponse<T> = await res.json();
+  // 204 No Content ou body vide (ex: DELETE réussi)
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+    return undefined as T;
+  }
+
+  let json: ApiResponse<T>;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(`Erreur ${res.status} (réponse non JSON)`);
+  }
+
   if (!res.ok || !json.success) {
     throw new Error(json.message || `Erreur ${res.status}`);
   }
@@ -91,3 +103,21 @@ export const apiClient = {
     return parseResponse<T>(res);
   },
 };
+
+// Pour les endpoints qui renvoient directement une PageResponse sans enveloppe success/data
+export async function fetchPage<T>(url: string, extra?: Record<string, string>): Promise<T> {
+  const token = getToken();
+  const tenantId = getTenantId(); // utilise decodeTenantFromJwt → tenantId ?? tenant_id ?? tenant
+
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { "X-Tenant-ID": tenantId } : {}),
+      ...extra,
+    }
+  });
+
+  if (!res.ok) throw new Error(`Erreur ${res.status}`);
+  return res.json();
+}

@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { authService } from "@/services/cabinetService";
+import { apiClient } from "@/lib/apiClient";
 
 type PortalType = "admin" | "tenant" | "client";
 
@@ -58,7 +58,7 @@ export default function ForgotPassword() {
     if (!email.trim()) { toast.error(t("forgot.errorEmpty")); return; }
     setLoading(true);
     try {
-      await authService.forgotPassword(email.trim());
+      await apiClient.post("/api/auth/forgot-password", { email: email.trim() });
       setSubmitted(true);
       toast.success(t("forgot.successToast"));
     } catch (err: unknown) {

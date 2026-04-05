@@ -3,16 +3,16 @@
 // via le lien reçu par email, permet de définir un nouveau mdp
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
-import { Lock, Eye, EyeOff, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Lock, Eye, EyeOff, CheckCircle2, ShieldCheck, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { authService } from "@/services/cabinetService";
+import { apiClient } from "@/lib/apiClient";
 
 type PortalType = "admin" | "tenant" | "client";
 
@@ -30,6 +30,24 @@ export default function ResetPassword() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(true);
+  const [tokenError, setTokenError] = useState(false);
+
+  // Validate token on mount
+  useEffect(() => {
+    if (!token) {
+      setTokenError(true);
+      setValidating(false);
+      return;
+    }
+    apiClient
+      .get(`/api/auth/validate-reset-token?token=${encodeURIComponent(token)}`)
+      .then(() => setValidating(false))
+      .catch(() => {
+        setTokenError(true);
+        setValidating(false);
+      });
+  }, [token]);
 
   const configs: Record<PortalType, { title: string; gradient: string; loginPath: string }> = {
     admin: {
@@ -63,7 +81,7 @@ export default function ResetPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !tenantId) {
+    if (!token) {
       toast.error("Lien invalide ou expiré");
       return;
     }
@@ -77,7 +95,7 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      await authService.resetPassword(token, password, tenantId);
+      await apiClient.post("/api/auth/reset-password", { token, newPassword: password }, tenantId ? { "X-Tenant-ID": tenantId } : undefined);
       setSubmitted(true);
       toast.success(t("reset.success"));
     } catch (err: unknown) {
@@ -106,7 +124,29 @@ export default function ResetPassword() {
           </div>
 
           <div className="p-8">
-            {!submitted ? (
+            {validating ? (
+              <div className="flex flex-col items-center gap-4 py-8">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Vérification du lien…</p>
+              </div>
+            ) : tokenError ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-6 space-y-4"
+              >
+                <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                </div>
+                <h2 className="text-lg font-semibold text-foreground">Lien invalide ou expiré</h2>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Ce lien de réinitialisation n'est plus valide. Il a peut-être déjà été utilisé ou a expiré.
+                </p>
+                <Button variant="outline" onClick={() => navigate(config.loginPath)}>
+                  Retour à la connexion
+                </Button>
+              </motion.div>
+            ) : !submitted ? (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <p className="text-sm text-muted-foreground">{t("reset.instructions")}</p>
 

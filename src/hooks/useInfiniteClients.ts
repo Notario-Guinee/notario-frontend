@@ -13,7 +13,7 @@ export function useInfiniteClients(options: Options = {}) {
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       lastPage.hasNext ? lastPage.page + 1 : undefined,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     retry: 2,
   });
 }

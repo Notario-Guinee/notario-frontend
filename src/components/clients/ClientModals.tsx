@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { mockDossiers, type Dossier } from "@/data/mockData";
 import { PROFESSIONS, RAISONS_SOCIALES, TYPES_ACTE } from "@/data/constants";
 import type { ClientType } from "./ClientTable";
 
@@ -36,7 +35,7 @@ export interface DossierForm {
   typeActe: string;
   objet: string;
   montant: string;
-  priorite: Dossier["priorite"];
+  priorite: "Basse" | "Normale" | "Haute" | "Urgente";
   notaire: string;
   notes: string;
 }
@@ -338,7 +337,7 @@ export function ClientModals({
               </div>
               <div className="space-y-2">
                 <Label>{fr ? "Priorité" : "Priority"}</Label>
-                <Select value={dossierForm.priorite} onValueChange={v => setDossierForm(f => ({ ...f, priorite: v as Dossier["priorite"] }))}>
+                <Select value={dossierForm.priorite} onValueChange={v => setDossierForm(f => ({ ...f, priorite: v as DossierForm["priorite"] }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{prioritesDossier.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                 </Select>
@@ -394,7 +393,7 @@ export function ClientModals({
               <Select value={factureForm.dossier} onValueChange={v => setFactureForm(f => ({ ...f, dossier: v }))}>
                 <SelectTrigger><SelectValue placeholder={fr ? "Sélectionner un dossier..." : "Select a case..."} /></SelectTrigger>
                 <SelectContent>
-                  {mockDossiers.map(d => <SelectItem key={d.id} value={d.code}>{d.code} — {d.objet}</SelectItem>)}
+                  <SelectItem value="" disabled>{fr ? "Aucun dossier disponible" : "No cases available"}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

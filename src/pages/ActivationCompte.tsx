@@ -1,78 +1,28 @@
 // ═══════════════════════════════════════════════════════════════
-// Page ActivationCompte — Flux invitation / magic link
+// Page ActivationCompte — Vérification d'email / activation
 //
 // Accessible via /activer?token=<TOKEN_UNIQUE>
 // Étapes :
-//  1. Montage → validation du token auprès de l'API (simulée)
-//  2. Si token invalide/expiré → état "error"
-//  3. Si token valide → formulaire de création de mot de passe
-//  4. Soumission → état "success" + bouton vers /login
+//  1. Montage → POST /api/auth/verify-email?token=...
+//  2. Si erreur → état "error"
+//  3. Si succès → état "success" + bouton vers /login
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import {
-  Lock, Eye, EyeOff, CheckCircle2, ShieldCheck,
+  CheckCircle2,
   UserCheck, AlertTriangle, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-
-// ── Règles de validation du mot de passe ─────────────────────────────────────
-// Chaque règle expose un id, un label affiché et une fonction de test.
-const PASSWORD_RULES = [
-  {
-    id: "length",
-    label: "12 caractères minimum",
-    test: (p: string) => p.length >= 12,
-  },
-  {
-    id: "upper",
-    label: "Une majuscule (A–Z)",
-    test: (p: string) => /[A-Z]/.test(p),
-  },
-  {
-    id: "digit",
-    label: "Un chiffre (0–9)",
-    test: (p: string) => /\d/.test(p),
-  },
-  {
-    id: "special",
-    label: "Un caractère spécial (!@#…)",
-    test: (p: string) => /[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~]/.test(p),
-  },
-];
-
-// ── Calcul de la force en fonction du nombre de critères validés ──────────────
-function getStrength(password: string, score: number) {
-  if (!password) return null;
-  if (score === 1) return { label: "Faible",    barClass: "w-1/4 bg-destructive",  textClass: "text-destructive" };
-  if (score === 2) return { label: "Moyen",     barClass: "w-2/4 bg-orange-400",   textClass: "text-orange-400" };
-  if (score === 3) return { label: "Fort",      barClass: "w-3/4 bg-blue-500",     textClass: "text-blue-500" };
-  return             { label: "Très fort",  barClass: "w-full bg-success",     textClass: "text-success" };
-}
-
-// ── Simulation d'appel API : validation du token ─────────────────────────────
-// Remplacer par un vrai appel fetch / Supabase en production.
-async function validateToken(token: string): Promise<{ valid: boolean; email?: string; nom?: string }> {
-  await new Promise(r => setTimeout(r, 1200)); // latence simulée
-  if (!token || token === "expired" || token === "invalid") return { valid: false };
-  // Token accepté → on retourne les infos de l'utilisateur invité
-  return { valid: true, email: "utilisateur@cabinet.gn", nom: "Mamadou Diallo" };
-}
-
-// ── Simulation d'appel API : activation du compte ────────────────────────────
-async function activateAccount(_token: string, _password: string): Promise<void> {
-  await new Promise(r => setTimeout(r, 1000));
-  // En production : POST /api/activate avec { token, password }
-}
+import { apiClient } from "@/lib/apiClient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Phase = "loading" | "error" | "form" | "success";
+type Phase = "loading" | "error" | "success";
 
 export default function ActivationCompte() {
   const navigate = useNavigate();
@@ -82,53 +32,23 @@ export default function ActivationCompte() {
 
   // ── Phase globale du flux ─────────────────────────────────────────────────
   const [phase, setPhase] = useState<Phase>("loading");
-  const [tokenInfo, setTokenInfo] = useState<{ email: string; nom: string } | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Champs du formulaire ──────────────────────────────────────────────────
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [showPwd, setShowPwd] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  // ── Validation en temps réel ──────────────────────────────────────────────
-  const checks = PASSWORD_RULES.map(r => ({ ...r, valid: r.test(password) }));
-  const score = checks.filter(c => c.valid).length;
-  const allValid = score === PASSWORD_RULES.length;
-  const matches = password.length > 0 && password === confirm;
-  const strength = getStrength(password, score);
-
-  // ── Vérification du token au montage du composant ─────────────────────────
+  // ── Vérification et activation du compte au montage ───────────────────────
   useEffect(() => {
     if (!token) {
       setPhase("error");
       return;
     }
-    validateToken(token).then(result => {
-      if (result.valid && result.email && result.nom) {
-        setTokenInfo({ email: result.email, nom: result.nom });
-        setPhase("form");
-      } else {
+    apiClient
+      .post(`/api/auth/verify-email?token=${encodeURIComponent(token)}`)
+      .then(() => {
+        setPhase("success");
+        toast.success("Votre compte a été activé avec succès !");
+      })
+      .catch(() => {
         setPhase("error");
-      }
-    });
+      });
   }, [token]);
-
-  // ── Soumission du formulaire ──────────────────────────────────────────────
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!allValid || !matches) return;
-    setIsSubmitting(true);
-    try {
-      await activateAccount(token, password);
-      setPhase("success");
-      toast.success("Votre compte a été activé avec succès !");
-    } catch {
-      toast.error("Une erreur est survenue. Veuillez réessayer.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
   return (
@@ -191,146 +111,7 @@ export default function ActivationCompte() {
             )}
 
             {/* ══════════════════════════════════════════
-                État 3 : Formulaire de création de mdp
-            ══════════════════════════════════════════ */}
-            {phase === "form" && (
-              <form onSubmit={handleSubmit} className="space-y-5">
-
-                {/* Accueil personnalisé avec les infos de l'invité */}
-                {tokenInfo && (
-                  <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3">
-                    <p className="text-sm font-medium text-foreground">
-                      Bienvenue, {tokenInfo.nom}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {tokenInfo.email}
-                    </p>
-                  </div>
-                )}
-
-                <p className="text-sm text-muted-foreground">
-                  Définissez votre mot de passe pour activer votre accès à Notario.
-                </p>
-
-                {/* ── Champ : Nouveau mot de passe ── */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">
-                    Nouveau mot de passe
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type={showPwd ? "text" : "password"}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      placeholder="••••••••••••"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPwd(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      tabIndex={-1}
-                    >
-                      {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-
-                  {/* Barre de force — visible dès qu'on tape */}
-                  {password && strength && (
-                    <div className="space-y-1 pt-1">
-                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${strength.barClass}`}
-                        />
-                      </div>
-                      <p className={`text-[11px] font-medium ${strength.textClass}`}>
-                        Force : {strength.label}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Checklist des critères en temps réel ── */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  {checks.map(c => (
-                    <div key={c.id} className="flex items-center gap-1.5 text-xs">
-                      <CheckCircle2
-                        className={`h-3.5 w-3.5 shrink-0 transition-colors ${
-                          c.valid ? "text-success" : "text-muted-foreground/40"
-                        }`}
-                      />
-                      <span className={c.valid ? "text-foreground" : "text-muted-foreground"}>
-                        {c.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ── Champ : Confirmation ── */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-foreground">
-                    Confirmer le mot de passe
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type={showConfirm ? "text" : "password"}
-                      value={confirm}
-                      onChange={e => setConfirm(e.target.value)}
-                      className={`pl-10 pr-10 ${
-                        confirm && !matches ? "border-destructive focus-visible:ring-destructive" : ""
-                      }`}
-                      placeholder="••••••••••••"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      tabIndex={-1}
-                    >
-                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {/* Feedback correspondance */}
-                  {confirm && !matches && (
-                    <p className="text-xs text-destructive">
-                      Les mots de passe ne correspondent pas.
-                    </p>
-                  )}
-                  {matches && (
-                    <p className="text-xs text-success flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Les mots de passe correspondent.
-                    </p>
-                  )}
-                </div>
-
-                {/* ── Bouton de soumission — grisé tant que les critères ne sont pas tous validés ── */}
-                <Button
-                  type="submit"
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={!allValid || !matches || isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Activation en cours…
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-4 w-4 mr-2" />
-                      Activer mon compte
-                    </>
-                  )}
-                </Button>
-              </form>
-            )}
-
-            {/* ══════════════════════════════════════════
-                État 4 : Succès — compte activé
+                État 3 : Succès — compte activé
             ══════════════════════════════════════════ */}
             {phase === "success" && (
               <motion.div

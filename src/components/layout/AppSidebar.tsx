@@ -6,7 +6,7 @@
 
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { currentUser } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
 import { useSidebarState } from "@/context/SidebarContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useRole } from "@/context/RoleContext";
@@ -15,7 +15,7 @@ import {
   Receipt, CreditCard, Landmark, Wallet, BarChart3, Settings,
   Search, Package, FileText, MessageSquare, Bell,
   GraduationCap, Globe, Building2, UserCog, Shield,
-  ChevronLeft, ChevronRight, Scale, Activity, Key, Megaphone, Monitor, HardDrive, CalendarCheck, Mail,
+  ChevronLeft, ChevronRight, Scale, Key, Megaphone, Monitor, HardDrive, CalendarCheck, Mail,
 } from "lucide-react";
 
 /** Structure d'un élément de navigation */
@@ -26,8 +26,9 @@ interface NavGroup { label: string; items: NavItem[]; }
 export function AppSidebar() {
   const { collapsed, toggle } = useSidebarState();
   const location = useLocation();
-  const { t, lang } = useLanguage();
-  const { isAdminGlobal, role, setRole } = useRole();
+  const { t } = useLanguage();
+  const { isAdminGlobal, setRole } = useRole();
+  const { user } = useAuth();
 
   // ─── Navigation du gérant ───
   const gerantGroups: NavGroup[] = [
@@ -137,7 +138,7 @@ export function AppSidebar() {
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="font-heading text-sm font-bold text-foreground truncate">Notario</h1>
-            <p className="text-[10px] text-muted-foreground truncate">{isAdminGlobal ? t("sidebar.adminGlobal") : currentUser.cabinet}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{isAdminGlobal ? t("sidebar.adminGlobal") : (user?.nomCabinet ?? "")}</p>
           </div>
         )}
       </div>
@@ -226,12 +227,12 @@ export function AppSidebar() {
             "flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-heading text-xs font-bold",
             isAdminGlobal ? "bg-destructive/20 text-destructive" : "bg-primary/20 text-primary"
           )}>
-            {isAdminGlobal ? "A" : currentUser.firstName.charAt(0)}
+            {isAdminGlobal ? "A" : (user?.initiales ?? user?.prenom?.charAt(0) ?? "?")}
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{isAdminGlobal ? "Super Admin" : currentUser.name}</p>
-              <p className="text-[10px] text-muted-foreground">{isAdminGlobal ? "Admin Global" : currentUser.role}</p>
+              <p className="text-sm font-medium text-foreground truncate">{isAdminGlobal ? "Super Admin" : (user?.nomComplet ?? `${user?.prenom ?? ""} ${user?.nom ?? ""}`.trim())}</p>
+              <p className="text-[10px] text-muted-foreground">{isAdminGlobal ? "Admin Global" : (user?.role ?? "")}</p>
             </div>
           )}
         </div>

@@ -3,27 +3,38 @@
 // Props : données + callbacks fournis par Clients.tsx
 // ═══════════════════════════════════════════════════════════════
 
-import { Building2, Phone, Edit, Trash2, MoreHorizontal, Eye, FileText, Archive, FolderPlus, Receipt, Link, Users } from "lucide-react";
+import { Building2, Phone, Edit, Trash2, MoreHorizontal, Eye, Archive, FolderPlus, Receipt, Link, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { mockClients } from "@/data/mockData";
 
-export type ClientType = (typeof mockClients)[0] & { adresse?: string; description?: string };
-
-const PAGE_SIZE = 20;
+export interface ClientType {
+  id: string;
+  code: string;
+  nom: string;
+  prenom: string;
+  type: 'Physique' | 'Morale';
+  telephone: string;
+  email: string;
+  profession: string;
+  statut: 'Actif' | 'Inactif' | 'Prospect';
+  dateInscription: string;
+  adresse?: string;
+  description?: string;
+}
 
 interface ClientTableProps {
   visibleClients: ClientType[];
   filtered: ClientType[];
-  visibleCount: number;
+  totalCount: number;
   hasMore: boolean;
   fr: boolean;
   search: string;
-  setVisibleCount: React.Dispatch<React.SetStateAction<number>>;
+  loadMore: () => void;
+  isFetchingMore?: boolean;
   onView: (client: ClientType) => void;
   onEdit: (client: ClientType) => void;
   onDelete: (client: ClientType) => void;
@@ -35,11 +46,12 @@ interface ClientTableProps {
 export function ClientTable({
   visibleClients,
   filtered,
-  visibleCount,
+  totalCount,
   hasMore,
   fr,
   search,
-  setVisibleCount,
+  loadMore,
+  isFetchingMore,
   onView,
   onEdit,
   onDelete,
@@ -144,8 +156,8 @@ export function ClientTable({
       {/* Chargement progressif */}
       {hasMore && (
         <div className="flex justify-center py-4 border-t border-border">
-          <Button variant="outline" size="sm" onClick={() => setVisibleCount(v => v + PAGE_SIZE)}>
-            {fr ? `Charger plus (${filtered.length - visibleCount} restants)` : `Load more (${filtered.length - visibleCount} remaining)`}
+          <Button variant="outline" size="sm" onClick={loadMore} disabled={isFetchingMore}>
+            {fr ? `Charger plus (${totalCount - visibleClients.length} restants)` : `Load more (${totalCount - visibleClients.length} remaining)`}
           </Button>
         </div>
       )}

@@ -3,7 +3,7 @@
 // via le paramètre ?portal=admin|tenant|client (défaut: tenant)
 // ═══════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,11 @@ export default function LoginTenant() {
   const [searchParams] = useSearchParams();
   const portal = (searchParams.get("portal") as PortalType) || "tenant";
   const { t } = useLanguage();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) navigate(getDashboardPath(portal), { replace: true });
+  }, [isAuthenticated, navigate, portal]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,7 +59,6 @@ export default function LoginTenant() {
     setError("");
     try {
       await login(email, password, getTenantId(portal));
-      navigate(getDashboardPath(portal));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
@@ -217,10 +220,16 @@ export default function LoginTenant() {
 
           <div className="flex flex-col items-center gap-1.5 text-center text-xs text-muted-foreground">
             {portal === "tenant" && (
-              <p>
-                {t("login.tenantClientLink")}{" "}
-                <button onClick={() => navigate("/espace-client")} className="text-primary hover:underline font-medium">{t("login.tenantClientAccess")}</button>
-              </p>
+              <>
+                <p>
+                  {t("login.tenantClientLink")}{" "}
+                  <button onClick={() => navigate("/espace-client")} className="text-primary hover:underline font-medium">{t("login.tenantClientAccess")}</button>
+                </p>
+                <p>
+                  Pas encore de compte ?{" "}
+                  <button onClick={() => navigate("/register")} className="text-primary hover:underline font-medium">Créer un cabinet</button>
+                </p>
+              </>
             )}
             {portal === "client" && (
               <p>

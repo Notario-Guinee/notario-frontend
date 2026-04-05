@@ -6,67 +6,235 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { useState, useMemo, useCallback } from "react";
-import { searchMatch, cn } from "@/lib/utils";
-import { Plus, Download, X, User, Building2, Search, Users, CheckCircle2, Edit, Trash2, FileText, FolderPlus, Receipt, Calendar, BarChart3, MessageSquare, FileDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Plus, Download, X, User, Building2, Search, Users, CheckCircle2, Edit, Trash2, FileText, FolderPlus, Receipt, BarChart3, MessageSquare, FileDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { mockClients, mockDossiers, mockFactures, formatGNF, type Dossier } from "@/data/mockData";
-import { PROFESSIONS, TYPES_ACTE } from "@/data/constants";
+import { PROFESSIONS } from "@/data/constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAnnouncer } from "@/hooks/useAnnouncer";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useInfiniteClients } from "@/hooks/useInfiniteClients";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createClient, updateClient, deleteClient, getStatistiquesGlobales, getClientHistorique, getClientStatistiques, exportClientsCsv, exportClientsExcel, toggleClientStatus, getClientContacts, addClientContact, deleteClientContact, setContactPrincipal, getClientById, validateEmail, validateRccm, validateNif, getClientsByType, getClientsByStatus, getRecentClients, getInactiveClients, getVipClients, mergeClients, getClientDuplicates } from "@/api/clients";
 import { ClientTable } from "@/components/clients/ClientTable";
 import { ClientModals } from "@/components/clients/ClientModals";
+import type { DossierForm } from "@/components/clients/ClientModals";
 import type { ClientType } from "@/components/clients/ClientTable";
+import type { Client } from "@/types/client";
 
 // Alias locaux pour les constantes centralisées (rétrocompatibilité)
 const professions = PROFESSIONS;
-const typesActe = TYPES_ACTE;
 
 const PAGE_SIZE = 20;
 
-// Données simulées pour l'historique client
-const mockCommunications = [
-  { id: "1", type: "email", objet: "Confirmation RDV", date: "2025-03-01", statut: "Envoyé" },
-  { id: "2", type: "sms", objet: "Rappel paiement", date: "2025-02-15", statut: "Délivré" },
-  { id: "3", type: "appel", objet: "Consultation initiale", date: "2025-01-20", statut: "Effectué" },
-  { id: "4", type: "email", objet: "Envoi documents", date: "2024-12-10", statut: "Envoyé" },
-];
+/** Convertit un Client API en ClientType pour l'affichage */
+function toClientType(c: Client): ClientType {
+  return {
+    id: String(c.id),
+    code: c.codeClient ?? `C-${c.id}`,
+    nom: c.typeClient === 'MORALE' ? (c.denominationSociale || c.nom || '') : (c.nom || ''),
+    prenom: c.typeClient === 'PHYSIQUE' ? (c.prenom ?? '') : '',
+    type: c.typeClient === 'PHYSIQUE' ? 'Physique' : 'Morale',
+    telephone: c.telephone ?? '',
+    email: c.email ?? '',
+    profession: c.typeClient === 'PHYSIQUE' ? (c.profession ?? '') : (c.secteurActivite ?? ''),
+    statut: c.actif ? 'Actif' : 'Inactif',
+    dateInscription: c.datePremiereVisite ?? c.createdAt?.slice(0, 10) ?? '',
+    adresse: c.adresse,
+    description: c.noteDescriptive,
+  };
+}
 
-const mockDocumentsClient = [
-  { id: "1", nom: "Carte d'identité", type: "Identité", dossier: "N-2025-101", date: "2024-03-15" },
-  { id: "2", nom: "Titre foncier", type: "Propriété", dossier: "N-2025-101", date: "2024-03-20" },
-  { id: "3", nom: "Contrat de vente", type: "Acte", dossier: "N-2025-104", date: "2024-08-15" },
-  { id: "4", nom: "Procuration notariée", type: "Acte", dossier: "N-2025-101", date: "2024-04-02" },
-];
 
 export default function Clients() {
   const { lang } = useLanguage();
   const fr = lang === "FR";
   const { announce } = useAnnouncer();
-  const [clients, setClients] = useState<ClientType[]>(mockClients);
+  const queryClient = useQueryClient();
+
+  // Statistiques globales depuis l'API
+  const { data: globalStats } = useQuery({
+    queryKey: ['clients', 'statistiques-globales'],
+    queryFn: getStatistiquesGlobales,
+    staleTime: 60_000,
+  });
+
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
   const [selectedClient, setSelectedClient] = useState<ClientType | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientType | null>(null);
   const [drawerTab, setDrawerTab] = useState("infos");
+
+  // Données du tiroir client (historique + statistiques)
+  const { data: clientHistorique = [], isLoading: isLoadingHistorique } = useQuery({
+    queryKey: ['clients', selectedClient?.id, 'historique'],
+    queryFn: () => getClientHistorique(selectedClient!.id),
+    enabled: !!selectedClient && drawerTab === 'historique',
+  });
+
+  const { data: clientStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['clients', selectedClient?.id, 'statistiques'],
+    queryFn: () => getClientStatistiques(selectedClient!.id),
+    enabled: !!selectedClient && drawerTab === 'statistiques',
+  });
+
   const [customProfession, setCustomProfession] = useState(false);
   const [customRaison, setCustomRaison] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Paramètre typeClient pour l'API
+  const typeClientParam = filter === 'Physique' ? 'PHYSIQUE' : filter === 'Morale' ? 'MORALE' : undefined;
+
+  // Chargement des clients depuis l'API
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteClients({
+    search: debouncedSearch || undefined,
+    typeClient: typeClientParam,
+    size: PAGE_SIZE,
+    sortBy: 'createdAt',
+    sortDir: 'desc',
+  });
+
+  const allClients = useMemo(
+    () => (data?.pages.flatMap(p => p.content) ?? []).map(toClientType),
+    [data],
+  );
+  const totalCount = data?.pages[0]?.totalElements ?? 0;
+
+  // Mutations CRUD
+  const createMutation = useMutation({
+    mutationFn: createClient,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateClient>[1] }) =>
+      updateClient(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteClient,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients'] }),
+  });
+
+  // Toggle statut actif/inactif
+  const toggleStatusMutation = useMutation({
+    mutationFn: toggleClientStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success(fr ? "Statut du client mis à jour" : "Client status updated");
+    },
+    onError: () => toast.error(fr ? "Erreur lors du changement de statut" : "Error toggling status"),
+  });
+
+  // Contacts du client sélectionné
+  const { data: clientContacts = [], isLoading: isLoadingContacts } = useQuery({
+    queryKey: ['clients', selectedClient?.id, 'contacts'],
+    queryFn: () => getClientContacts(selectedClient!.id),
+    enabled: !!selectedClient && drawerTab === 'communications',
+  });
+
+  const addContactMutation = useMutation({
+    mutationFn: ({ clientId, payload }: { clientId: string | number; payload: Record<string, unknown> }) =>
+      addClientContact(clientId, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients', selectedClient?.id, 'contacts'] }),
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: ({ clientId, contactId }: { clientId: string | number; contactId: string | number }) =>
+      deleteClientContact(clientId, contactId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients', selectedClient?.id, 'contacts'] }),
+  });
+
+  const setContactPrincipalMutation = useMutation({
+    mutationFn: ({ clientId, contactId }: { clientId: string | number; contactId: string | number }) =>
+      setContactPrincipal(clientId, contactId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clients', selectedClient?.id, 'contacts'] }),
+  });
+
+  // Doublons éventuels
+  const { data: clientDuplicates = [] } = useQuery({
+    queryKey: ['clients', selectedClient?.id, 'duplicates'],
+    queryFn: () => getClientDuplicates(selectedClient!.id),
+    enabled: !!selectedClient && drawerTab === 'infos',
+  });
+
+  // Détail complet du client sélectionné
+  const { data: clientDetail } = useQuery({
+    queryKey: ['clients', selectedClient?.id, 'detail'],
+    queryFn: () => getClientById(selectedClient!.id),
+    enabled: !!selectedClient,
+  });
+
+  // Quick filters (presets)
+  const [quickFilter, setQuickFilter] = useState<string | null>(null);
+  const { data: quickFilterClients } = useQuery({
+    queryKey: ['clients', 'quick-filter', quickFilter],
+    queryFn: () => {
+      if (quickFilter === 'recent') return getRecentClients();
+      if (quickFilter === 'inactive') return getInactiveClients(90);
+      if (quickFilter === 'vip') return getVipClients();
+      if (quickFilter === 'PHYSIQUE') return getClientsByType('PHYSIQUE');
+      if (quickFilter === 'MORALE') return getClientsByType('MORALE');
+      if (quickFilter === 'actif') return getClientsByStatus(true);
+      if (quickFilter === 'inactif') return getClientsByStatus(false);
+      return Promise.resolve([]);
+    },
+    enabled: !!quickFilter,
+  });
+
+  // Validation email en temps réel (debounced)
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
+  const validateClientEmail = useCallback(async (email: string) => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailValid(null); return; }
+    try {
+      await validateEmail(email);
+      setEmailValid(true);
+    } catch {
+      setEmailValid(false);
+    }
+  }, []);
+
+  // Validation RCCM
+  const _validateClientRccm = useCallback(async (rccm: string) => {
+    if (!rccm) return;
+    try { await validateRccm(rccm); } catch { /* silencieux */ }
+  }, []);
+
+  // Validation NIF
+  const _validateClientNif = useCallback(async (nif: string) => {
+    if (!nif) return;
+    try { await validateNif(nif); } catch { /* silencieux */ }
+  }, []);
+
+  // Merge clients
+  const mergeMutation = useMutation({
+    mutationFn: ({ sourceId, targetId }: { sourceId: string | number; targetId: string | number }) =>
+      mergeClients(sourceId, targetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success(fr ? "Clients fusionnés" : "Clients merged");
+    },
+    onError: () => toast.error(fr ? "Erreur lors de la fusion" : "Error merging clients"),
+  });
 
   // Création de dossier depuis une action client
   const [showCreateDossierModal, setShowCreateDossierModal] = useState(false);
   const [dossierClient, setDossierClient] = useState<ClientType | null>(null);
-  const [dossierForm, setDossierForm] = useState({
-    typeActe: "", objet: "", montant: "", priorite: "Normale" as Dossier["priorite"], notaire: "Maître Notario", notes: "",
+  const [dossierForm, setDossierForm] = useState<DossierForm>({
+    typeActe: "", objet: "", montant: "", priorite: "Normale", notaire: "", notes: "",
   });
 
   // Création de facture depuis une action client
@@ -76,11 +244,7 @@ export default function Clients() {
     dossier: "", montant: "", description: "", echeance: "",
   });
 
-  // Filtres d'historique dans le détail client
-  const [historyPeriod, setHistoryPeriod] = useState("all");
-  const [historyTypeActe, setHistoryTypeActe] = useState("all");
 
-  // Invitation client
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteClient, setInviteClient] = useState<ClientType | null>(null);
   const inscriptionLink = `${window.location.origin}/inscription-client?cabinet=${encodeURIComponent("Cabinet Maître Sylla")}`;
@@ -110,29 +274,21 @@ export default function Clients() {
     setCustomRaison(false);
   }, []);
 
-  // Filtrage des clients par type et recherche
-  const filtered = useMemo(() => clients.filter((c) => {
-    if (filter === "Physique" && c.type !== "Physique") return false;
-    if (filter === "Morale" && c.type !== "Morale") return false;
-    if (search) {
-      const fields = [c.nom, c.prenom, c.email, c.code, c.telephone, c.profession || ""];
-      return fields.some(f => searchMatch(f, search));
-    }
-    return true;
-  }), [clients, filter, search]);
+  // Les données viennent de l'API (filtre type + recherche server-side)
+  // allClients et totalCount définis plus haut via useInfiniteClients
 
-  const visibleClients = filtered.slice(0, visibleCount);
-  const hasMore = visibleCount < filtered.length;
+  // Statistiques globales depuis l'API, avec fallback local
+  const stats = useMemo(() => {
+    if (globalStats) return globalStats;
+    return {
+      total: totalCount,
+      physiques: filter === 'Physique' ? totalCount : allClients.filter(c => c.type === 'Physique').length,
+      morales: filter === 'Morale' ? totalCount : allClients.filter(c => c.type === 'Morale').length,
+      actifs: allClients.filter(c => c.statut === 'Actif').length,
+    };
+  }, [globalStats, totalCount, allClients, filter]);
 
-  // Statistiques globales
-  const stats = useMemo(() => ({
-    total: clients.length,
-    physiques: clients.filter(c => c.type === "Physique").length,
-    morales: clients.filter(c => c.type === "Morale").length,
-    actifs: clients.filter(c => c.statut === "Actif").length,
-  }), [clients]);
-
-  // Création d'un nouveau client
+  // Création d'un nouveau client via l'API
   const handleCreate = useCallback(() => {
     if (!form.nom?.trim()) {
       toast.error(fr ? "Le nom est obligatoire." : "Last name is required.");
@@ -147,67 +303,93 @@ export default function Clients() {
       toast.error(fr ? "Numéro de téléphone invalide." : "Invalid phone number.");
       return;
     }
-    setIsSubmitting(true);
-    try {
-      const newClient: ClientType = {
-        id: String(Date.now()),
-        code: `C-${1209 + clients.length - mockClients.length}`,
-        nom: form.nom, prenom: form.prenom, type: form.type,
-        telephone: form.telephone, email: form.email,
-        profession: form.profession, statut: form.statut as ClientType["statut"],
-        adresse: form.adresse,
-        description: form.description,
-        dateInscription: new Date().toISOString().slice(0, 10),
-      };
-      setClients(prev => [newClient, ...prev]);
-      setShowCreateModal(false);
-      resetForm();
-      toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
-      announce(fr ? "Client créé avec succès" : "Client created successfully");
-    } catch (err) {
-      toast.error(fr ? "Erreur lors de la création" : "Error creating client");
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+    if (emailValid === false) {
+      toast.error(fr ? "L'adresse email est déjà utilisée." : "Email address is already in use.");
+      return;
     }
-  }, [form, fr, clients.length, announce, resetForm]);
+    // Server-side validations
+    if (form.email) validateClientEmail(form.email);
+    setIsSubmitting(true);
+    createMutation.mutate(
+      {
+        typeClient: form.type === 'Physique' ? 'PHYSIQUE' : 'MORALE',
+        nom: form.type === 'Physique' ? form.nom : undefined,
+        prenom: form.type === 'Physique' ? form.prenom : undefined,
+        denominationSociale: form.type === 'Morale' ? form.nom : undefined,
+        email: form.email || undefined,
+        telephone: form.telephone || undefined,
+        profession: form.type === 'Physique' ? form.profession || undefined : undefined,
+        secteurActivite: form.type === 'Morale' ? form.profession || undefined : undefined,
+        adresse: form.adresse || undefined,
+        noteDescriptive: form.description || undefined,
+      },
+      {
+        onSuccess: () => {
+          setShowCreateModal(false);
+          resetForm();
+          toast.success(fr ? "Client ajouté avec succès" : "Client added successfully");
+          announce(fr ? "Client créé avec succès" : "Client created successfully");
+        },
+        onError: (err) => {
+          toast.error(err.message || (fr ? "Erreur lors de la création" : "Error creating client"));
+          console.error(err);
+        },
+        onSettled: () => setIsSubmitting(false),
+      },
+    );
+  }, [form, fr, announce, resetForm, createMutation, emailValid, validateClientEmail]);
 
-  // Modification d'un client existant
+  // Modification d'un client via l'API
   const handleEdit = useCallback(() => {
     if (!editingClient) return;
-    try {
-      setClients(prev => prev.map(c => c.id === editingClient.id ? {
-        ...editingClient,
-        nom: form.nom || editingClient.nom,
-        prenom: form.prenom ?? editingClient.prenom,
-        type: form.type,
-        telephone: form.telephone || editingClient.telephone,
-        email: form.email || editingClient.email,
-        profession: form.profession || editingClient.profession,
-        statut: form.statut as ClientType["statut"],
-        adresse: form.adresse,
-        description: form.description,
-      } : c));
-      setShowEditModal(false);
-      setSelectedClient(null);
-      toast.success(fr ? "Client modifié" : "Client updated");
-      announce(fr ? "Client mis à jour" : "Client updated");
-    } catch (err) {
-      toast.error(fr ? "Erreur lors de la modification" : "Error updating client");
-      console.error(err);
-    }
-  }, [editingClient, form, fr, announce]);
+    updateMutation.mutate(
+      {
+        id: editingClient.id,
+        data: {
+          typeClient: form.type === 'Physique' ? 'PHYSIQUE' : 'MORALE',
+          nom: form.type === 'Physique' ? form.nom || editingClient.nom : undefined,
+          prenom: form.type === 'Physique' ? form.prenom || editingClient.prenom || undefined : undefined,
+          denominationSociale: form.type === 'Morale' ? form.nom || editingClient.nom : undefined,
+          email: form.email || editingClient.email || undefined,
+          telephone: form.telephone || editingClient.telephone || undefined,
+          profession: form.type === 'Physique' ? form.profession || undefined : undefined,
+          secteurActivite: form.type === 'Morale' ? form.profession || undefined : undefined,
+          adresse: form.adresse || undefined,
+          noteDescriptive: form.description || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setShowEditModal(false);
+          setSelectedClient(null);
+          toast.success(fr ? "Client modifié" : "Client updated");
+          announce(fr ? "Client mis à jour" : "Client updated");
+        },
+        onError: (err) => {
+          toast.error(fr ? "Erreur lors de la modification" : "Error updating client");
+          console.error(err);
+        },
+      },
+    );
+  }, [editingClient, form, fr, announce, updateMutation]);
 
-  // Suppression d'un client
+  // Suppression d'un client via l'API
   const handleDelete = useCallback(() => {
     if (!editingClient) return;
-    setClients(prev => prev.filter(c => c.id !== editingClient.id));
-    setShowDeleteDialog(false);
-    setSelectedClient(null);
-    setEditingClient(null);
-    toast.success(fr ? "Client supprimé" : "Client deleted");
-    announce(fr ? "Client supprimé" : "Client deleted");
-  }, [editingClient, fr, announce]);
+    deleteMutation.mutate(editingClient.id, {
+      onSuccess: () => {
+        setShowDeleteDialog(false);
+        setSelectedClient(null);
+        setEditingClient(null);
+        toast.success(fr ? "Client supprimé" : "Client deleted");
+        announce(fr ? "Client supprimé" : "Client deleted");
+      },
+      onError: (err) => {
+        toast.error(fr ? "Erreur lors de la suppression" : "Error deleting client");
+        console.error(err);
+      },
+    });
+  }, [editingClient, fr, announce, deleteMutation]);
 
   const openEdit = useCallback((c: ClientType) => {
     setEditingClient(c);
@@ -245,36 +427,35 @@ export default function Clients() {
     setShowCreateFactureModal(false);
   };
 
-  // Export CSV de la liste filtrée
-  const exportCSV = () => {
-    const headers = ["Code", fr ? "Nom" : "Name", fr ? "Prénom" : "First name", "Type", fr ? "Téléphone" : "Phone", "Email", "Profession", fr ? "Statut" : "Status", fr ? "Date inscription" : "Registration date"];
-    const rows = filtered.map(c => [c.code, c.nom, c.prenom, c.type, c.telephone, c.email, c.profession, c.statut, c.dateInscription]);
-    const csv = [headers, ...rows].map(r => r.join(";")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "clients.csv"; a.click();
-    URL.revokeObjectURL(url);
-    toast.success(fr ? "Export CSV téléchargé" : "CSV export downloaded");
+  // Export CSV via l'API backend
+  const exportCSV = async () => {
+    try {
+      const blob = await exportClientsCsv();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "clients.csv"; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(fr ? "Export CSV téléchargé" : "CSV export downloaded");
+    } catch {
+      toast.error(fr ? "Erreur lors de l'export CSV" : "CSV export error");
+    }
   };
 
-  const exportPDF = () => {
-    toast.info(fr ? "Export PDF en cours de génération..." : "PDF export generating...");
-    setTimeout(() => toast.success(fr ? "PDF généré avec succès" : "PDF generated successfully"), 1000);
+  // Export Excel via l'API backend
+  const exportExcel = async () => {
+    try {
+      const blob = await exportClientsExcel();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "clients.xlsx"; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(fr ? "Export Excel téléchargé" : "Excel export downloaded");
+    } catch {
+      toast.error(fr ? "Erreur lors de l'export Excel" : "Excel export error");
+    }
   };
 
-  // Récupérer les dossiers/factures associés à un client
-  const getClientDossiers = useCallback((client: ClientType) => {
-    return mockDossiers.filter(d =>
-      d.clients.some(c => c.toLowerCase().includes(client.nom.toLowerCase()))
-    );
-  }, []);
 
-  const getClientFactures = useCallback((client: ClientType) => {
-    return mockFactures.filter(f =>
-      f.client.toLowerCase().includes(client.nom.toLowerCase())
-    );
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -291,7 +472,7 @@ export default function Clients() {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem onClick={exportCSV}><FileDown className="mr-2 h-4 w-4" /> {fr ? "Exporter CSV" : "Export CSV"}</DropdownMenuItem>
-              <DropdownMenuItem onClick={exportPDF}><FileText className="mr-2 h-4 w-4" /> {fr ? "Exporter PDF" : "Export PDF"}</DropdownMenuItem>
+              <DropdownMenuItem onClick={exportExcel}><FileDown className="mr-2 h-4 w-4" /> {fr ? "Exporter Excel" : "Export Excel"}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" className="bg-primary text-primary-foreground font-semibold hover:bg-primary/90 gap-2" onClick={() => { resetForm(); setShowCreateModal(true); }}>
@@ -325,9 +506,9 @@ export default function Clients() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input aria-label={fr ? "Rechercher un client" : "Search a client"} placeholder={fr ? "Rechercher par nom, code, email ou téléphone..." : "Search by name, code, email or phone..."} value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }} className="pl-10" />
+          <Input aria-label={fr ? "Rechercher un client" : "Search a client"} placeholder={fr ? "Rechercher par nom, code, email ou téléphone..." : "Search by name, code, email or phone..."} value={search} onChange={e => { setSearch(e.target.value); }} className="pl-10" />
         </div>
-        <Select value={filter} onValueChange={v => { setFilter(v); setVisibleCount(PAGE_SIZE); }}>
+        <Select value={filter} onValueChange={v => { setFilter(v); setQuickFilter(null); }}>
           <SelectTrigger className="w-[200px]"><SelectValue placeholder={fr ? "Tous les types" : "All types"} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{fr ? "Tous les types" : "All types"}</SelectItem>
@@ -337,15 +518,33 @@ export default function Clients() {
         </Select>
       </div>
 
+      {/* Filtres rapides */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: null, label: fr ? "Tous" : "All" },
+          { key: 'recent', label: fr ? "Récents" : "Recent" },
+          { key: 'vip', label: "VIP" },
+          { key: 'actif', label: fr ? "Actifs" : "Active" },
+          { key: 'inactif', label: fr ? "Inactifs" : "Inactive" },
+          { key: 'inactive', label: fr ? "Sans activité (90j)" : "Idle (90d)" },
+        ].map((f) => (
+          <Button key={f.key ?? 'all'} variant={quickFilter === f.key ? "default" : "outline"} size="sm"
+            onClick={() => setQuickFilter(f.key)}>
+            {f.label}
+          </Button>
+        ))}
+      </div>
+
       {/* Tableau des clients */}
       <ClientTable
-        visibleClients={visibleClients}
-        filtered={filtered}
-        visibleCount={visibleCount}
-        hasMore={hasMore}
+        visibleClients={quickFilter && quickFilterClients ? quickFilterClients.map(toClientType) : allClients}
+        filtered={quickFilter && quickFilterClients ? quickFilterClients.map(toClientType) : allClients}
+        totalCount={quickFilter && quickFilterClients ? quickFilterClients.length : totalCount}
+        hasMore={!!hasNextPage}
         fr={fr}
         search={search}
-        setVisibleCount={setVisibleCount}
+        loadMore={fetchNextPage}
+        isFetchingMore={isFetchingNextPage}
         onView={(client) => { setSelectedClient(client); setDrawerTab("infos"); }}
         onEdit={openEdit}
         onDelete={openDelete}
@@ -388,6 +587,7 @@ export default function Clients() {
                     { key: "dossiers", label: fr ? "Dossiers" : "Cases" },
                     { key: "finances", label: "Finances" },
                     { key: "documents", label: "Documents" },
+                    { key: "historique", label: fr ? "Historique" : "History" },
                     { key: "communications", label: "Communications" },
                     { key: "statistiques", label: fr ? "Statistiques" : "Statistics" },
                   ].map((tab) => (
@@ -413,6 +613,16 @@ export default function Clients() {
                           { label: "Type", value: selectedClient.type },
                           { label: fr ? "Statut" : "Status", value: selectedClient.statut },
                           { label: fr ? "Date d'inscription" : "Registration date", value: new Date(selectedClient.dateInscription).toLocaleDateString(fr ? "fr-FR" : "en-US") },
+                          ...(clientDetail ? [
+                            { label: fr ? "Adresse" : "Address", value: clientDetail.adresse || "-" },
+                            { label: fr ? "Ville" : "City", value: clientDetail.ville || "-" },
+                            { label: fr ? "Pays" : "Country", value: clientDetail.pays || "-" },
+                            ...(clientDetail.typeClient === 'MORALE' ? [
+                              { label: "RCCM", value: clientDetail.numeroRccm || "-" },
+                              { label: "NIF", value: clientDetail.nif || "-" },
+                              { label: fr ? "Forme juridique" : "Legal form", value: clientDetail.formeJuridique || "-" },
+                            ] : []),
+                          ] : []),
                         ].map((item) => (
                           <div key={item.label} className="flex justify-between border-b border-border pb-3 last:border-0">
                             <span className="text-sm text-muted-foreground">{item.label}</span>
@@ -425,191 +635,152 @@ export default function Clients() {
                             <p className="text-sm text-foreground whitespace-pre-line">{selectedClient.description}</p>
                           </div>
                         )}
+                        {/* Bouton toggle statut */}
+                        <div className="pt-3 border-t border-border">
+                          <Button variant="outline" size="sm" onClick={() => toggleStatusMutation.mutate(selectedClient.id)} disabled={toggleStatusMutation.isPending}>
+                            {selectedClient.statut === "Actif" ? (fr ? "Désactiver le client" : "Deactivate client") : (fr ? "Activer le client" : "Activate client")}
+                          </Button>
+                        </div>
+                        {/* Doublons potentiels */}
+                        {clientDuplicates.length > 0 && (
+                          <div className="pt-3 border-t border-border">
+                            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-2">{fr ? "Doublons potentiels détectés" : "Potential duplicates detected"}</p>
+                            {clientDuplicates.map((dup: Record<string, unknown>) => (
+                              <div key={String(dup.id)} className="flex items-center justify-between text-xs border-b border-border pb-2 mb-2 last:border-0">
+                                <div>
+                                  <span className="text-foreground">{String(dup.nomComplet || dup.nom || dup.denominationSociale || '')}</span>
+                                  <span className="text-muted-foreground ml-2">{String(dup.email || '')}</span>
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-6 text-xs text-primary"
+                                  onClick={() => mergeMutation.mutate({ sourceId: dup.id as string | number, targetId: selectedClient!.id })}>
+                                  {fr ? "Fusionner" : "Merge"}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Onglet Dossiers — Chronologie */}
-                    {drawerTab === "dossiers" && (() => {
-                      const clientDossiers = getClientDossiers(selectedClient);
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex gap-2 flex-wrap">
-                            <Select value={historyPeriod} onValueChange={setHistoryPeriod}>
-                              <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue placeholder={fr ? "Période" : "Period"} /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">{fr ? "Toutes périodes" : "All periods"}</SelectItem>
-                                <SelectItem value="2025">2025</SelectItem>
-                                <SelectItem value="2024">2024</SelectItem>
-                                <SelectItem value="2023">2023</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Select value={historyTypeActe} onValueChange={setHistoryTypeActe}>
-                              <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder={fr ? "Type d'acte" : "Deed type"} /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">{fr ? "Tous types" : "All types"}</SelectItem>
-                                {typesActe.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => toast.info(fr ? "Export historique en cours..." : "Exporting history...")}>
-                              <FileDown className="h-3.5 w-3.5" /> {fr ? "Exporter" : "Export"}
-                            </Button>
-                          </div>
-
-                          {clientDossiers.length > 0 ? (
-                            <div className="relative pl-4 border-l-2 border-primary/20 space-y-4">
-                              {clientDossiers.map((d) => (
-                                <div key={d.id} className="relative">
-                                  <div className="absolute -left-[1.35rem] top-2 h-3 w-3 rounded-full bg-primary border-2 border-card" />
-                                  <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                                    <div className="flex items-start justify-between mb-2">
-                                      <div>
-                                        <span className="text-xs font-mono text-primary">{d.code}</span>
-                                        <h4 className="text-sm font-medium text-foreground">{d.objet}</h4>
-                                      </div>
-                                      <StatusBadge status={d.statut} />
-                                    </div>
-                                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                      <span>📅 {d.clientDate}</span>
-                                      <span>📄 {d.typeActe}</span>
-                                      <span>💰 {formatGNF(d.montant)}</span>
-                                      <span>📊 {d.avancement}%</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <FolderPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                              <p className="text-sm">{fr ? "Aucun dossier pour ce client" : "No cases for this client"}</p>
-                              <Button variant="outline" size="sm" className="mt-3" onClick={() => openCreateDossier(selectedClient)}>
-                                <FolderPlus className="mr-2 h-4 w-4" /> {fr ? "Créer un dossier" : "Create case"}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {/* Onglet Dossiers */}
+                    {drawerTab === "dossiers" && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FolderPlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{fr ? "Aucun dossier pour ce client" : "No cases for this client"}</p>
+                        <Button variant="outline" size="sm" className="mt-3" onClick={() => openCreateDossier(selectedClient)}>
+                          <FolderPlus className="mr-2 h-4 w-4" /> {fr ? "Créer un dossier" : "Create case"}
+                        </Button>
+                      </div>
+                    )}
 
                     {/* Onglet Finances */}
-                    {drawerTab === "finances" && (() => {
-                      const clientDossiers = getClientDossiers(selectedClient);
-                      const clientFactures = getClientFactures(selectedClient);
-                      const totalFacture = clientFactures.reduce((s, f) => s + f.montant, 0) || clientDossiers.reduce((s, d) => s + d.montant, 0);
-                      const totalPaye = clientFactures.filter(f => f.statut === "Payée").reduce((s, f) => s + f.montant, 0);
-                      const totalDebours = Math.round(totalFacture * 0.15);
-                      return (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                              <p className="text-xs text-muted-foreground">{fr ? "Total facturé" : "Total invoiced"}</p>
-                              <p className="text-lg font-bold text-foreground font-mono">{formatGNF(totalFacture)}</p>
-                            </div>
-                            <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                              <p className="text-xs text-muted-foreground">{fr ? "Total payé" : "Total paid"}</p>
-                              <p className="text-lg font-bold text-success font-mono">{formatGNF(totalPaye)}</p>
-                            </div>
-                            <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                              <p className="text-xs text-muted-foreground">{fr ? "Débours" : "Disbursements"}</p>
-                              <p className="text-lg font-bold text-warning font-mono">{formatGNF(totalDebours)}</p>
-                            </div>
-                          </div>
-                          <div className="p-4 rounded-lg bg-muted/30 border border-border">
-                            <p className="text-xs text-muted-foreground mb-1">{fr ? "Reste à payer" : "Outstanding"}</p>
-                            <p className="text-xl font-bold text-destructive font-mono">{formatGNF(totalFacture - totalPaye)}</p>
-                          </div>
-                          <h4 className="text-sm font-medium text-foreground mt-4">{fr ? "Factures" : "Invoices"}</h4>
-                          {clientFactures.length > 0 ? clientFactures.map(f => (
-                            <div key={f.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
-                              <div>
-                                <p className="text-sm font-mono font-medium text-foreground">{f.numero}</p>
-                                <p className="text-xs text-muted-foreground">{new Date(f.dateEmission).toLocaleDateString(fr ? "fr-FR" : "en-US")} · {f.dossier}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-mono font-medium text-foreground">{formatGNF(f.montant)}</p>
-                                <StatusBadge status={f.statut} />
-                              </div>
-                            </div>
-                          )) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">{fr ? "Aucune facture" : "No invoices"}</p>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {drawerTab === "finances" && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Receipt className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{fr ? "Aucune donnée financière disponible" : "No financial data available"}</p>
+                      </div>
+                    )}
 
                     {/* Onglet Documents */}
                     {drawerTab === "documents" && (
-                      <div className="space-y-3">
-                        {mockDocumentsClient.map(doc => (
-                          <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                            <FileText className="h-5 w-5 text-primary shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">{doc.nom}</p>
-                              <p className="text-xs text-muted-foreground">{doc.type} · {doc.dossier} · {new Date(doc.date).toLocaleDateString(fr ? "fr-FR" : "en-US")}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" className="text-xs shrink-0">{fr ? "Voir" : "View"}</Button>
-                          </div>
-                        ))}
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">{fr ? "Aucun document pour ce client" : "No documents for this client"}</p>
                       </div>
                     )}
 
-                    {/* Onglet Communications */}
+                    {/* Onglet Historique */}
+                    {drawerTab === "historique" && (
+                      <div className="space-y-3">
+                        {isLoadingHistorique ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">{fr ? "Chargement..." : "Loading..."}</p>
+                        ) : clientHistorique.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">{fr ? "Aucun historique pour ce client" : "No history for this client"}</p>
+                          </div>
+                        ) : (
+                          clientHistorique.map((entry, i) => (
+                            <div key={entry.id ?? i} className="flex items-start gap-3 border-b border-border pb-3 last:border-0">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-foreground">{entry.type}</p>
+                                <p className="text-xs text-muted-foreground">{entry.description}</p>
+                                {entry.date && <p className="text-xs text-muted-foreground mt-1">{new Date(entry.date).toLocaleDateString(fr ? "fr-FR" : "en-US")}</p>}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Onglet Communications — Contacts du client */}
                     {drawerTab === "communications" && (
                       <div className="space-y-3">
-                        {mockCommunications.map(comm => (
-                          <div key={comm.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border">
-                            <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg text-white shrink-0",
-                              comm.type === "email" ? "bg-blue-500" : comm.type === "sms" ? "bg-emerald-500" : "bg-amber-500"
-                            )}>
-                              <MessageSquare className="h-4 w-4" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-foreground">{comm.objet}</p>
-                              <p className="text-xs text-muted-foreground capitalize">{comm.type} · {new Date(comm.date).toLocaleDateString(fr ? "fr-FR" : "en-US")}</p>
-                            </div>
-                            <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">{comm.statut}</span>
+                        {isLoadingContacts ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">{fr ? "Chargement..." : "Loading..."}</p>
+                        ) : clientContacts.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">{fr ? "Aucun contact enregistré" : "No contacts recorded"}</p>
                           </div>
-                        ))}
+                        ) : (
+                          clientContacts.map((contact: Record<string, unknown>) => (
+                            <div key={String(contact.id)} className="flex items-start justify-between gap-2 border-b border-border pb-3 last:border-0">
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{String(contact.nom || '')} {String(contact.prenom || '')}</p>
+                                <p className="text-xs text-muted-foreground">{String(contact.email || '')} {contact.telephone ? `· ${String(contact.telephone)}` : ''}</p>
+                                {contact.fonction && <p className="text-xs text-muted-foreground">{String(contact.fonction)}</p>}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {!contact.principal && (
+                                  <Button variant="ghost" size="sm" className="text-xs h-7"
+                                    onClick={() => setContactPrincipalMutation.mutate({ clientId: selectedClient!.id, contactId: contact.id })}>
+                                    {fr ? "Principal" : "Set primary"}
+                                  </Button>
+                                )}
+                                {contact.principal && <span className="text-xs text-primary font-medium px-2">★</span>}
+                                <Button variant="ghost" size="sm" className="h-7 text-destructive"
+                                  onClick={() => deleteContactMutation.mutate({ clientId: selectedClient!.id, contactId: contact.id })}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        {/* Ajout rapide de contact */}
+                        <Button variant="outline" size="sm" className="w-full mt-2"
+                          onClick={() => {
+                            const nom = prompt(fr ? "Nom du contact :" : "Contact name:");
+                            if (nom) addContactMutation.mutate({ clientId: selectedClient!.id, payload: { nom } });
+                          }}>
+                          <Plus className="h-3.5 w-3.5 mr-1" /> {fr ? "Ajouter un contact" : "Add contact"}
+                        </Button>
                       </div>
                     )}
 
                     {/* Onglet Statistiques */}
-                    {drawerTab === "statistiques" && (() => {
-                      const clientDossiers = getClientDossiers(selectedClient);
-                      const clientFactures = getClientFactures(selectedClient);
-                      const ca = clientFactures.reduce((s, f) => s + f.montant, 0) || clientDossiers.reduce((s, d) => s + d.montant, 0);
-                      const nbDossiers = clientDossiers.length;
-                      const avgAvancement = nbDossiers > 0 ? Math.round(clientDossiers.reduce((s, d) => s + d.avancement, 0) / nbDossiers) : 0;
-                      return (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-border text-center">
-                              <BarChart3 className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                              <p className="text-2xl font-bold text-foreground">{nbDossiers}</p>
-                              <p className="text-xs text-muted-foreground">{fr ? "Dossiers" : "Cases"}</p>
-                            </div>
-                            <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-border text-center">
-                              <Receipt className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                              <p className="text-lg font-bold text-foreground font-mono">{formatGNF(ca)}</p>
-                              <p className="text-xs text-muted-foreground">{fr ? "CA généré" : "Revenue"}</p>
-                            </div>
-                            <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-border text-center">
-                              <Calendar className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                              <p className="text-2xl font-bold text-foreground">{avgAvancement}%</p>
-                              <p className="text-xs text-muted-foreground">{fr ? "Avancement moyen" : "Avg. progress"}</p>
-                            </div>
-                            <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-border text-center">
-                              <FileText className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                              <p className="text-2xl font-bold text-foreground">{clientFactures.length}</p>
-                              <p className="text-xs text-muted-foreground">{fr ? "Factures" : "Invoices"}</p>
-                            </div>
+                    {drawerTab === "statistiques" && (
+                      <div className="space-y-4">
+                        {isLoadingStats ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">{fr ? "Chargement..." : "Loading..."}</p>
+                        ) : !clientStats || Object.keys(clientStats).length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">{fr ? "Statistiques non disponibles" : "Statistics not available"}</p>
                           </div>
-                          <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => toast.info(fr ? "Export historique client..." : "Exporting client history...")}>
-                            <FileDown className="h-4 w-4" /> {fr ? "Exporter l'historique complet" : "Export full history"}
-                          </Button>
-                        </div>
-                      );
-                    })()}
+                        ) : (
+                          Object.entries(clientStats).map(([key, value]) => (
+                            <div key={key} className="flex justify-between border-b border-border pb-3 last:border-0">
+                              <span className="text-sm text-muted-foreground">{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()}</span>
+                              <span className="text-sm font-medium text-foreground">{typeof value === 'number' ? value.toLocaleString(fr ? 'fr-FR' : 'en-US') : String(value ?? '-')}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
 
                   </motion.div>
                 </AnimatePresence>

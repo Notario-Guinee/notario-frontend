@@ -22,6 +22,7 @@ import { PageLoader } from "@/components/ui/loading-spinner";
 
 // ─── Pages d'authentification ───
 const LoginTenant         = lazy(() => import("./pages/LoginTenant"));
+const RegisterTenant      = lazy(() => import("./pages/RegisterTenant"));
 const ForgotPassword      = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword       = lazy(() => import("./pages/ResetPassword"));
 const ActivationCompte    = lazy(() => import("./pages/ActivationCompte"));
@@ -85,6 +86,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient();
 
 // ─── Protection des routes privées ───
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuth = localStorage.getItem("notario_auth") === "true";
   if (!isAuth) return <Navigate to="/login" replace />;
@@ -112,6 +114,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Portail client protégé ───
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ClientRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
   if (loading) return null;
@@ -136,11 +139,12 @@ const App = () => (
         {/* Systèmes de notifications toast */}
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* ═══ Pages d'authentification (hors layout principal) ═══ */}
-              <Route path="/login"           element={<LoginTenant />} />
+              <Route path="/login"           element={<GuestRoute><LoginTenant /></GuestRoute>} />
+              <Route path="/register"        element={<GuestRoute><RegisterTenant /></GuestRoute>} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password"  element={<ResetPassword />} />
               <Route path="/activation-compte" element={<ActivationCompte />} />
@@ -150,7 +154,7 @@ const App = () => (
               <Route path="/inscription-client" element={<InscriptionClient />} />
 
               {/* ═══ Routes protégées avec layout Dashboard ═══ */}
-              <Route element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+              <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
                 {/* Routes du gérant */}
                 <Route index                      element={<Dashboard />} />
                 <Route path="/dashboard"          element={<Dashboard />} />
